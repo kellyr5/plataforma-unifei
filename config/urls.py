@@ -8,8 +8,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/', include('autenticacao.api.urls')),
     path('api/forum/', include('forum.api.urls')),
+    path('api/notificacoes/', include('notificacoes.api.urls')),
 ]
 
-# Servir arquivos de media em desenvolvimento (em producao, usar nginx/storage)
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
