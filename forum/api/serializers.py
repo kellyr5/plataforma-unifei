@@ -1,5 +1,7 @@
 from rest_framework import serializers
-from forum.models import Disciplina, Post, AlertaConteudo, ReacaoPersiste
+from forum.models import (
+    Disciplina, Post, AlertaConteudo, ReacaoPersiste, PermissaoDisciplina
+)
 
 
 class DisciplinaSerializer(serializers.ModelSerializer):
@@ -72,11 +74,30 @@ class AlertaConteudoSerializer(serializers.ModelSerializer):
 
 
 class ReacaoPersisteSerializer(serializers.ModelSerializer):
-    """Serializa reacoes 'duvida persiste' em respostas."""
-
     usuario_nome = serializers.CharField(source='usuario.nome_completo', read_only=True)
 
     class Meta:
         model = ReacaoPersiste
         fields = ['id', 'usuario', 'usuario_nome', 'post', 'comentario', 'created_at']
         read_only_fields = ['id', 'usuario', 'usuario_nome', 'created_at']
+
+
+class PermissaoDisciplinaSerializer(serializers.ModelSerializer):
+    """Serializa o vinculo de um usuario com uma disciplina (papel: aluno/monitor/professor)."""
+
+    usuario_nome = serializers.CharField(source='usuario.nome_completo', read_only=True)
+    usuario_cpf = serializers.CharField(source='usuario.cpf', read_only=True)
+    disciplina_codigo = serializers.CharField(source='disciplina.codigo', read_only=True)
+    disciplina_nome = serializers.CharField(source='disciplina.nome', read_only=True)
+
+    class Meta:
+        model = PermissaoDisciplina
+        fields = [
+            'id', 'usuario', 'usuario_cpf', 'usuario_nome',
+            'disciplina', 'disciplina_codigo', 'disciplina_nome',
+            'papel', 'ativo', 'created_at',
+        ]
+        read_only_fields = [
+            'id', 'usuario_cpf', 'usuario_nome',
+            'disciplina_codigo', 'disciplina_nome', 'created_at',
+        ]

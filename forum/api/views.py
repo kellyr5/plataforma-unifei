@@ -6,15 +6,39 @@ from django.db.models import F
 
 from forum.models import (
     Disciplina, Post, HistoricoEdicao, Voto,
-    ReacaoPersiste, AlertaConteudo,
+    ReacaoPersiste, AlertaConteudo, PermissaoDisciplina,
 )
 from forum.api.serializers import (
     DisciplinaSerializer,
     PostSerializer,
     AlertaConteudoSerializer,
     ReacaoPersisteSerializer,
+    PermissaoDisciplinaSerializer,
 )
 from config.permissions import IsAdminOrSuperuser
+
+
+def usuario_pode_marcar_melhor_resposta(usuario, topico):
+    """
+    Determina se o usuario tem permissao para marcar a melhor resposta de um topico.
+
+    Permitido para:
+    - Autor do topico (mas nao na propria resposta — verificado no endpoint)
+    - Monitor ou Professor com PermissaoDisciplina ativa na disciplina do topico
+    - Administradores e superusuarios
+    """
+    if usuario.is_superuser or usuario.is_admin:
+        return True
+
+    if topico.autor_id == usuario.id:
+        return True
+
+    return PermissaoDisciplina.objects.filter(
+        usuario=usuario,
+        disciplina=topico.disciplina,
+        papel__in=['monitor', 'professor'],
+        ativo=True,
+    ).exists()
 
 
 class DisciplinaViewSet(viewsets.ModelViewSet):
@@ -33,6 +57,36 @@ class DisciplinaViewSet(viewsets.ModelViewSet):
         instance.save()
 
 
+class PermissaoDisciplinaViewSet(viewsets.ModelViewSet):
+    """
+    CRUD de permissoes de disciplina. Apenas administradores tem acesso.
+
+    Permite cadastrar quem e aluno, monitor ou professor de cada disciplina.
+    """
+
+    serializer_class = PermissaoDisciplinaSerializer
+    permission_classes = [IsAdminOrSuperuser]
+    filter_backends = [filters.OrderingFilter]
+    ordering_fields = ['created_at', 'papel']
+    ordering = ['-created_at']
+
+    def get_queryset(self):
+        queryset = PermissaoDisciplina.objects.select_related('usuario', 'disciplina')
+
+        disciplina_id = self.request.query_params.get('disciplina')
+        usuario_id = self.request.query_params.get('usuario')
+        papel = self.request.query_params.get('papel')
+
+        if disciplina_id:
+            queryset = queryset.filter(disciplina_id=disciplina_id)
+        if usuario_id:
+            queryset = queryset.filter(usuario_id=usuario_id)
+        if papel:
+            queryset = queryset.filter(papel=papel)
+
+        return queryset
+
+
 class PostViewSet(viewsets.ModelViewSet):
     """
     CRUD de Posts (topicos e respostas).
@@ -41,9 +95,11 @@ class PostViewSet(viewsets.ModelViewSet):
     - GET /posts/?disciplina={id}
     - GET /posts/{id}/respostas/
     - POST /posts/{id}/visualizar/
-    - POST/DELETE /posts/{id}/votar/ -- upvote (toggle)
-    - POST/DELETE /posts/{id}/reagir_persiste/ -- marca duvida persistente em respostas
+    - POST/DELETE /posts/{id}/votar/
+    - POST/DELETE /posts/{id}/reagir-persiste/
     - POST /posts/{id}/denunciar/
+    - POST /posts/{id}/marcar-melhor/ -- marca a resposta como melhor (so autor topico/monitor/prof)
+    - DELETE /posts/{id}/marcar-melhor/ -- desmarca
     """
 
     serializer_class = PostSerializer
@@ -109,10 +165,6 @@ class PostViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post', 'delete'])
     def votar(self, request, pk=None):
-        """
-        POST: registra upvote (ou remove se ja existir, em toggle).
-        DELETE: remove o upvote do usuario atual.
-        """
         post = self.get_object()
         usuario = request.user
 
@@ -134,7 +186,6 @@ class PostViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # POST: cria voto se nao existe, remove se ja existe (toggle)
         if voto_existente:
             voto_existente.delete()
             self._recalcular_pontuacao(post)
@@ -151,30 +202,20 @@ class PostViewSet(viewsets.ModelViewSet):
         )
 
     def _recalcular_pontuacao(self, post):
-        """Recalcula a pontuacao do post contando upvotes."""
         post.pontuacao = Voto.objects.filter(post=post).count()
         post.save(update_fields=['pontuacao'])
 
     @action(detail=True, methods=['post', 'delete'], url_path='reagir-persiste')
     def reagir_persiste(self, request, pk=None):
-        """
-        POST: marca que a duvida persiste nesta resposta (so funciona em respostas).
-        DELETE: remove a marcacao do usuario atual.
-
-        Mecanismo pedagogico que substitui o downvote tradicional, permitindo
-        sinalizar que a resposta nao foi suficiente sem criar feedback negativo.
-        """
         post = self.get_object()
         usuario = request.user
 
-        # So permite reacao em respostas, nao em topicos
         if post.post_pai is None:
             return Response(
                 {'detail': 'A reacao "duvida persiste" so e aplicavel em respostas, nao em topicos.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Autor da resposta nao pode reagir na propria resposta
         if post.autor_id == usuario.id:
             return Response(
                 {'detail': 'Voce nao pode reagir na propria resposta.'},
@@ -193,7 +234,6 @@ class PostViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # POST
         comentario = request.data.get('comentario', '').strip()
 
         if reacao_existente:
@@ -218,7 +258,6 @@ class PostViewSet(viewsets.ModelViewSet):
         )
 
     def _recalcular_reacoes_persiste(self, post):
-        """Recalcula o cache de reacoes 'duvida persiste' do post."""
         post.total_reacoes_persiste = ReacaoPersiste.objects.filter(post=post).count()
         post.save(update_fields=['total_reacoes_persiste'])
 
@@ -260,6 +299,73 @@ class PostViewSet(viewsets.ModelViewSet):
 
         serializer = AlertaConteudoSerializer(alerta)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post', 'delete'], url_path='marcar-melhor')
+    def marcar_melhor(self, request, pk=None):
+        """
+        POST: marca a resposta como melhor do topico.
+        DELETE: desmarca a resposta como melhor.
+
+        Permitido para autor do topico, monitor/professor da disciplina, ou admin.
+        Restricoes:
+        - So funciona em respostas (post_pai != null)
+        - Autor da resposta nao pode marcar a propria resposta (anti auto-validacao)
+        - So uma resposta pode ser marcada como melhor por topico
+        """
+        resposta = self.get_object()
+        usuario = request.user
+
+        if resposta.post_pai is None:
+            return Response(
+                {'detail': 'Apenas respostas podem ser marcadas como melhor (topicos nao).'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        topico = resposta.post_pai
+
+        if not usuario_pode_marcar_melhor_resposta(usuario, topico):
+            return Response(
+                {'detail': 'Voce nao tem permissao para marcar a melhor resposta deste topico. '
+                           'Apenas o autor do topico, monitores e professores da disciplina podem fazer isso.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Anti auto-validacao: autor da resposta nao pode marcar a propria resposta
+        if resposta.autor_id == usuario.id:
+            return Response(
+                {'detail': 'Voce nao pode marcar a propria resposta como melhor.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if request.method == 'DELETE':
+            if not resposta.e_melhor:
+                return Response(
+                    {'detail': 'Esta resposta nao esta marcada como melhor.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            resposta.e_melhor = False
+            resposta.save(update_fields=['e_melhor'])
+            return Response(
+                {'detail': 'Marcacao removida.'},
+                status=status.HTTP_200_OK
+            )
+
+        # POST: garantir que apenas uma resposta seja a melhor
+        Post.objects.filter(
+            post_pai=topico,
+            e_melhor=True,
+        ).exclude(pk=resposta.pk).update(e_melhor=False)
+
+        resposta.e_melhor = True
+        resposta.save(update_fields=['e_melhor'])
+
+        return Response(
+            {
+                'detail': 'Resposta marcada como melhor.',
+                'resposta_id': str(resposta.id),
+            },
+            status=status.HTTP_200_OK
+        )
 
 
 class AlertaConteudoViewSet(viewsets.ReadOnlyModelViewSet):
