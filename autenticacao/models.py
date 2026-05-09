@@ -66,6 +66,10 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     def is_staff(self):
         return self.is_admin
 
+    @property
+    def is_active(self):
+        return self.ativo
+
     def save(self, *args, **kwargs):
         self.cpf = self.cpf.replace('.', '').replace('-', '').strip()
         super().save(*args, **kwargs)
