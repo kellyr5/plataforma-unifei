@@ -90,6 +90,10 @@ class Post(models.Model):
     e_melhor = models.BooleanField(default=False)
     visualizacoes = models.IntegerField(default=0)
     pontuacao = models.IntegerField(default=0, help_text='Cache de votos')
+    total_reacoes_persiste = models.IntegerField(
+        default=0,
+        help_text='Cache de quantos usuarios marcaram que a duvida persiste'
+    )
     deleted_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -143,12 +147,13 @@ class HistoricoEdicao(models.Model):
 
 
 class Voto(models.Model):
-    """Voto positivo ou negativo de um usuario em um post."""
+    """
+    Voto positivo (upvote) de um usuario em um post.
 
-    TIPO_CHOICES = [
-        ('positivo', 'Positivo'),
-        ('negativo', 'Negativo'),
-    ]
+    Decisao de design: removemos o downvote para evitar comportamento
+    toxico, conforme Cheng et al. (Stanford) e literatura sobre Reddit.
+    Para sinalizar respostas insuficientes, ver model ReacaoPersiste.
+    """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     usuario = models.ForeignKey(
@@ -161,7 +166,6 @@ class Voto(models.Model):
         on_delete=models.CASCADE,
         related_name='votos',
     )
-    tipo = models.CharField(max_length=10, choices=TIPO_CHOICES)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -176,7 +180,7 @@ class Voto(models.Model):
         ]
 
     def __str__(self):
-        return f'{self.usuario} votou {self.tipo} em {self.post}'
+        return f'{self.usuario} votou em {self.post}'
 
 
 class Arquivo(models.Model):
@@ -245,3 +249,47 @@ class AlertaConteudo(models.Model):
 
     def __str__(self):
         return f'Alerta em {self.post} ({self.status})'
+
+class ReacaoPersiste(models.Model):
+    """
+    Reacao 'duvida persiste' em respostas que nao resolveram a questao.
+
+    Substitui o downvote tradicional por um mecanismo pedagogico: sinaliza
+    ao autor da resposta que ela precisa de complementacao, sem criar
+    feedback negativo que poderia desencorajar a participacao.
+
+    Aplicavel apenas em respostas (posts com post_pai). Em topicos, a
+    sinalizacao equivalente e a ausencia de marcacao de melhor resposta.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='reacoes_persiste',
+    )
+    post = models.ForeignKey(
+        Post,
+        on_delete=models.CASCADE,
+        related_name='reacoes_persiste',
+        help_text='Deve ser uma resposta (post com post_pai)'
+    )
+    comentario = models.TextField(
+        blank=True,
+        help_text='Opcional: explicacao do que ainda nao ficou claro'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'reacao_persiste'
+        verbose_name = 'Reacao Duvida Persiste'
+        verbose_name_plural = 'Reacoes Duvida Persiste'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['usuario', 'post'],
+                name='unique_reacao_persiste_usuario_post',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.usuario} marcou duvida persistente em {self.post}'

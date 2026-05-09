@@ -5,10 +5,10 @@ from .models import (
     Post,
     HistoricoEdicao,
     Voto,
+    ReacaoPersiste,
     Arquivo,
     AlertaConteudo,
 )
-
 
 @admin.register(Disciplina)
 class DisciplinaAdmin(admin.ModelAdmin):
@@ -49,9 +49,9 @@ class HistoricoEdicaoAdmin(admin.ModelAdmin):
 
 @admin.register(Voto)
 class VotoAdmin(admin.ModelAdmin):
-    list_display = ('usuario', 'post', 'tipo', 'created_at')
-    list_filter = ('tipo',)
+    list_display = ('usuario', 'post', 'created_at')
     readonly_fields = ('id', 'created_at')
+    search_fields = ('usuario__cpf', 'usuario__nome_completo')
 
 
 @admin.register(Arquivo)
@@ -67,3 +67,10 @@ class AlertaConteudoAdmin(admin.ModelAdmin):
     list_filter = ('status',)
     search_fields = ('motivo', 'denunciante__email')
     readonly_fields = ('id', 'created_at', 'resolvido_em')
+
+
+@admin.register(ReacaoPersiste)
+class ReacaoPersisteAdmin(admin.ModelAdmin):
+    list_display = ('usuario', 'post', 'created_at')
+    search_fields = ('usuario__cpf', 'usuario__nome_completo', 'comentario')
+    readonly_fields = ('id', 'created_at')

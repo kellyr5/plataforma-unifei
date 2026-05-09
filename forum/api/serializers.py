@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from forum.models import Disciplina, Post, AlertaConteudo
+from forum.models import Disciplina, Post, AlertaConteudo, ReacaoPersiste
 
 
 class DisciplinaSerializer(serializers.ModelSerializer):
@@ -20,13 +20,13 @@ class PostSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'disciplina', 'disciplina_codigo', 'autor', 'autor_nome',
             'post_pai', 'titulo', 'conteudo', 'e_melhor', 'e_topico',
-            'visualizacoes', 'pontuacao', 'total_respostas',
-            'created_at', 'updated_at',
+            'visualizacoes', 'pontuacao', 'total_reacoes_persiste',
+            'total_respostas', 'created_at', 'updated_at',
         ]
         read_only_fields = [
             'id', 'autor', 'autor_nome', 'disciplina_codigo', 'visualizacoes',
-            'pontuacao', 'total_respostas', 'e_melhor', 'e_topico',
-            'created_at', 'updated_at',
+            'pontuacao', 'total_reacoes_persiste', 'total_respostas',
+            'e_melhor', 'e_topico', 'created_at', 'updated_at',
         ]
 
     def get_total_respostas(self, obj):
@@ -46,8 +46,6 @@ class PostSerializer(serializers.ModelSerializer):
 
 
 class AlertaConteudoSerializer(serializers.ModelSerializer):
-    """Serializa alertas (denuncias) de posts inapropriados."""
-
     denunciante_nome = serializers.CharField(source='denunciante.nome_completo', read_only=True)
     post_titulo = serializers.SerializerMethodField()
     resolvido_por_nome = serializers.CharField(source='resolvido_por.nome_completo', read_only=True)
@@ -71,3 +69,14 @@ class AlertaConteudoSerializer(serializers.ModelSerializer):
         if obj.post.titulo:
             return obj.post.titulo
         return f'Resposta em: {obj.post.post_pai.titulo[:50]}' if obj.post.post_pai else '(sem titulo)'
+
+
+class ReacaoPersisteSerializer(serializers.ModelSerializer):
+    """Serializa reacoes 'duvida persiste' em respostas."""
+
+    usuario_nome = serializers.CharField(source='usuario.nome_completo', read_only=True)
+
+    class Meta:
+        model = ReacaoPersiste
+        fields = ['id', 'usuario', 'usuario_nome', 'post', 'comentario', 'created_at']
+        read_only_fields = ['id', 'usuario', 'usuario_nome', 'created_at']

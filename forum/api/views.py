@@ -1,21 +1,23 @@
-from rest_framework import viewsets, filters, status, permissions
+from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
-from django.db.models import F, Sum, Case, When, IntegerField
+from django.db.models import F
 
-from forum.models import Disciplina, Post, HistoricoEdicao, Voto, AlertaConteudo
+from forum.models import (
+    Disciplina, Post, HistoricoEdicao, Voto,
+    ReacaoPersiste, AlertaConteudo,
+)
 from forum.api.serializers import (
     DisciplinaSerializer,
     PostSerializer,
     AlertaConteudoSerializer,
+    ReacaoPersisteSerializer,
 )
 from config.permissions import IsAdminOrSuperuser
 
 
 class DisciplinaViewSet(viewsets.ModelViewSet):
-    """CRUD de Disciplinas com soft delete e busca por codigo, nome ou curso."""
-
     serializer_class = DisciplinaSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['codigo', 'nome', 'curso']
@@ -39,7 +41,8 @@ class PostViewSet(viewsets.ModelViewSet):
     - GET /posts/?disciplina={id}
     - GET /posts/{id}/respostas/
     - POST /posts/{id}/visualizar/
-    - POST/DELETE /posts/{id}/votar/
+    - POST/DELETE /posts/{id}/votar/ -- upvote (toggle)
+    - POST/DELETE /posts/{id}/reagir_persiste/ -- marca duvida persistente em respostas
     - POST /posts/{id}/denunciar/
     """
 
@@ -106,6 +109,10 @@ class PostViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post', 'delete'])
     def votar(self, request, pk=None):
+        """
+        POST: registra upvote (ou remove se ja existir, em toggle).
+        DELETE: remove o upvote do usuario atual.
+        """
         post = self.get_object()
         usuario = request.user
 
@@ -127,49 +134,96 @@ class PostViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        tipo = request.data.get('tipo')
-        if tipo not in ['positivo', 'negativo']:
+        # POST: cria voto se nao existe, remove se ja existe (toggle)
+        if voto_existente:
+            voto_existente.delete()
+            self._recalcular_pontuacao(post)
             return Response(
-                {'detail': 'Campo "tipo" e obrigatorio e deve ser "positivo" ou "negativo".'},
-                status=status.HTTP_400_BAD_REQUEST
+                {'detail': 'Voto removido.', 'pontuacao': post.pontuacao},
+                status=status.HTTP_200_OK
             )
 
-        if voto_existente:
-            if voto_existente.tipo == tipo:
-                voto_existente.delete()
-                self._recalcular_pontuacao(post)
-                return Response(
-                    {'detail': 'Voto removido.', 'pontuacao': post.pontuacao},
-                    status=status.HTTP_200_OK
-                )
-            voto_existente.tipo = tipo
-            voto_existente.save()
-        else:
-            Voto.objects.create(usuario=usuario, post=post, tipo=tipo)
-
+        Voto.objects.create(usuario=usuario, post=post)
         self._recalcular_pontuacao(post)
         return Response(
-            {'detail': 'Voto registrado.', 'pontuacao': post.pontuacao, 'tipo': tipo},
+            {'detail': 'Voto registrado.', 'pontuacao': post.pontuacao},
             status=status.HTTP_200_OK
         )
 
     def _recalcular_pontuacao(self, post):
-        resultado = Voto.objects.filter(post=post).aggregate(
-            total=Sum(
-                Case(
-                    When(tipo='positivo', then=1),
-                    When(tipo='negativo', then=-1),
-                    default=0,
-                    output_field=IntegerField(),
-                )
-            )
-        )
-        post.pontuacao = resultado['total'] or 0
+        """Recalcula a pontuacao do post contando upvotes."""
+        post.pontuacao = Voto.objects.filter(post=post).count()
         post.save(update_fields=['pontuacao'])
+
+    @action(detail=True, methods=['post', 'delete'], url_path='reagir-persiste')
+    def reagir_persiste(self, request, pk=None):
+        """
+        POST: marca que a duvida persiste nesta resposta (so funciona em respostas).
+        DELETE: remove a marcacao do usuario atual.
+
+        Mecanismo pedagogico que substitui o downvote tradicional, permitindo
+        sinalizar que a resposta nao foi suficiente sem criar feedback negativo.
+        """
+        post = self.get_object()
+        usuario = request.user
+
+        # So permite reacao em respostas, nao em topicos
+        if post.post_pai is None:
+            return Response(
+                {'detail': 'A reacao "duvida persiste" so e aplicavel em respostas, nao em topicos.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Autor da resposta nao pode reagir na propria resposta
+        if post.autor_id == usuario.id:
+            return Response(
+                {'detail': 'Voce nao pode reagir na propria resposta.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        reacao_existente = ReacaoPersiste.objects.filter(usuario=usuario, post=post).first()
+
+        if request.method == 'DELETE':
+            if reacao_existente:
+                reacao_existente.delete()
+                self._recalcular_reacoes_persiste(post)
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            return Response(
+                {'detail': 'Voce nao tem reacao registrada nesta resposta.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # POST
+        comentario = request.data.get('comentario', '').strip()
+
+        if reacao_existente:
+            return Response(
+                {'detail': 'Voce ja marcou que sua duvida persiste nesta resposta.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        ReacaoPersiste.objects.create(
+            usuario=usuario,
+            post=post,
+            comentario=comentario,
+        )
+        self._recalcular_reacoes_persiste(post)
+
+        return Response(
+            {
+                'detail': 'Reacao registrada. O autor sera notificado para complementar a resposta.',
+                'total_reacoes_persiste': post.total_reacoes_persiste,
+            },
+            status=status.HTTP_201_CREATED
+        )
+
+    def _recalcular_reacoes_persiste(self, post):
+        """Recalcula o cache de reacoes 'duvida persiste' do post."""
+        post.total_reacoes_persiste = ReacaoPersiste.objects.filter(post=post).count()
+        post.save(update_fields=['total_reacoes_persiste'])
 
     @action(detail=True, methods=['post'])
     def denunciar(self, request, pk=None):
-        """Cria um alerta de conteudo inapropriado para o post."""
         post = self.get_object()
         usuario = request.user
 
@@ -179,7 +233,6 @@ class PostViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Impede denuncia duplicada com status pendente ou em analise
         denuncia_existente = AlertaConteudo.objects.filter(
             denunciante=usuario,
             post=post,
@@ -210,14 +263,6 @@ class PostViewSet(viewsets.ModelViewSet):
 
 
 class AlertaConteudoViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    Listagem e resolucao de denuncias.
-
-    Apenas administradores tem acesso.
-    Acoes adicionais:
-    - POST /alertas/{id}/resolver/ -- marca como procedente ou improcedente
-    """
-
     serializer_class = AlertaConteudoSerializer
     permission_classes = [IsAdminOrSuperuser]
     filter_backends = [filters.OrderingFilter]
@@ -235,7 +280,6 @@ class AlertaConteudoViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=['post'])
     def resolver(self, request, pk=None):
-        """Marca a denuncia como procedente ou improcedente."""
         alerta = self.get_object()
 
         if alerta.status in ['procedente', 'improcedente']:
@@ -264,7 +308,6 @@ class AlertaConteudoViewSet(viewsets.ReadOnlyModelViewSet):
         alerta.resolvido_em = timezone.now()
         alerta.save()
 
-        # Se procedente, faz soft delete do post denunciado
         if decisao == 'procedente':
             alerta.post.deleted_at = timezone.now()
             alerta.post.save(update_fields=['deleted_at'])
