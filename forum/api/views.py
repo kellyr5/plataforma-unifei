@@ -1,11 +1,16 @@
-from rest_framework import viewsets, filters, status
+from rest_framework import viewsets, filters, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
 from django.db.models import F, Sum, Case, When, IntegerField
 
-from forum.models import Disciplina, Post, HistoricoEdicao, Voto
-from forum.api.serializers import DisciplinaSerializer, PostSerializer
+from forum.models import Disciplina, Post, HistoricoEdicao, Voto, AlertaConteudo
+from forum.api.serializers import (
+    DisciplinaSerializer,
+    PostSerializer,
+    AlertaConteudoSerializer,
+)
+from config.permissions import IsAdminOrSuperuser
 
 
 class DisciplinaViewSet(viewsets.ModelViewSet):
@@ -31,11 +36,11 @@ class PostViewSet(viewsets.ModelViewSet):
     CRUD de Posts (topicos e respostas).
 
     Acoes adicionais:
-    - GET /posts/?disciplina={id} -- lista topicos de uma disciplina
-    - GET /posts/{id}/respostas/  -- lista respostas de um topico
-    - POST /posts/{id}/visualizar/ -- incrementa contador de visualizacoes
-    - POST /posts/{id}/votar/ -- cria, atualiza ou remove voto do usuario
-    - DELETE /posts/{id}/votar/ -- remove o voto do usuario atual
+    - GET /posts/?disciplina={id}
+    - GET /posts/{id}/respostas/
+    - POST /posts/{id}/visualizar/
+    - POST/DELETE /posts/{id}/votar/
+    - POST /posts/{id}/denunciar/
     """
 
     serializer_class = PostSerializer
@@ -101,14 +106,9 @@ class PostViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post', 'delete'])
     def votar(self, request, pk=None):
-        """
-        POST: cria voto novo, ou atualiza se ja existir, ou remove se for igual ao atual (toggle)
-        DELETE: remove o voto do usuario atual
-        """
         post = self.get_object()
         usuario = request.user
 
-        # Usuario nao pode votar no proprio post
         if post.autor_id == usuario.id:
             return Response(
                 {'detail': 'Voce nao pode votar no proprio post.'},
@@ -127,7 +127,6 @@ class PostViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # POST: criar ou atualizar voto
         tipo = request.data.get('tipo')
         if tipo not in ['positivo', 'negativo']:
             return Response(
@@ -136,7 +135,6 @@ class PostViewSet(viewsets.ModelViewSet):
             )
 
         if voto_existente:
-            # Se o usuario clicou no mesmo tipo de voto, remove (toggle)
             if voto_existente.tipo == tipo:
                 voto_existente.delete()
                 self._recalcular_pontuacao(post)
@@ -144,7 +142,6 @@ class PostViewSet(viewsets.ModelViewSet):
                     {'detail': 'Voto removido.', 'pontuacao': post.pontuacao},
                     status=status.HTTP_200_OK
                 )
-            # Se mudou o tipo, atualiza
             voto_existente.tipo = tipo
             voto_existente.save()
         else:
@@ -157,7 +154,6 @@ class PostViewSet(viewsets.ModelViewSet):
         )
 
     def _recalcular_pontuacao(self, post):
-        """Recalcula a pontuacao do post somando votos positivos e subtraindo negativos."""
         resultado = Voto.objects.filter(post=post).aggregate(
             total=Sum(
                 Case(
@@ -170,3 +166,108 @@ class PostViewSet(viewsets.ModelViewSet):
         )
         post.pontuacao = resultado['total'] or 0
         post.save(update_fields=['pontuacao'])
+
+    @action(detail=True, methods=['post'])
+    def denunciar(self, request, pk=None):
+        """Cria um alerta de conteudo inapropriado para o post."""
+        post = self.get_object()
+        usuario = request.user
+
+        if post.autor_id == usuario.id:
+            return Response(
+                {'detail': 'Voce nao pode denunciar o proprio post.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Impede denuncia duplicada com status pendente ou em analise
+        denuncia_existente = AlertaConteudo.objects.filter(
+            denunciante=usuario,
+            post=post,
+            status__in=['pendente', 'em_analise']
+        ).exists()
+
+        if denuncia_existente:
+            return Response(
+                {'detail': 'Voce ja denunciou este post e a denuncia esta sendo analisada.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        motivo = request.data.get('motivo', '').strip()
+        if not motivo:
+            return Response(
+                {'detail': 'O campo "motivo" e obrigatorio.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        alerta = AlertaConteudo.objects.create(
+            denunciante=usuario,
+            post=post,
+            motivo=motivo,
+        )
+
+        serializer = AlertaConteudoSerializer(alerta)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class AlertaConteudoViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Listagem e resolucao de denuncias.
+
+    Apenas administradores tem acesso.
+    Acoes adicionais:
+    - POST /alertas/{id}/resolver/ -- marca como procedente ou improcedente
+    """
+
+    serializer_class = AlertaConteudoSerializer
+    permission_classes = [IsAdminOrSuperuser]
+    filter_backends = [filters.OrderingFilter]
+    ordering_fields = ['created_at', 'status']
+    ordering = ['-created_at']
+
+    def get_queryset(self):
+        queryset = AlertaConteudo.objects.select_related(
+            'denunciante', 'post', 'post__post_pai', 'resolvido_por'
+        )
+        status_filtro = self.request.query_params.get('status')
+        if status_filtro:
+            queryset = queryset.filter(status=status_filtro)
+        return queryset
+
+    @action(detail=True, methods=['post'])
+    def resolver(self, request, pk=None):
+        """Marca a denuncia como procedente ou improcedente."""
+        alerta = self.get_object()
+
+        if alerta.status in ['procedente', 'improcedente']:
+            return Response(
+                {'detail': 'Esta denuncia ja foi resolvida.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        decisao = request.data.get('decisao')
+        if decisao not in ['procedente', 'improcedente']:
+            return Response(
+                {'detail': 'Campo "decisao" e obrigatorio e deve ser "procedente" ou "improcedente".'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        resolucao = request.data.get('resolucao', '').strip()
+        if not resolucao:
+            return Response(
+                {'detail': 'O campo "resolucao" e obrigatorio.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        alerta.status = decisao
+        alerta.resolvido_por = request.user
+        alerta.resolucao = resolucao
+        alerta.resolvido_em = timezone.now()
+        alerta.save()
+
+        # Se procedente, faz soft delete do post denunciado
+        if decisao == 'procedente':
+            alerta.post.deleted_at = timezone.now()
+            alerta.post.save(update_fields=['deleted_at'])
+
+        serializer = self.get_serializer(alerta)
+        return Response(serializer.data, status=status.HTTP_200_OK)
