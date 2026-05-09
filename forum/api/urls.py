@@ -5,6 +5,7 @@ from forum.api.views import (
     PostViewSet,
     AlertaConteudoViewSet,
     PermissaoDisciplinaViewSet,
+    ArquivoViewSet,
 )
 
 
@@ -13,5 +14,6 @@ router.register(r'disciplinas', DisciplinaViewSet, basename='disciplina')
 router.register(r'posts', PostViewSet, basename='post')
 router.register(r'alertas', AlertaConteudoViewSet, basename='alerta')
 router.register(r'permissoes', PermissaoDisciplinaViewSet, basename='permissao')
+router.register(r'arquivos', ArquivoViewSet, basename='arquivo')
 
 urlpatterns = router.urls

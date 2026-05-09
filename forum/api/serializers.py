@@ -1,6 +1,12 @@
 from rest_framework import serializers
 from forum.models import (
-    Disciplina, Post, AlertaConteudo, ReacaoPersiste, PermissaoDisciplina
+    Disciplina, Post, AlertaConteudo, ReacaoPersiste,
+    PermissaoDisciplina, Arquivo,
+)
+from forum.validators import (
+    validar_tamanho_arquivo,
+    validar_tipo_arquivo,
+    sanitizar_nome_arquivo,
 )
 
 
@@ -83,8 +89,6 @@ class ReacaoPersisteSerializer(serializers.ModelSerializer):
 
 
 class PermissaoDisciplinaSerializer(serializers.ModelSerializer):
-    """Serializa o vinculo de um usuario com uma disciplina (papel: aluno/monitor/professor)."""
-
     usuario_nome = serializers.CharField(source='usuario.nome_completo', read_only=True)
     usuario_cpf = serializers.CharField(source='usuario.cpf', read_only=True)
     disciplina_codigo = serializers.CharField(source='disciplina.codigo', read_only=True)
@@ -101,3 +105,46 @@ class PermissaoDisciplinaSerializer(serializers.ModelSerializer):
             'id', 'usuario_cpf', 'usuario_nome',
             'disciplina_codigo', 'disciplina_nome', 'created_at',
         ]
+
+
+class ArquivoSerializer(serializers.ModelSerializer):
+    """
+    Serializa anexos de posts.
+
+    Aplica validacao em tres camadas (extensao, magic bytes, tamanho)
+    e sanitiza o nome antes de salvar.
+    """
+
+    arquivo_url = serializers.SerializerMethodField()
+    tamanho_legivel = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Arquivo
+        fields = [
+            'id', 'post', 'arquivo', 'arquivo_url',
+            'nome_original', 'tamanho_bytes', 'tamanho_legivel',
+            'tipo_mime', 'created_at',
+        ]
+        read_only_fields = [
+            'id', 'arquivo_url', 'nome_original',
+            'tamanho_bytes', 'tamanho_legivel', 'tipo_mime', 'created_at',
+        ]
+
+    def get_arquivo_url(self, obj):
+        request = self.context.get('request')
+        if obj.arquivo and request:
+            return request.build_absolute_uri(obj.arquivo.url)
+        return None
+
+    def get_tamanho_legivel(self, obj):
+        """Converte bytes em formato legivel (KB ou MB)."""
+        bytes_total = obj.tamanho_bytes
+        if bytes_total < 1024 * 1024:
+            return f'{bytes_total / 1024:.1f} KB'
+        return f'{bytes_total / (1024 * 1024):.2f} MB'
+
+    def validate_arquivo(self, value):
+        """Aplica validacao em tres camadas."""
+        validar_tamanho_arquivo(value)
+        validar_tipo_arquivo(value)
+        return value

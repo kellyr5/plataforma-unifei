@@ -1,12 +1,16 @@
+import os
+import magic
+
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from django.utils import timezone
 from django.db.models import F
 
 from forum.models import (
     Disciplina, Post, HistoricoEdicao, Voto,
-    ReacaoPersiste, AlertaConteudo, PermissaoDisciplina,
+    ReacaoPersiste, AlertaConteudo, PermissaoDisciplina, Arquivo,
 )
 from forum.api.serializers import (
     DisciplinaSerializer,
@@ -14,25 +18,22 @@ from forum.api.serializers import (
     AlertaConteudoSerializer,
     ReacaoPersisteSerializer,
     PermissaoDisciplinaSerializer,
+    ArquivoSerializer,
+)
+from forum.validators import (
+    MAX_ARQUIVOS_POR_POST,
+    sanitizar_nome_arquivo,
+    validar_tamanho_arquivo,
+    validar_tipo_arquivo,
 )
 from config.permissions import IsAdminOrSuperuser
 
 
 def usuario_pode_marcar_melhor_resposta(usuario, topico):
-    """
-    Determina se o usuario tem permissao para marcar a melhor resposta de um topico.
-
-    Permitido para:
-    - Autor do topico (mas nao na propria resposta — verificado no endpoint)
-    - Monitor ou Professor com PermissaoDisciplina ativa na disciplina do topico
-    - Administradores e superusuarios
-    """
     if usuario.is_superuser or usuario.is_admin:
         return True
-
     if topico.autor_id == usuario.id:
         return True
-
     return PermissaoDisciplina.objects.filter(
         usuario=usuario,
         disciplina=topico.disciplina,
@@ -58,12 +59,6 @@ class DisciplinaViewSet(viewsets.ModelViewSet):
 
 
 class PermissaoDisciplinaViewSet(viewsets.ModelViewSet):
-    """
-    CRUD de permissoes de disciplina. Apenas administradores tem acesso.
-
-    Permite cadastrar quem e aluno, monitor ou professor de cada disciplina.
-    """
-
     serializer_class = PermissaoDisciplinaSerializer
     permission_classes = [IsAdminOrSuperuser]
     filter_backends = [filters.OrderingFilter]
@@ -72,18 +67,15 @@ class PermissaoDisciplinaViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = PermissaoDisciplina.objects.select_related('usuario', 'disciplina')
-
         disciplina_id = self.request.query_params.get('disciplina')
         usuario_id = self.request.query_params.get('usuario')
         papel = self.request.query_params.get('papel')
-
         if disciplina_id:
             queryset = queryset.filter(disciplina_id=disciplina_id)
         if usuario_id:
             queryset = queryset.filter(usuario_id=usuario_id)
         if papel:
             queryset = queryset.filter(papel=papel)
-
         return queryset
 
 
@@ -98,8 +90,9 @@ class PostViewSet(viewsets.ModelViewSet):
     - POST/DELETE /posts/{id}/votar/
     - POST/DELETE /posts/{id}/reagir-persiste/
     - POST /posts/{id}/denunciar/
-    - POST /posts/{id}/marcar-melhor/ -- marca a resposta como melhor (so autor topico/monitor/prof)
-    - DELETE /posts/{id}/marcar-melhor/ -- desmarca
+    - POST/DELETE /posts/{id}/marcar-melhor/
+    - POST /posts/{id}/anexar/ -- upload de arquivo (multipart/form-data)
+    - GET /posts/{id}/arquivos/ -- lista anexos do post
     """
 
     serializer_class = PostSerializer
@@ -112,16 +105,13 @@ class PostViewSet(viewsets.ModelViewSet):
         queryset = Post.objects.filter(deleted_at__isnull=True).select_related(
             'autor', 'disciplina', 'post_pai'
         )
-
         disciplina_id = self.request.query_params.get('disciplina')
         if disciplina_id:
             queryset = queryset.filter(disciplina_id=disciplina_id)
-
         if self.action == 'list':
             apenas_topicos = self.request.query_params.get('apenas_topicos', 'true')
             if apenas_topicos.lower() == 'true':
                 queryset = queryset.filter(post_pai__isnull=True)
-
         return queryset
 
     def perform_create(self, serializer):
@@ -130,7 +120,6 @@ class PostViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         post_atual = self.get_object()
         novo_conteudo = serializer.validated_data.get('conteudo')
-
         if novo_conteudo and novo_conteudo != post_atual.conteudo:
             HistoricoEdicao.objects.create(
                 post=post_atual,
@@ -138,7 +127,6 @@ class PostViewSet(viewsets.ModelViewSet):
                 editado_por=self.request.user,
                 motivo=self.request.data.get('motivo_edicao', ''),
             )
-
         serializer.save()
 
     def perform_destroy(self, instance):
@@ -152,7 +140,6 @@ class PostViewSet(viewsets.ModelViewSet):
             post_pai=topico,
             deleted_at__isnull=True
         ).order_by('-e_melhor', '-pontuacao', 'created_at')
-
         serializer = self.get_serializer(respostas, many=True)
         return Response(serializer.data)
 
@@ -167,15 +154,12 @@ class PostViewSet(viewsets.ModelViewSet):
     def votar(self, request, pk=None):
         post = self.get_object()
         usuario = request.user
-
         if post.autor_id == usuario.id:
             return Response(
                 {'detail': 'Voce nao pode votar no proprio post.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
         voto_existente = Voto.objects.filter(usuario=usuario, post=post).first()
-
         if request.method == 'DELETE':
             if voto_existente:
                 voto_existente.delete()
@@ -185,7 +169,6 @@ class PostViewSet(viewsets.ModelViewSet):
                 {'detail': 'Voce ainda nao votou neste post.'},
                 status=status.HTTP_404_NOT_FOUND
             )
-
         if voto_existente:
             voto_existente.delete()
             self._recalcular_pontuacao(post)
@@ -193,7 +176,6 @@ class PostViewSet(viewsets.ModelViewSet):
                 {'detail': 'Voto removido.', 'pontuacao': post.pontuacao},
                 status=status.HTTP_200_OK
             )
-
         Voto.objects.create(usuario=usuario, post=post)
         self._recalcular_pontuacao(post)
         return Response(
@@ -209,21 +191,17 @@ class PostViewSet(viewsets.ModelViewSet):
     def reagir_persiste(self, request, pk=None):
         post = self.get_object()
         usuario = request.user
-
         if post.post_pai is None:
             return Response(
                 {'detail': 'A reacao "duvida persiste" so e aplicavel em respostas, nao em topicos.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
         if post.autor_id == usuario.id:
             return Response(
                 {'detail': 'Voce nao pode reagir na propria resposta.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
         reacao_existente = ReacaoPersiste.objects.filter(usuario=usuario, post=post).first()
-
         if request.method == 'DELETE':
             if reacao_existente:
                 reacao_existente.delete()
@@ -233,22 +211,18 @@ class PostViewSet(viewsets.ModelViewSet):
                 {'detail': 'Voce nao tem reacao registrada nesta resposta.'},
                 status=status.HTTP_404_NOT_FOUND
             )
-
         comentario = request.data.get('comentario', '').strip()
-
         if reacao_existente:
             return Response(
                 {'detail': 'Voce ja marcou que sua duvida persiste nesta resposta.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
         ReacaoPersiste.objects.create(
             usuario=usuario,
             post=post,
             comentario=comentario,
         )
         self._recalcular_reacoes_persiste(post)
-
         return Response(
             {
                 'detail': 'Reacao registrada. O autor sera notificado para complementar a resposta.',
@@ -265,78 +239,56 @@ class PostViewSet(viewsets.ModelViewSet):
     def denunciar(self, request, pk=None):
         post = self.get_object()
         usuario = request.user
-
         if post.autor_id == usuario.id:
             return Response(
                 {'detail': 'Voce nao pode denunciar o proprio post.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
         denuncia_existente = AlertaConteudo.objects.filter(
             denunciante=usuario,
             post=post,
             status__in=['pendente', 'em_analise']
         ).exists()
-
         if denuncia_existente:
             return Response(
                 {'detail': 'Voce ja denunciou este post e a denuncia esta sendo analisada.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
         motivo = request.data.get('motivo', '').strip()
         if not motivo:
             return Response(
                 {'detail': 'O campo "motivo" e obrigatorio.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
         alerta = AlertaConteudo.objects.create(
             denunciante=usuario,
             post=post,
             motivo=motivo,
         )
-
         serializer = AlertaConteudoSerializer(alerta)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post', 'delete'], url_path='marcar-melhor')
     def marcar_melhor(self, request, pk=None):
-        """
-        POST: marca a resposta como melhor do topico.
-        DELETE: desmarca a resposta como melhor.
-
-        Permitido para autor do topico, monitor/professor da disciplina, ou admin.
-        Restricoes:
-        - So funciona em respostas (post_pai != null)
-        - Autor da resposta nao pode marcar a propria resposta (anti auto-validacao)
-        - So uma resposta pode ser marcada como melhor por topico
-        """
         resposta = self.get_object()
         usuario = request.user
-
         if resposta.post_pai is None:
             return Response(
                 {'detail': 'Apenas respostas podem ser marcadas como melhor (topicos nao).'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
         topico = resposta.post_pai
-
         if not usuario_pode_marcar_melhor_resposta(usuario, topico):
             return Response(
                 {'detail': 'Voce nao tem permissao para marcar a melhor resposta deste topico. '
                            'Apenas o autor do topico, monitores e professores da disciplina podem fazer isso.'},
                 status=status.HTTP_403_FORBIDDEN
             )
-
-        # Anti auto-validacao: autor da resposta nao pode marcar a propria resposta
         if resposta.autor_id == usuario.id:
             return Response(
                 {'detail': 'Voce nao pode marcar a propria resposta como melhor.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
         if request.method == 'DELETE':
             if not resposta.e_melhor:
                 return Response(
@@ -349,16 +301,12 @@ class PostViewSet(viewsets.ModelViewSet):
                 {'detail': 'Marcacao removida.'},
                 status=status.HTTP_200_OK
             )
-
-        # POST: garantir que apenas uma resposta seja a melhor
         Post.objects.filter(
             post_pai=topico,
             e_melhor=True,
         ).exclude(pk=resposta.pk).update(e_melhor=False)
-
         resposta.e_melhor = True
         resposta.save(update_fields=['e_melhor'])
-
         return Response(
             {
                 'detail': 'Resposta marcada como melhor.',
@@ -366,6 +314,114 @@ class PostViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_200_OK
         )
+
+    @action(
+        detail=True,
+        methods=['post'],
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def anexar(self, request, pk=None):
+        """
+        Faz upload de um arquivo como anexo de um post.
+
+        Apenas o autor do post pode anexar arquivos. Limite de 5 arquivos por post,
+        10MB cada. Validacao em tres camadas: extensao + magic bytes + tamanho.
+        """
+        post = self.get_object()
+        usuario = request.user
+
+        # So o autor pode anexar (ou admin)
+        if post.autor_id != usuario.id and not (usuario.is_admin or usuario.is_superuser):
+            return Response(
+                {'detail': 'Apenas o autor do post pode anexar arquivos.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Limite de arquivos por post
+        total_atual = Arquivo.objects.filter(post=post).count()
+        if total_atual >= MAX_ARQUIVOS_POR_POST:
+            return Response(
+                {'detail': f'Limite de {MAX_ARQUIVOS_POR_POST} arquivos por post atingido.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        arquivo = request.FILES.get('arquivo')
+        if not arquivo:
+            return Response(
+                {'detail': 'Nenhum arquivo enviado. Use o campo "arquivo" no multipart/form-data.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validacao em tres camadas
+        try:
+            validar_tamanho_arquivo(arquivo)
+            validar_tipo_arquivo(arquivo)
+        except Exception as e:
+            return Response(
+                {'detail': str(e.messages[0]) if hasattr(e, 'messages') else str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Captura metadados antes de salvar
+        nome_original = arquivo.name
+        tamanho = arquivo.size
+
+        inicio = arquivo.read(2048)
+        arquivo.seek(0)
+        tipo_mime = magic.from_buffer(inicio, mime=True)
+
+        # Sanitiza o nome antes de salvar
+        arquivo.name = sanitizar_nome_arquivo(nome_original)
+
+        anexo = Arquivo.objects.create(
+            post=post,
+            arquivo=arquivo,
+            nome_original=nome_original,
+            tamanho_bytes=tamanho,
+            tipo_mime=tipo_mime,
+        )
+
+        serializer = ArquivoSerializer(anexo, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['get'])
+    def arquivos(self, request, pk=None):
+        """Lista os anexos do post."""
+        post = self.get_object()
+        anexos = Arquivo.objects.filter(post=post).order_by('-created_at')
+        serializer = ArquivoSerializer(anexos, many=True, context={'request': request})
+        return Response(serializer.data)
+
+
+class ArquivoViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Listagem e remocao de arquivos.
+
+    A criacao e feita via POST /posts/{id}/anexar/ (que usa multipart).
+    Aqui apenas read e delete.
+    """
+
+    serializer_class = ArquivoSerializer
+    queryset = Arquivo.objects.all()
+
+    def get_queryset(self):
+        return Arquivo.objects.select_related('post', 'post__autor').all()
+
+    def destroy(self, request, *args, **kwargs):
+        anexo = self.get_object()
+        usuario = request.user
+
+        if anexo.post.autor_id != usuario.id and not (usuario.is_admin or usuario.is_superuser):
+            return Response(
+                {'detail': 'Apenas o autor do post pode remover anexos.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Remove o arquivo fisico do disco antes de apagar o registro
+        if anexo.arquivo:
+            anexo.arquivo.delete(save=False)
+        anexo.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class AlertaConteudoViewSet(viewsets.ReadOnlyModelViewSet):
@@ -387,36 +443,30 @@ class AlertaConteudoViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=['post'])
     def resolver(self, request, pk=None):
         alerta = self.get_object()
-
         if alerta.status in ['procedente', 'improcedente']:
             return Response(
                 {'detail': 'Esta denuncia ja foi resolvida.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
         decisao = request.data.get('decisao')
         if decisao not in ['procedente', 'improcedente']:
             return Response(
                 {'detail': 'Campo "decisao" e obrigatorio e deve ser "procedente" ou "improcedente".'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
         resolucao = request.data.get('resolucao', '').strip()
         if not resolucao:
             return Response(
                 {'detail': 'O campo "resolucao" e obrigatorio.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
         alerta.status = decisao
         alerta.resolvido_por = request.user
         alerta.resolucao = resolucao
         alerta.resolvido_em = timezone.now()
         alerta.save()
-
         if decisao == 'procedente':
             alerta.post.deleted_at = timezone.now()
             alerta.post.save(update_fields=['deleted_at'])
-
         serializer = self.get_serializer(alerta)
         return Response(serializer.data, status=status.HTTP_200_OK)
