@@ -162,3 +162,16 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Limite de tamanho de upload (alinhado com validators do forum)
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB
+
+# ===== Email =====
+# Em desenvolvimento, os emails sao impressos no terminal em vez de enviados.
+# Em producao, trocar EMAIL_BACKEND para SMTP real (Gmail, SendGrid, etc).
+EMAIL_BACKEND = config(
+    'EMAIL_BACKEND',
+    default='django.core.mail.backends.console.EmailBackend',
+)
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='nao-responda@plataforma-unifei.local')
+
+# ===== Codigo de ativacao =====
+CODIGO_ATIVACAO_VALIDADE_MINUTOS = 30
+CODIGO_ATIVACAO_MAX_TENTATIVAS = 5
