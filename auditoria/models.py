@@ -98,10 +98,10 @@ class AuditLog(models.Model):
         """
         Imutabilidade: impede atualizacao de registros existentes.
 
-        A unica operacao permitida e a criacao (INSERT). Tentativas
-        de UPDATE sao bloqueadas para preservar a integridade do log.
+        Aplicado para conformidade com SOC 2 (registros nao adulteraveis)
+        e LGPD (integridade do log de auditoria).
         """
-        if self.pk:
+        if not self._state.adding:
             raise ValueError(
                 'AuditLog e imutavel. Registros nao podem ser atualizados.'
             )
