@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Certificado de Voluntariado</title>
+    <style>
+        @page {
+            size: A4 landscape;
+            margin: 0;
+        }
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            color: #1a2238;
+        }
+        .pagina {
+            width: 297mm;
+            height: 210mm;
+            position: relative;
+            padding: 25mm 30mm;
+            box-sizing: border-box;
+            background:
+                linear-gradient(135deg, #f8fafc 0%, #ffffff 60%, #eef2f7 100%);
+        }
+        .borda {
+            position: absolute;
+            top: 12mm;
+            left: 12mm;
+            right: 12mm;
+            bottom: 12mm;
+            border: 2px solid #1a2238;
+            border-radius: 6px;
+            pointer-events: none;
+        }
+        .borda-interna {
+            position: absolute;
+            top: 16mm;
+            left: 16mm;
+            right: 16mm;
+            bottom: 16mm;
+            border: 1px solid #4a5d8f;
+            border-radius: 4px;
+        }
+        .conteudo {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            padding-top: 8mm;
+        }
+        .cabecalho {
+            font-size: 11pt;
+            letter-spacing: 4px;
+            color: #4a5d8f;
+            margin-bottom: 8mm;
+            text-transform: uppercase;
+        }
+        h1 {
+            font-size: 38pt;
+            margin: 0 0 10mm 0;
+            color: #1a2238;
+            font-weight: 700;
+            letter-spacing: 2px;
+        }
+        .texto {
+            font-size: 14pt;
+            line-height: 1.7;
+            margin: 0 auto 8mm auto;
+            max-width: 200mm;
+            color: #2c3e50;
+        }
+        .nome {
+            font-size: 26pt;
+            font-weight: 700;
+            color: #1a2238;
+            margin: 6mm 0;
+            border-bottom: 1px solid #1a2238;
+            display: inline-block;
+            padding: 0 20mm 4mm 20mm;
+        }
+        .detalhes {
+            font-size: 13pt;
+            color: #4a5d8f;
+            margin-top: 6mm;
+            line-height: 1.8;
+        }
+        .detalhes strong { color: #1a2238; }
+        .rodape {
+            position: absolute;
+            bottom: 22mm;
+            left: 30mm;
+            right: 30mm;
+            display: flex;
+            justify-content: space-between;
+            font-size: 9pt;
+            color: #4a5d8f;
+        }
+        .rodape .bloco {
+            text-align: center;
+            width: 45%;
+        }
+        .rodape .codigo {
+            font-family: 'Courier New', monospace;
+            font-size: 11pt;
+            color: #1a2238;
+            letter-spacing: 1px;
+            margin-top: 1mm;
+        }
+        .rodape .info {
+            font-size: 8pt;
+            margin-top: 1mm;
+        }
+    </style>
+</head>
+<body>
+    <div class="pagina">
+        <div class="borda"></div>
+        <div class="borda-interna"></div>
+
+        <div class="conteudo">
+            <div class="cabecalho">Plataforma UNIFEI &middot; Certificado de Voluntariado</div>
+
+            <h1>Certificado</h1>
+
+            <p class="texto">
+                A <strong>{{ certificado.nome_organizacao }}</strong> certifica que
+            </p>
+
+            <div class="nome">{{ certificado.nome_estudante }}</div>
+
+            <p class="texto">
+                participou da acao voluntaria intitulada
+                <strong>"{{ certificado.nome_oportunidade }}"</strong>,
+                na area de <strong>{{ certificado.area_atuacao }}</strong>,
+                realizada em {{ certificado.local }},
+                no periodo de <strong>{{ certificado.data_inicio|date:"d/m/Y" }}</strong>
+                a <strong>{{ certificado.data_fim|date:"d/m/Y" }}</strong>,
+                totalizando <strong>{{ certificado.horas_realizadas }} hora(s)</strong>
+                de atividade.
+            </p>
+
+            <div class="detalhes">
+                Emitido em <strong>{{ certificado.emitido_em|date:"d \d\e F \d\e Y" }}</strong>
+            </div>
+        </div>
+
+        <div class="rodape">
+            <div class="bloco">
+                <strong>Codigo de Validacao</strong>
+                <div class="codigo">{{ certificado.codigo_validacao }}</div>
+                <div class="info">
+                    Verifique a autenticidade em<br>
+                    {{ url_validacao }}
+                </div>
+            </div>
+            <div class="bloco">
+                <strong>Documento Digital</strong>
+                <div class="info">
+                    Emitido pela Plataforma UNIFEI<br>
+                    Universidade Federal de Itajuba
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

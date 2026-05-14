@@ -10,6 +10,7 @@ urlpatterns = [
     path('api/forum/', include('forum.api.urls')),
     path('api/notificacoes/', include('notificacoes.api.urls')),
     path('api/auditoria/', include('auditoria.api.urls')),
+    path('api/voluntariado/', include('voluntariado.api.urls')),
 ]
 
 if settings.DEBUG:

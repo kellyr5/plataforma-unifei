@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'forum',
     'notificacoes',
     'auditoria',
+    'voluntariado',
 ]
 
 MIDDLEWARE = [
