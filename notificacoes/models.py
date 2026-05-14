@@ -24,6 +24,7 @@ class Notificacao(models.Model):
     """
 
     TIPO_CHOICES = [
+        # Forum
         ('nova_resposta', 'Nova resposta no seu topico'),
         ('voto_recebido', 'Novo voto no seu post'),
         ('melhor_resposta', 'Sua resposta foi marcada como melhor'),
@@ -31,6 +32,11 @@ class Notificacao(models.Model):
         ('denuncia_resolvida', 'Sua denuncia foi resolvida'),
         ('post_removido', 'Seu post foi removido por moderacao'),
         ('papel_disciplina', 'Voce foi adicionado a uma disciplina'),
+        # Voluntariado
+        ('inscricao_aprovada', 'Sua inscricao em voluntariado foi aprovada'),
+        ('inscricao_rejeitada', 'Sua inscricao em voluntariado foi rejeitada'),
+        ('inscricao_removida', 'Voce foi removido de uma oportunidade'),
+        ('voluntariado_concluido', 'Sua participacao foi concluida e o certificado emitido'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

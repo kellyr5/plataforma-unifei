@@ -41,6 +41,14 @@ class AuditLog(models.Model):
         ('desmarcou_melhor', 'Desmarcou melhor resposta'),
         ('denunciou', 'Denunciou conteudo'),
 
+        # Voluntariado
+        ('oportunidade_criada', 'Oportunidade de voluntariado criada'),
+        ('inscricao_voluntariado', 'Inscricao em oportunidade de voluntariado'),
+        ('inscricao_aprovada', 'Inscricao em voluntariado aprovada'),
+        ('inscricao_rejeitada', 'Inscricao em voluntariado rejeitada'),
+        ('inscricao_removida', 'Participante removido de oportunidade'),
+        ('voluntariado_concluido', 'Voluntariado concluido e certificado emitido'),
+
         # Moderacao
         ('denuncia_resolvida', 'Denuncia resolvida'),
     ]

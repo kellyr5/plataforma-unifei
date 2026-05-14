@@ -34,7 +34,6 @@ def notificar_mudancas_de_status(sender, instance, created, **kwargs):
     """Dispara notificacao quando o status da inscricao muda."""
     status_anterior = _cache_status_anteriores.pop(instance.pk, None)
 
-    # Sem mudanca de status, nada a fazer
     if status_anterior == instance.status:
         return
 
@@ -46,7 +45,7 @@ def notificar_mudancas_de_status(sender, instance, created, **kwargs):
         criar_notificacao(
             destinatario=estudante,
             remetente=instance.avaliado_por or organizacao,
-            tipo='nova_resposta',
+            tipo='inscricao_aprovada',
             titulo=f'Inscricao aprovada: {op.titulo}',
             mensagem=(
                 f'Sua inscricao em "{op.titulo}" foi aprovada por '
@@ -59,7 +58,7 @@ def notificar_mudancas_de_status(sender, instance, created, **kwargs):
         criar_notificacao(
             destinatario=estudante,
             remetente=instance.avaliado_por or organizacao,
-            tipo='nova_resposta',
+            tipo='inscricao_rejeitada',
             titulo=f'Inscricao nao aprovada: {op.titulo}',
             mensagem=(
                 f'Sua inscricao em "{op.titulo}" nao foi aprovada. '
@@ -72,7 +71,7 @@ def notificar_mudancas_de_status(sender, instance, created, **kwargs):
         criar_notificacao(
             destinatario=estudante,
             remetente=instance.avaliado_por or organizacao,
-            tipo='nova_resposta',
+            tipo='inscricao_removida',
             titulo=f'Voce foi removido da oportunidade: {op.titulo}',
             mensagem=(
                 f'Voce foi removido da oportunidade "{op.titulo}". '
@@ -85,7 +84,7 @@ def notificar_mudancas_de_status(sender, instance, created, **kwargs):
         criar_notificacao(
             destinatario=estudante,
             remetente=instance.avaliado_por or organizacao,
-            tipo='nova_resposta',
+            tipo='voluntariado_concluido',
             titulo=f'Voluntariado concluido: {op.titulo}',
             mensagem=(
                 f'Sua participacao em "{op.titulo}" foi concluida com '

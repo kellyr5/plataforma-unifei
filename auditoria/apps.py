@@ -7,3 +7,4 @@ class AuditoriaConfig(AppConfig):
 
     def ready(self):
         import auditoria.signals  # noqa: F401
+        import auditoria.signals_voluntariado  # noqa: F401
