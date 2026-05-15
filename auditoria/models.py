@@ -49,6 +49,9 @@ class AuditLog(models.Model):
         ('inscricao_removida', 'Participante removido de oportunidade'),
         ('voluntariado_concluido', 'Voluntariado concluido e certificado emitido'),
 
+        # Reputacao
+        ('ranking_semestral_gerado', 'Ranking semestral gerado'),
+
         # Moderacao
         ('denuncia_resolvida', 'Denuncia resolvida'),
     ]

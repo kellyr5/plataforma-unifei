@@ -3,6 +3,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
+from auditoria.services import registrar_acao
+from django.db import transaction
 
 from forum.models import Disciplina
 from reputacao.models import UsuarioDisciplinaReputacao, RankingSemestral
@@ -96,12 +98,18 @@ class RankingSemestralViewSet(viewsets.ReadOnlyModelViewSet):
         methods=['post'],
         permission_classes=[IsAdminOrSuperuser],
     )
+    @action(
+        detail=False,
+        methods=['post'],
+        permission_classes=[IsAdminOrSuperuser],
+    )
     def gerar(self, request):
         """
         Gera um snapshot do ranking semestral de uma disciplina.
 
         Body esperado: {"disciplina": "<uuid>", "semestre": "2026.1"}
         Se ja existir ranking para essa disciplina/semestre, e substituido.
+        A operacao e atomica: ou o ranking inteiro e regerado, ou nada muda.
         """
         disciplina_id = request.data.get('disciplina')
         semestre = request.data.get('semestre', '').strip()
@@ -114,28 +122,38 @@ class RankingSemestralViewSet(viewsets.ReadOnlyModelViewSet):
 
         disciplina = get_object_or_404(Disciplina, id=disciplina_id)
 
-        # Remove ranking anterior do mesmo semestre/disciplina (substituicao)
-        RankingSemestral.objects.filter(
-            disciplina=disciplina,
-            semestre=semestre,
-        ).delete()
-
-        reputacoes = UsuarioDisciplinaReputacao.objects.filter(
-            disciplina=disciplina
-        ).select_related('usuario').order_by('-pontos')
-
-        registros = []
-        for posicao, rep in enumerate(reputacoes, start=1):
-            registros.append(RankingSemestral(
+        with transaction.atomic():
+            # Remove ranking anterior do mesmo semestre/disciplina (substituicao)
+            RankingSemestral.objects.filter(
                 disciplina=disciplina,
                 semestre=semestre,
-                usuario=rep.usuario,
-                posicao=posicao,
-                pontos=rep.pontos,
-                nome_usuario=rep.usuario.nome_completo,
-            ))
+            ).delete()
 
-        RankingSemestral.objects.bulk_create(registros)
+            reputacoes = UsuarioDisciplinaReputacao.objects.filter(
+                disciplina=disciplina
+            ).select_related('usuario').order_by('-pontos')
+
+            registros = []
+            for posicao, rep in enumerate(reputacoes, start=1):
+                registros.append(RankingSemestral(
+                    disciplina=disciplina,
+                    semestre=semestre,
+                    usuario=rep.usuario,
+                    posicao=posicao,
+                    pontos=rep.pontos,
+                    nome_usuario=rep.usuario.nome_completo,
+                ))
+
+            RankingSemestral.objects.bulk_create(registros)
+
+            registrar_acao(
+                acao='ranking_semestral_gerado',
+                objeto_afetado=disciplina,
+                descricao=(
+                    f'Ranking semestral gerado para {disciplina.codigo} - {semestre} '
+                    f'com {len(registros)} posicao(oes).'
+                ),
+            )
 
         return Response(
             {
