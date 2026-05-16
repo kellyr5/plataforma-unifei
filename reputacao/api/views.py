@@ -5,6 +5,7 @@ from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from auditoria.services import registrar_acao
 from django.db import transaction
+from drf_spectacular.utils import extend_schema
 
 from forum.models import Disciplina
 from reputacao.models import UsuarioDisciplinaReputacao, RankingSemestral
@@ -24,6 +25,12 @@ class MinhaReputacaoView(APIView):
     onde ele tem pontuacao registrada.
     """
 
+    @extend_schema(
+        responses={200: UsuarioDisciplinaReputacaoSerializer(many=True)},
+        tags=['Reputacao'],
+        summary='Minha reputacao em todas as disciplinas',
+    )
+    
     def get(self, request):
         reputacoes = UsuarioDisciplinaReputacao.objects.filter(
             usuario=request.user
@@ -41,6 +48,12 @@ class RankingDisciplinaView(APIView):
     Aceita ?limite=N para limitar o numero de posicoes (default 50).
     """
 
+    @extend_schema(
+        responses={200: dict},
+        tags=['Reputacao'],
+        summary='Ranking ao vivo de uma disciplina',
+    )
+    
     def get(self, request, disciplina_id):
         disciplina = get_object_or_404(Disciplina, id=disciplina_id, deleted_at__isnull=True)
 

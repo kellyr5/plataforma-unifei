@@ -11,6 +11,7 @@ from rest_framework import status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
+from drf_spectacular.utils import extend_schema
 
 from autenticacao.models import Usuario
 from autenticacao.api.serializers import (
@@ -35,6 +36,12 @@ class RegistroView(APIView):
 
     permission_classes = [permissions.AllowAny]
 
+    @extend_schema(
+        request=RegistroSerializer,
+        responses={201: dict},
+        tags=['Autenticacao'],
+        summary='Registrar novo usuario',
+    )
     def post(self, request):
         serializer = RegistroSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -76,6 +83,13 @@ class AtivacaoView(APIView):
 
     permission_classes = [permissions.AllowAny]
 
+    @extend_schema(
+        request=AtivacaoSerializer,
+        responses={200: dict},
+        tags=['Autenticacao'],
+        summary='Ativar conta de usuario',
+    )
+    
     def post(self, request):
         serializer = AtivacaoSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -134,6 +148,13 @@ class ReenvioCodigoView(APIView):
 
     permission_classes = [permissions.AllowAny]
 
+    @extend_schema(
+        request=ReenvioCodigoSerializer,
+        responses={200: dict},
+        tags=['Autenticacao'],
+        summary='Reenviar codigo de ativacao',
+    )
+    
     def post(self, request):
         serializer = ReenvioCodigoSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

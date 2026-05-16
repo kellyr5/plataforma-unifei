@@ -1,0 +1,3402 @@
+openapi: 3.0.3
+info:
+  title: Plataforma UNIFEI - API
+  version: 1.0.0
+  description: API REST da plataforma que integra forum academico organizado por disciplina
+    com sistema de voluntariado universitario. Trabalho de Conclusao de Curso - Ciencia
+    da Computacao - UNIFEI.
+paths:
+  /api/auditoria/:
+    get:
+      operationId: auditoria_list
+      description: |-
+        Listagem de registros de auditoria (somente leitura).
+
+        Regras de acesso:
+        - Admin/superuser: ve todos os registros
+        - Usuario comum: ve apenas registros que envolvem ele
+          (acoes que ele executou OU sobre objetos que ele e dono/autor)
+
+        Filtros disponiveis via query params:
+        - ?acao=login -- filtra por tipo de acao
+        - ?usuario={id} -- filtra por usuario (so admin)
+        - ?data_inicio=2026-05-01 -- filtra por data
+        - ?data_fim=2026-05-31
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      tags:
+      - auditoria
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuditLog'
+          description: ''
+  /api/auditoria/{id}/:
+    get:
+      operationId: auditoria_retrieve
+      description: |-
+        Listagem de registros de auditoria (somente leitura).
+
+        Regras de acesso:
+        - Admin/superuser: ve todos os registros
+        - Usuario comum: ve apenas registros que envolvem ele
+          (acoes que ele executou OU sobre objetos que ele e dono/autor)
+
+        Filtros disponiveis via query params:
+        - ?acao=login -- filtra por tipo de acao
+        - ?usuario={id} -- filtra por usuario (so admin)
+        - ?data_inicio=2026-05-01 -- filtra por data
+        - ?data_fim=2026-05-31
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - auditoria
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLog'
+          description: ''
+  /api/auth/ativar/:
+    post:
+      operationId: auth_ativar_create
+      description: |-
+        POST /api/auth/ativar/
+
+        Valida o codigo OTP e ativa a conta do usuario. Em caso de sucesso,
+        retorna os tokens JWT (access e refresh) prontos para uso.
+      summary: Ativar conta de usuario
+      tags:
+      - Autenticacao
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AtivacaoRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AtivacaoRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AtivacaoRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/auth/login/:
+    post:
+      operationId: auth_login_create
+      description: |-
+        Takes a set of user credentials and returns an access and refresh JSON web
+        token pair to prove the authentication of those credentials.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPairRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPairRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPairRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenObtainPair'
+          description: ''
+  /api/auth/reenviar-codigo/:
+    post:
+      operationId: auth_reenviar_codigo_create
+      description: |-
+        POST /api/auth/reenviar-codigo/
+
+        Gera um novo codigo de ativacao para usuario ainda inativo.
+        Para evitar enumeration attacks (descobrir quais emails estao cadastrados),
+        sempre retorna sucesso, mesmo se o email nao existir.
+      summary: Reenviar codigo de ativacao
+      tags:
+      - Autenticacao
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReenvioCodigoRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ReenvioCodigoRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ReenvioCodigoRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/auth/refresh/:
+    post:
+      operationId: auth_refresh_create
+      description: |-
+        Takes a refresh type JSON web token and returns an access type JSON web
+        token if the refresh token is valid.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /api/auth/register/:
+    post:
+      operationId: auth_register_create
+      description: |-
+        POST /api/auth/register/
+
+        Cria um novo usuario com status inativo e dispara o email de ativacao.
+        Nao retorna tokens; usuario precisa ativar a conta antes de logar.
+      summary: Registrar novo usuario
+      tags:
+      - Autenticacao
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistroRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RegistroRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RegistroRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/auth/verify/:
+    post:
+      operationId: auth_verify_create
+      description: |-
+        Takes a token and indicates if it is valid.  This view provides no
+        information about a token's fitness for a particular use.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenVerifyRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenVerifyRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenVerifyRequest'
+        required: true
+      responses:
+        '200':
+          description: No response body
+  /api/forum/alertas/:
+    get:
+      operationId: forum_alertas_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      tags:
+      - forum
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AlertaConteudo'
+          description: ''
+  /api/forum/alertas/{id}/:
+    get:
+      operationId: forum_alertas_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Alerta de Conteudo.
+        required: true
+      tags:
+      - forum
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertaConteudo'
+          description: ''
+  /api/forum/alertas/{id}/resolver/:
+    post:
+      operationId: forum_alertas_resolver_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Alerta de Conteudo.
+        required: true
+      tags:
+      - forum
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertaConteudoRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AlertaConteudoRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AlertaConteudoRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertaConteudo'
+          description: ''
+  /api/forum/arquivos/:
+    get:
+      operationId: forum_arquivos_list
+      description: |-
+        Listagem e remocao de arquivos.
+
+        A criacao e feita via POST /posts/{id}/anexar/ (que usa multipart).
+        Aqui apenas read e delete.
+      tags:
+      - forum
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Arquivo'
+          description: ''
+  /api/forum/arquivos/{id}/:
+    get:
+      operationId: forum_arquivos_retrieve
+      description: |-
+        Listagem e remocao de arquivos.
+
+        A criacao e feita via POST /posts/{id}/anexar/ (que usa multipart).
+        Aqui apenas read e delete.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Arquivo.
+        required: true
+      tags:
+      - forum
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Arquivo'
+          description: ''
+    delete:
+      operationId: forum_arquivos_destroy
+      description: |-
+        Listagem e remocao de arquivos.
+
+        A criacao e feita via POST /posts/{id}/anexar/ (que usa multipart).
+        Aqui apenas read e delete.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Arquivo.
+        required: true
+      tags:
+      - forum
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/forum/disciplinas/:
+    get:
+      operationId: forum_disciplinas_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - forum
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Disciplina'
+          description: ''
+    post:
+      operationId: forum_disciplinas_create
+      tags:
+      - forum
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DisciplinaRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DisciplinaRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DisciplinaRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Disciplina'
+          description: ''
+  /api/forum/disciplinas/{id}/:
+    get:
+      operationId: forum_disciplinas_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Disciplina.
+        required: true
+      tags:
+      - forum
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Disciplina'
+          description: ''
+    put:
+      operationId: forum_disciplinas_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Disciplina.
+        required: true
+      tags:
+      - forum
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DisciplinaRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DisciplinaRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DisciplinaRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Disciplina'
+          description: ''
+    patch:
+      operationId: forum_disciplinas_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Disciplina.
+        required: true
+      tags:
+      - forum
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedDisciplinaRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedDisciplinaRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedDisciplinaRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Disciplina'
+          description: ''
+    delete:
+      operationId: forum_disciplinas_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Disciplina.
+        required: true
+      tags:
+      - forum
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/forum/permissoes/:
+    get:
+      operationId: forum_permissoes_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      tags:
+      - forum
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PermissaoDisciplina'
+          description: ''
+    post:
+      operationId: forum_permissoes_create
+      tags:
+      - forum
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PermissaoDisciplinaRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PermissaoDisciplinaRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PermissaoDisciplinaRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissaoDisciplina'
+          description: ''
+  /api/forum/permissoes/{id}/:
+    get:
+      operationId: forum_permissoes_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Permissao de Disciplina.
+        required: true
+      tags:
+      - forum
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissaoDisciplina'
+          description: ''
+    put:
+      operationId: forum_permissoes_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Permissao de Disciplina.
+        required: true
+      tags:
+      - forum
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PermissaoDisciplinaRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PermissaoDisciplinaRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PermissaoDisciplinaRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissaoDisciplina'
+          description: ''
+    patch:
+      operationId: forum_permissoes_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Permissao de Disciplina.
+        required: true
+      tags:
+      - forum
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPermissaoDisciplinaRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedPermissaoDisciplinaRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedPermissaoDisciplinaRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissaoDisciplina'
+          description: ''
+    delete:
+      operationId: forum_permissoes_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Permissao de Disciplina.
+        required: true
+      tags:
+      - forum
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/forum/posts/:
+    get:
+      operationId: forum_posts_list
+      description: |-
+        CRUD de Posts (topicos e respostas).
+
+        Acoes adicionais:
+        - GET /posts/?disciplina={id}
+        - GET /posts/{id}/respostas/
+        - POST /posts/{id}/visualizar/
+        - POST/DELETE /posts/{id}/votar/
+        - POST/DELETE /posts/{id}/reagir-persiste/
+        - POST /posts/{id}/denunciar/
+        - POST/DELETE /posts/{id}/marcar-melhor/
+        - POST /posts/{id}/anexar/ -- upload de arquivo (multipart/form-data)
+        - GET /posts/{id}/arquivos/ -- lista anexos do post
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - forum
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Post'
+          description: ''
+    post:
+      operationId: forum_posts_create
+      description: |-
+        CRUD de Posts (topicos e respostas).
+
+        Acoes adicionais:
+        - GET /posts/?disciplina={id}
+        - GET /posts/{id}/respostas/
+        - POST /posts/{id}/visualizar/
+        - POST/DELETE /posts/{id}/votar/
+        - POST/DELETE /posts/{id}/reagir-persiste/
+        - POST /posts/{id}/denunciar/
+        - POST/DELETE /posts/{id}/marcar-melhor/
+        - POST /posts/{id}/anexar/ -- upload de arquivo (multipart/form-data)
+        - GET /posts/{id}/arquivos/ -- lista anexos do post
+      tags:
+      - forum
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+          description: ''
+  /api/forum/posts/{id}/:
+    get:
+      operationId: forum_posts_retrieve
+      description: |-
+        CRUD de Posts (topicos e respostas).
+
+        Acoes adicionais:
+        - GET /posts/?disciplina={id}
+        - GET /posts/{id}/respostas/
+        - POST /posts/{id}/visualizar/
+        - POST/DELETE /posts/{id}/votar/
+        - POST/DELETE /posts/{id}/reagir-persiste/
+        - POST /posts/{id}/denunciar/
+        - POST/DELETE /posts/{id}/marcar-melhor/
+        - POST /posts/{id}/anexar/ -- upload de arquivo (multipart/form-data)
+        - GET /posts/{id}/arquivos/ -- lista anexos do post
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Post.
+        required: true
+      tags:
+      - forum
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+          description: ''
+    put:
+      operationId: forum_posts_update
+      description: |-
+        CRUD de Posts (topicos e respostas).
+
+        Acoes adicionais:
+        - GET /posts/?disciplina={id}
+        - GET /posts/{id}/respostas/
+        - POST /posts/{id}/visualizar/
+        - POST/DELETE /posts/{id}/votar/
+        - POST/DELETE /posts/{id}/reagir-persiste/
+        - POST /posts/{id}/denunciar/
+        - POST/DELETE /posts/{id}/marcar-melhor/
+        - POST /posts/{id}/anexar/ -- upload de arquivo (multipart/form-data)
+        - GET /posts/{id}/arquivos/ -- lista anexos do post
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Post.
+        required: true
+      tags:
+      - forum
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+          description: ''
+    patch:
+      operationId: forum_posts_partial_update
+      description: |-
+        CRUD de Posts (topicos e respostas).
+
+        Acoes adicionais:
+        - GET /posts/?disciplina={id}
+        - GET /posts/{id}/respostas/
+        - POST /posts/{id}/visualizar/
+        - POST/DELETE /posts/{id}/votar/
+        - POST/DELETE /posts/{id}/reagir-persiste/
+        - POST /posts/{id}/denunciar/
+        - POST/DELETE /posts/{id}/marcar-melhor/
+        - POST /posts/{id}/anexar/ -- upload de arquivo (multipart/form-data)
+        - GET /posts/{id}/arquivos/ -- lista anexos do post
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Post.
+        required: true
+      tags:
+      - forum
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPostRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedPostRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedPostRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+          description: ''
+    delete:
+      operationId: forum_posts_destroy
+      description: |-
+        CRUD de Posts (topicos e respostas).
+
+        Acoes adicionais:
+        - GET /posts/?disciplina={id}
+        - GET /posts/{id}/respostas/
+        - POST /posts/{id}/visualizar/
+        - POST/DELETE /posts/{id}/votar/
+        - POST/DELETE /posts/{id}/reagir-persiste/
+        - POST /posts/{id}/denunciar/
+        - POST/DELETE /posts/{id}/marcar-melhor/
+        - POST /posts/{id}/anexar/ -- upload de arquivo (multipart/form-data)
+        - GET /posts/{id}/arquivos/ -- lista anexos do post
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Post.
+        required: true
+      tags:
+      - forum
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/forum/posts/{id}/anexar/:
+    post:
+      operationId: forum_posts_anexar_create
+      description: |-
+        Faz upload de um arquivo como anexo de um post.
+
+        Apenas o autor do post pode anexar arquivos. Limite de 5 arquivos por post,
+        10MB cada. Validacao em tres camadas: extensao + magic bytes + tamanho.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Post.
+        required: true
+      tags:
+      - forum
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+          description: ''
+  /api/forum/posts/{id}/arquivos/:
+    get:
+      operationId: forum_posts_arquivos_retrieve
+      description: Lista os anexos do post.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Post.
+        required: true
+      tags:
+      - forum
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+          description: ''
+  /api/forum/posts/{id}/denunciar/:
+    post:
+      operationId: forum_posts_denunciar_create
+      description: |-
+        CRUD de Posts (topicos e respostas).
+
+        Acoes adicionais:
+        - GET /posts/?disciplina={id}
+        - GET /posts/{id}/respostas/
+        - POST /posts/{id}/visualizar/
+        - POST/DELETE /posts/{id}/votar/
+        - POST/DELETE /posts/{id}/reagir-persiste/
+        - POST /posts/{id}/denunciar/
+        - POST/DELETE /posts/{id}/marcar-melhor/
+        - POST /posts/{id}/anexar/ -- upload de arquivo (multipart/form-data)
+        - GET /posts/{id}/arquivos/ -- lista anexos do post
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Post.
+        required: true
+      tags:
+      - forum
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+          description: ''
+  /api/forum/posts/{id}/marcar-melhor/:
+    post:
+      operationId: forum_posts_marcar_melhor_create
+      description: |-
+        CRUD de Posts (topicos e respostas).
+
+        Acoes adicionais:
+        - GET /posts/?disciplina={id}
+        - GET /posts/{id}/respostas/
+        - POST /posts/{id}/visualizar/
+        - POST/DELETE /posts/{id}/votar/
+        - POST/DELETE /posts/{id}/reagir-persiste/
+        - POST /posts/{id}/denunciar/
+        - POST/DELETE /posts/{id}/marcar-melhor/
+        - POST /posts/{id}/anexar/ -- upload de arquivo (multipart/form-data)
+        - GET /posts/{id}/arquivos/ -- lista anexos do post
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Post.
+        required: true
+      tags:
+      - forum
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+          description: ''
+    delete:
+      operationId: forum_posts_marcar_melhor_destroy
+      description: |-
+        CRUD de Posts (topicos e respostas).
+
+        Acoes adicionais:
+        - GET /posts/?disciplina={id}
+        - GET /posts/{id}/respostas/
+        - POST /posts/{id}/visualizar/
+        - POST/DELETE /posts/{id}/votar/
+        - POST/DELETE /posts/{id}/reagir-persiste/
+        - POST /posts/{id}/denunciar/
+        - POST/DELETE /posts/{id}/marcar-melhor/
+        - POST /posts/{id}/anexar/ -- upload de arquivo (multipart/form-data)
+        - GET /posts/{id}/arquivos/ -- lista anexos do post
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Post.
+        required: true
+      tags:
+      - forum
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/forum/posts/{id}/reagir-persiste/:
+    post:
+      operationId: forum_posts_reagir_persiste_create
+      description: |-
+        CRUD de Posts (topicos e respostas).
+
+        Acoes adicionais:
+        - GET /posts/?disciplina={id}
+        - GET /posts/{id}/respostas/
+        - POST /posts/{id}/visualizar/
+        - POST/DELETE /posts/{id}/votar/
+        - POST/DELETE /posts/{id}/reagir-persiste/
+        - POST /posts/{id}/denunciar/
+        - POST/DELETE /posts/{id}/marcar-melhor/
+        - POST /posts/{id}/anexar/ -- upload de arquivo (multipart/form-data)
+        - GET /posts/{id}/arquivos/ -- lista anexos do post
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Post.
+        required: true
+      tags:
+      - forum
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+          description: ''
+    delete:
+      operationId: forum_posts_reagir_persiste_destroy
+      description: |-
+        CRUD de Posts (topicos e respostas).
+
+        Acoes adicionais:
+        - GET /posts/?disciplina={id}
+        - GET /posts/{id}/respostas/
+        - POST /posts/{id}/visualizar/
+        - POST/DELETE /posts/{id}/votar/
+        - POST/DELETE /posts/{id}/reagir-persiste/
+        - POST /posts/{id}/denunciar/
+        - POST/DELETE /posts/{id}/marcar-melhor/
+        - POST /posts/{id}/anexar/ -- upload de arquivo (multipart/form-data)
+        - GET /posts/{id}/arquivos/ -- lista anexos do post
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Post.
+        required: true
+      tags:
+      - forum
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/forum/posts/{id}/respostas/:
+    get:
+      operationId: forum_posts_respostas_retrieve
+      description: |-
+        CRUD de Posts (topicos e respostas).
+
+        Acoes adicionais:
+        - GET /posts/?disciplina={id}
+        - GET /posts/{id}/respostas/
+        - POST /posts/{id}/visualizar/
+        - POST/DELETE /posts/{id}/votar/
+        - POST/DELETE /posts/{id}/reagir-persiste/
+        - POST /posts/{id}/denunciar/
+        - POST/DELETE /posts/{id}/marcar-melhor/
+        - POST /posts/{id}/anexar/ -- upload de arquivo (multipart/form-data)
+        - GET /posts/{id}/arquivos/ -- lista anexos do post
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Post.
+        required: true
+      tags:
+      - forum
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+          description: ''
+  /api/forum/posts/{id}/visualizar/:
+    post:
+      operationId: forum_posts_visualizar_create
+      description: |-
+        CRUD de Posts (topicos e respostas).
+
+        Acoes adicionais:
+        - GET /posts/?disciplina={id}
+        - GET /posts/{id}/respostas/
+        - POST /posts/{id}/visualizar/
+        - POST/DELETE /posts/{id}/votar/
+        - POST/DELETE /posts/{id}/reagir-persiste/
+        - POST /posts/{id}/denunciar/
+        - POST/DELETE /posts/{id}/marcar-melhor/
+        - POST /posts/{id}/anexar/ -- upload de arquivo (multipart/form-data)
+        - GET /posts/{id}/arquivos/ -- lista anexos do post
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Post.
+        required: true
+      tags:
+      - forum
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+          description: ''
+  /api/forum/posts/{id}/votar/:
+    post:
+      operationId: forum_posts_votar_create
+      description: |-
+        CRUD de Posts (topicos e respostas).
+
+        Acoes adicionais:
+        - GET /posts/?disciplina={id}
+        - GET /posts/{id}/respostas/
+        - POST /posts/{id}/visualizar/
+        - POST/DELETE /posts/{id}/votar/
+        - POST/DELETE /posts/{id}/reagir-persiste/
+        - POST /posts/{id}/denunciar/
+        - POST/DELETE /posts/{id}/marcar-melhor/
+        - POST /posts/{id}/anexar/ -- upload de arquivo (multipart/form-data)
+        - GET /posts/{id}/arquivos/ -- lista anexos do post
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Post.
+        required: true
+      tags:
+      - forum
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+          description: ''
+    delete:
+      operationId: forum_posts_votar_destroy
+      description: |-
+        CRUD de Posts (topicos e respostas).
+
+        Acoes adicionais:
+        - GET /posts/?disciplina={id}
+        - GET /posts/{id}/respostas/
+        - POST /posts/{id}/visualizar/
+        - POST/DELETE /posts/{id}/votar/
+        - POST/DELETE /posts/{id}/reagir-persiste/
+        - POST /posts/{id}/denunciar/
+        - POST/DELETE /posts/{id}/marcar-melhor/
+        - POST /posts/{id}/anexar/ -- upload de arquivo (multipart/form-data)
+        - GET /posts/{id}/arquivos/ -- lista anexos do post
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Post.
+        required: true
+      tags:
+      - forum
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/notificacoes/:
+    get:
+      operationId: notificacoes_list
+      description: |-
+        Notificacoes do usuario autenticado.
+
+        Acoes:
+        - GET /notificacoes/ -- lista todas (com filtro ?lida=true|false)
+        - GET /notificacoes/{id}/ -- detalha
+        - GET /notificacoes/nao-lidas/ -- contador rapido
+        - POST /notificacoes/{id}/marcar-lida/ -- marca uma como lida
+        - POST /notificacoes/marcar-todas-lidas/ -- marca todas como lidas
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      tags:
+      - notificacoes
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notificacao'
+          description: ''
+  /api/notificacoes/{id}/:
+    get:
+      operationId: notificacoes_retrieve
+      description: |-
+        Notificacoes do usuario autenticado.
+
+        Acoes:
+        - GET /notificacoes/ -- lista todas (com filtro ?lida=true|false)
+        - GET /notificacoes/{id}/ -- detalha
+        - GET /notificacoes/nao-lidas/ -- contador rapido
+        - POST /notificacoes/{id}/marcar-lida/ -- marca uma como lida
+        - POST /notificacoes/marcar-todas-lidas/ -- marca todas como lidas
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - notificacoes
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notificacao'
+          description: ''
+  /api/notificacoes/{id}/marcar-lida/:
+    post:
+      operationId: notificacoes_marcar_lida_create
+      description: Marca uma notificacao como lida.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - notificacoes
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notificacao'
+          description: ''
+  /api/notificacoes/marcar-todas-lidas/:
+    post:
+      operationId: notificacoes_marcar_todas_lidas_create
+      description: Marca todas as notificacoes nao lidas do usuario como lidas.
+      tags:
+      - notificacoes
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notificacao'
+          description: ''
+  /api/notificacoes/nao-lidas/:
+    get:
+      operationId: notificacoes_nao_lidas_retrieve
+      description: Retorna apenas o contador de nao lidas (rapido, sem listar).
+      tags:
+      - notificacoes
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notificacao'
+          description: ''
+  /api/reputacao/disciplina/{disciplina_id}/:
+    get:
+      operationId: reputacao_disciplina_retrieve
+      description: |-
+        GET /api/reputacao/disciplina/{disciplina_id}/
+
+        Retorna o ranking ao vivo de uma disciplina, ordenado por pontos.
+        Aceita ?limite=N para limitar o numero de posicoes (default 50).
+      summary: Ranking ao vivo de uma disciplina
+      parameters:
+      - in: path
+        name: disciplina_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Reputacao
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/reputacao/minha/:
+    get:
+      operationId: reputacao_minha_list
+      description: |-
+        GET /api/reputacao/minha/
+
+        Retorna a reputacao do usuario autenticado em todas as disciplinas
+        onde ele tem pontuacao registrada.
+      summary: Minha reputacao em todas as disciplinas
+      tags:
+      - Reputacao
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UsuarioDisciplinaReputacao'
+          description: ''
+  /api/reputacao/ranking-semestral/:
+    get:
+      operationId: reputacao_ranking_semestral_list
+      description: |-
+        Consulta de rankings semestrais historicos.
+
+        - GET /api/reputacao/ranking-semestral/ -- lista (filtros: disciplina, semestre)
+        - POST /api/reputacao/ranking-semestral/gerar/ -- gera snapshot (so admin)
+      tags:
+      - reputacao
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RankingSemestral'
+          description: ''
+  /api/reputacao/ranking-semestral/{id}/:
+    get:
+      operationId: reputacao_ranking_semestral_retrieve
+      description: |-
+        Consulta de rankings semestrais historicos.
+
+        - GET /api/reputacao/ranking-semestral/ -- lista (filtros: disciplina, semestre)
+        - POST /api/reputacao/ranking-semestral/gerar/ -- gera snapshot (so admin)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Ranking Semestral.
+        required: true
+      tags:
+      - reputacao
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RankingSemestral'
+          description: ''
+  /api/reputacao/ranking-semestral/gerar/:
+    post:
+      operationId: reputacao_ranking_semestral_gerar_create
+      description: |-
+        Gera um snapshot do ranking semestral de uma disciplina.
+
+        Body esperado: {"disciplina": "<uuid>", "semestre": "2026.1"}
+        Se ja existir ranking para essa disciplina/semestre, e substituido.
+        A operacao e atomica: ou o ranking inteiro e regerado, ou nada muda.
+      tags:
+      - reputacao
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RankingSemestral'
+          description: ''
+  /api/voluntariado/certificados/:
+    get:
+      operationId: voluntariado_certificados_list
+      description: |-
+        Consulta de certificados.
+
+        - GET /certificados/ -- estudante ve os proprios
+        - GET /certificados/{id}/ -- detalha
+        - GET /certificados/validar/{codigo}/ -- endpoint publico de validacao
+      tags:
+      - voluntariado
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Certificado'
+          description: ''
+  /api/voluntariado/certificados/{id}/:
+    get:
+      operationId: voluntariado_certificados_retrieve
+      description: |-
+        Consulta de certificados.
+
+        - GET /certificados/ -- estudante ve os proprios
+        - GET /certificados/{id}/ -- detalha
+        - GET /certificados/validar/{codigo}/ -- endpoint publico de validacao
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - voluntariado
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Certificado'
+          description: ''
+  /api/voluntariado/certificados/validar/{codigo}/:
+    get:
+      operationId: voluntariado_certificados_validar_retrieve
+      description: |-
+        Endpoint publico de validacao de certificado por codigo.
+
+        Nao requer autenticacao para permitir verificacao por terceiros
+        (ex: empregadores). Mascara CPF do estudante.
+      parameters:
+      - in: path
+        name: codigo
+        schema:
+          type: string
+          pattern: ^[A-Z0-9]+$
+        required: true
+      tags:
+      - voluntariado
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Certificado'
+          description: ''
+  /api/voluntariado/inscricoes/:
+    get:
+      operationId: voluntariado_inscricoes_list
+      description: |-
+        Gerenciamento de inscricoes de voluntariado.
+
+        Visibilidade:
+        - Estudante: ve suas proprias inscricoes
+        - Organizacao: ve as inscricoes das suas oportunidades
+        - Admin: ve todas
+
+        Acoes:
+        - POST /inscricoes/{id}/aprovar/
+        - POST /inscricoes/{id}/rejeitar/
+        - POST /inscricoes/{id}/remover/
+        - POST /inscricoes/{id}/concluir/
+        - POST /inscricoes/{id}/desistir/  (apenas o proprio estudante)
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      tags:
+      - voluntariado
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InscricaoVoluntariado'
+          description: ''
+  /api/voluntariado/inscricoes/{id}/:
+    get:
+      operationId: voluntariado_inscricoes_retrieve
+      description: |-
+        Gerenciamento de inscricoes de voluntariado.
+
+        Visibilidade:
+        - Estudante: ve suas proprias inscricoes
+        - Organizacao: ve as inscricoes das suas oportunidades
+        - Admin: ve todas
+
+        Acoes:
+        - POST /inscricoes/{id}/aprovar/
+        - POST /inscricoes/{id}/rejeitar/
+        - POST /inscricoes/{id}/remover/
+        - POST /inscricoes/{id}/concluir/
+        - POST /inscricoes/{id}/desistir/  (apenas o proprio estudante)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - voluntariado
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InscricaoVoluntariado'
+          description: ''
+  /api/voluntariado/inscricoes/{id}/aprovar/:
+    post:
+      operationId: voluntariado_inscricoes_aprovar_create
+      description: ONG aprova a inscricao.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - voluntariado
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InscricaoVoluntariadoRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InscricaoVoluntariadoRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InscricaoVoluntariadoRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InscricaoVoluntariado'
+          description: ''
+  /api/voluntariado/inscricoes/{id}/concluir/:
+    post:
+      operationId: voluntariado_inscricoes_concluir_create
+      description: ONG marca a inscricao como concluida e emite o certificado.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - voluntariado
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InscricaoVoluntariadoRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InscricaoVoluntariadoRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InscricaoVoluntariadoRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InscricaoVoluntariado'
+          description: ''
+  /api/voluntariado/inscricoes/{id}/desistir/:
+    post:
+      operationId: voluntariado_inscricoes_desistir_create
+      description: Estudante desiste da inscricao (apenas o proprio).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - voluntariado
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InscricaoVoluntariadoRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InscricaoVoluntariadoRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InscricaoVoluntariadoRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InscricaoVoluntariado'
+          description: ''
+  /api/voluntariado/inscricoes/{id}/rejeitar/:
+    post:
+      operationId: voluntariado_inscricoes_rejeitar_create
+      description: ONG rejeita a inscricao.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - voluntariado
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InscricaoVoluntariadoRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InscricaoVoluntariadoRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InscricaoVoluntariadoRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InscricaoVoluntariado'
+          description: ''
+  /api/voluntariado/inscricoes/{id}/remover/:
+    post:
+      operationId: voluntariado_inscricoes_remover_create
+      description: ONG remove um participante (mesmo se ja aprovado).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - voluntariado
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InscricaoVoluntariadoRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InscricaoVoluntariadoRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InscricaoVoluntariadoRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InscricaoVoluntariado'
+          description: ''
+  /api/voluntariado/oportunidades/:
+    get:
+      operationId: voluntariado_oportunidades_list
+      description: |-
+        CRUD de oportunidades de voluntariado.
+
+        - GET (lista/detalhe): qualquer usuario autenticado
+        - POST/PUT/PATCH/DELETE: apenas organizacao dona ou admin
+        - Filtros: ?area=, ?status=, ?search=, ?aberta=true
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - voluntariado
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Oportunidade'
+          description: ''
+    post:
+      operationId: voluntariado_oportunidades_create
+      description: |-
+        CRUD de oportunidades de voluntariado.
+
+        - GET (lista/detalhe): qualquer usuario autenticado
+        - POST/PUT/PATCH/DELETE: apenas organizacao dona ou admin
+        - Filtros: ?area=, ?status=, ?search=, ?aberta=true
+      tags:
+      - voluntariado
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OportunidadeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OportunidadeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OportunidadeRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Oportunidade'
+          description: ''
+  /api/voluntariado/oportunidades/{id}/:
+    get:
+      operationId: voluntariado_oportunidades_retrieve
+      description: |-
+        CRUD de oportunidades de voluntariado.
+
+        - GET (lista/detalhe): qualquer usuario autenticado
+        - POST/PUT/PATCH/DELETE: apenas organizacao dona ou admin
+        - Filtros: ?area=, ?status=, ?search=, ?aberta=true
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Oportunidade de Voluntariado.
+        required: true
+      tags:
+      - voluntariado
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Oportunidade'
+          description: ''
+    put:
+      operationId: voluntariado_oportunidades_update
+      description: |-
+        CRUD de oportunidades de voluntariado.
+
+        - GET (lista/detalhe): qualquer usuario autenticado
+        - POST/PUT/PATCH/DELETE: apenas organizacao dona ou admin
+        - Filtros: ?area=, ?status=, ?search=, ?aberta=true
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Oportunidade de Voluntariado.
+        required: true
+      tags:
+      - voluntariado
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OportunidadeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OportunidadeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OportunidadeRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Oportunidade'
+          description: ''
+    patch:
+      operationId: voluntariado_oportunidades_partial_update
+      description: |-
+        CRUD de oportunidades de voluntariado.
+
+        - GET (lista/detalhe): qualquer usuario autenticado
+        - POST/PUT/PATCH/DELETE: apenas organizacao dona ou admin
+        - Filtros: ?area=, ?status=, ?search=, ?aberta=true
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Oportunidade de Voluntariado.
+        required: true
+      tags:
+      - voluntariado
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedOportunidadeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedOportunidadeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedOportunidadeRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Oportunidade'
+          description: ''
+    delete:
+      operationId: voluntariado_oportunidades_destroy
+      description: |-
+        CRUD de oportunidades de voluntariado.
+
+        - GET (lista/detalhe): qualquer usuario autenticado
+        - POST/PUT/PATCH/DELETE: apenas organizacao dona ou admin
+        - Filtros: ?area=, ?status=, ?search=, ?aberta=true
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Oportunidade de Voluntariado.
+        required: true
+      tags:
+      - voluntariado
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/voluntariado/oportunidades/{id}/inscrever/:
+    post:
+      operationId: voluntariado_oportunidades_inscrever_create
+      description: Inscreve o estudante autenticado na oportunidade.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Oportunidade de Voluntariado.
+        required: true
+      tags:
+      - voluntariado
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OportunidadeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OportunidadeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OportunidadeRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Oportunidade'
+          description: ''
+  /api/voluntariado/oportunidades/{id}/inscricoes/:
+    get:
+      operationId: voluntariado_oportunidades_inscricoes_retrieve
+      description: Lista as inscricoes de uma oportunidade (apenas organizacao dona/admin).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Oportunidade de Voluntariado.
+        required: true
+      tags:
+      - voluntariado
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Oportunidade'
+          description: ''
+components:
+  schemas:
+    AcaoEnum:
+      enum:
+      - login
+      - logout
+      - registro
+      - ativacao
+      - disciplina_criada
+      - permissao_disciplina_alterada
+      - post_criado
+      - post_editado
+      - post_removido
+      - marcou_melhor
+      - desmarcou_melhor
+      - denunciou
+      - oportunidade_criada
+      - inscricao_voluntariado
+      - inscricao_aprovada
+      - inscricao_rejeitada
+      - inscricao_removida
+      - voluntariado_concluido
+      - ranking_semestral_gerado
+      - denuncia_resolvida
+      type: string
+      description: |-
+        * `login` - Login
+        * `logout` - Logout
+        * `registro` - Registro de novo usuario
+        * `ativacao` - Ativacao de conta
+        * `disciplina_criada` - Disciplina criada
+        * `permissao_disciplina_alterada` - Permissao em disciplina alterada
+        * `post_criado` - Post criado
+        * `post_editado` - Post editado
+        * `post_removido` - Post removido
+        * `marcou_melhor` - Marcou resposta como melhor
+        * `desmarcou_melhor` - Desmarcou melhor resposta
+        * `denunciou` - Denunciou conteudo
+        * `oportunidade_criada` - Oportunidade de voluntariado criada
+        * `inscricao_voluntariado` - Inscricao em oportunidade de voluntariado
+        * `inscricao_aprovada` - Inscricao em voluntariado aprovada
+        * `inscricao_rejeitada` - Inscricao em voluntariado rejeitada
+        * `inscricao_removida` - Participante removido de oportunidade
+        * `voluntariado_concluido` - Voluntariado concluido e certificado emitido
+        * `ranking_semestral_gerado` - Ranking semestral gerado
+        * `denuncia_resolvida` - Denuncia resolvida
+    AlertaConteudo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        denunciante:
+          type: string
+          format: uuid
+          readOnly: true
+        denunciante_nome:
+          type: string
+          readOnly: true
+        post:
+          type: string
+          format: uuid
+        post_titulo:
+          type: string
+          readOnly: true
+        motivo:
+          type: string
+        status:
+          allOf:
+          - $ref: '#/components/schemas/AlertaConteudoStatusEnum'
+          readOnly: true
+        resolvido_por:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        resolvido_por_nome:
+          type: string
+          readOnly: true
+        resolucao:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        resolvido_em:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - created_at
+      - denunciante
+      - denunciante_nome
+      - id
+      - motivo
+      - post
+      - post_titulo
+      - resolucao
+      - resolvido_em
+      - resolvido_por
+      - resolvido_por_nome
+      - status
+    AlertaConteudoRequest:
+      type: object
+      properties:
+        post:
+          type: string
+          format: uuid
+        motivo:
+          type: string
+          minLength: 1
+      required:
+      - motivo
+      - post
+    AlertaConteudoStatusEnum:
+      enum:
+      - pendente
+      - em_analise
+      - procedente
+      - improcedente
+      type: string
+      description: |-
+        * `pendente` - Pendente
+        * `em_analise` - Em Analise
+        * `procedente` - Procedente
+        * `improcedente` - Improcedente
+    AreaEnum:
+      enum:
+      - educacao
+      - saude
+      - meio_ambiente
+      - assistencia_social
+      - direitos_humanos
+      - cultura
+      - tecnologia
+      - esporte
+      - outro
+      type: string
+      description: |-
+        * `educacao` - Educacao
+        * `saude` - Saude
+        * `meio_ambiente` - Meio Ambiente
+        * `assistencia_social` - Assistencia Social
+        * `direitos_humanos` - Direitos Humanos
+        * `cultura` - Cultura e Arte
+        * `tecnologia` - Tecnologia
+        * `esporte` - Esporte
+        * `outro` - Outro
+    Arquivo:
+      type: object
+      description: |-
+        Serializa anexos de posts.
+
+        Aplica validacao em tres camadas (extensao, magic bytes, tamanho)
+        e sanitiza o nome antes de salvar.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        post:
+          type: string
+          format: uuid
+        arquivo:
+          type: string
+          format: uri
+        arquivo_url:
+          type: string
+          readOnly: true
+        nome_original:
+          type: string
+          readOnly: true
+        tamanho_bytes:
+          type: integer
+          readOnly: true
+        tamanho_legivel:
+          type: string
+          readOnly: true
+        tipo_mime:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - arquivo
+      - arquivo_url
+      - created_at
+      - id
+      - nome_original
+      - post
+      - tamanho_bytes
+      - tamanho_legivel
+      - tipo_mime
+    AtivacaoRequest:
+      type: object
+      description: Serializer para ativacao de conta via codigo OTP.
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+        codigo:
+          type: string
+          minLength: 6
+          maxLength: 6
+      required:
+      - codigo
+      - email
+    AuditLog:
+      type: object
+      description: Serializa registros de auditoria (somente leitura).
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        usuario:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+          description: Usuario que executou a acao (nulo se anonimo ou usuario removido)
+        usuario_cpf:
+          type: string
+          readOnly: true
+        usuario_nome:
+          type: string
+          readOnly: true
+        acao:
+          allOf:
+          - $ref: '#/components/schemas/AcaoEnum'
+          readOnly: true
+        acao_display:
+          type: string
+          readOnly: true
+        objeto_id:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        objeto_tipo:
+          type: string
+          readOnly: true
+        dados_anteriores:
+          readOnly: true
+          nullable: true
+        dados_novos:
+          readOnly: true
+          nullable: true
+        ip_origem:
+          type: string
+          readOnly: true
+          nullable: true
+        user_agent:
+          type: string
+          readOnly: true
+        descricao:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - acao
+      - acao_display
+      - created_at
+      - dados_anteriores
+      - dados_novos
+      - descricao
+      - id
+      - ip_origem
+      - objeto_id
+      - objeto_tipo
+      - user_agent
+      - usuario
+      - usuario_cpf
+      - usuario_nome
+    Certificado:
+      type: object
+      description: Serializa certificados (somente leitura).
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        codigo_validacao:
+          type: string
+          readOnly: true
+        nome_estudante:
+          type: string
+          readOnly: true
+        cpf_estudante:
+          type: string
+          readOnly: true
+        nome_oportunidade:
+          type: string
+          readOnly: true
+        nome_organizacao:
+          type: string
+          readOnly: true
+        area_atuacao:
+          type: string
+          readOnly: true
+        local:
+          type: string
+          readOnly: true
+        data_inicio:
+          type: string
+          format: date
+          readOnly: true
+        data_fim:
+          type: string
+          format: date
+          readOnly: true
+        horas_realizadas:
+          type: integer
+          readOnly: true
+        arquivo_pdf_url:
+          type: string
+          readOnly: true
+        emitido_em:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - area_atuacao
+      - arquivo_pdf_url
+      - codigo_validacao
+      - cpf_estudante
+      - data_fim
+      - data_inicio
+      - emitido_em
+      - horas_realizadas
+      - id
+      - local
+      - nome_estudante
+      - nome_oportunidade
+      - nome_organizacao
+    Disciplina:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        codigo:
+          type: string
+          maxLength: 20
+        nome:
+          type: string
+          maxLength: 255
+        curso:
+          type: string
+          maxLength: 100
+        semestre:
+          type: string
+          description: 'Ex: 2026.1'
+          maxLength: 10
+        ativo:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - codigo
+      - created_at
+      - curso
+      - id
+      - nome
+      - semestre
+    DisciplinaRequest:
+      type: object
+      properties:
+        codigo:
+          type: string
+          minLength: 1
+          maxLength: 20
+        nome:
+          type: string
+          minLength: 1
+          maxLength: 255
+        curso:
+          type: string
+          minLength: 1
+          maxLength: 100
+        semestre:
+          type: string
+          minLength: 1
+          description: 'Ex: 2026.1'
+          maxLength: 10
+        ativo:
+          type: boolean
+      required:
+      - codigo
+      - curso
+      - nome
+      - semestre
+    InscricaoVoluntariado:
+      type: object
+      description: Serializa inscricoes de voluntariado.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        oportunidade:
+          type: string
+          format: uuid
+        oportunidade_titulo:
+          type: string
+          readOnly: true
+        oportunidade_organizacao:
+          type: string
+          readOnly: true
+        estudante:
+          type: string
+          format: uuid
+          readOnly: true
+        estudante_nome:
+          type: string
+          readOnly: true
+        estudante_cpf:
+          type: string
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/InscricaoVoluntariadoStatusEnum'
+          readOnly: true
+        status_display:
+          type: string
+          readOnly: true
+        motivacao:
+          type: string
+          description: Texto livre escrito pelo estudante no momento da inscricao
+        avaliado_por:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        avaliado_por_nome:
+          type: string
+          readOnly: true
+        avaliado_em:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        motivo_decisao:
+          type: string
+          readOnly: true
+          description: Justificativa para aprovacao, rejeicao ou remocao
+        horas_realizadas:
+          type: integer
+          readOnly: true
+          nullable: true
+          description: Horas efetivamente cumpridas, registradas na conclusao
+        avaliacao_organizacao:
+          type: string
+          readOnly: true
+          description: Comentario da ONG sobre o desempenho do voluntario
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - avaliacao_organizacao
+      - avaliado_em
+      - avaliado_por
+      - avaliado_por_nome
+      - created_at
+      - estudante
+      - estudante_cpf
+      - estudante_nome
+      - horas_realizadas
+      - id
+      - motivo_decisao
+      - oportunidade
+      - oportunidade_organizacao
+      - oportunidade_titulo
+      - status
+      - status_display
+      - updated_at
+    InscricaoVoluntariadoRequest:
+      type: object
+      description: Serializa inscricoes de voluntariado.
+      properties:
+        oportunidade:
+          type: string
+          format: uuid
+        motivacao:
+          type: string
+          description: Texto livre escrito pelo estudante no momento da inscricao
+      required:
+      - oportunidade
+    InscricaoVoluntariadoStatusEnum:
+      enum:
+      - pendente
+      - aprovada
+      - rejeitada
+      - removida
+      - desistente
+      - concluida
+      type: string
+      description: |-
+        * `pendente` - Pendente
+        * `aprovada` - Aprovada
+        * `rejeitada` - Rejeitada
+        * `removida` - Removida
+        * `desistente` - Desistente
+        * `concluida` - Concluida
+    Notificacao:
+      type: object
+      description: Serializa notificacoes para a API.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        tipo:
+          allOf:
+          - $ref: '#/components/schemas/TipoEnum'
+          readOnly: true
+        tipo_display:
+          type: string
+          readOnly: true
+        titulo:
+          type: string
+          readOnly: true
+        mensagem:
+          type: string
+          readOnly: true
+        remetente:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+          description: Usuario que originou o evento (pode ser nulo em eventos do
+            sistema)
+        remetente_nome:
+          type: string
+          readOnly: true
+        objeto_id:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        objeto_tipo:
+          type: string
+          readOnly: true
+        lida:
+          type: boolean
+          readOnly: true
+        lida_em:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - lida
+      - lida_em
+      - mensagem
+      - objeto_id
+      - objeto_tipo
+      - remetente
+      - remetente_nome
+      - tipo
+      - tipo_display
+      - titulo
+    Oportunidade:
+      type: object
+      description: Serializa oportunidades de voluntariado.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        organizacao:
+          type: string
+          format: uuid
+          readOnly: true
+          description: Usuario com RoleGlobal=ong ou admin que publicou a oportunidade
+        organizacao_nome:
+          type: string
+          readOnly: true
+        titulo:
+          type: string
+          maxLength: 255
+        descricao:
+          type: string
+        area:
+          $ref: '#/components/schemas/AreaEnum'
+        area_display:
+          type: string
+          readOnly: true
+        local:
+          type: string
+          description: Cidade/local de realizacao
+          maxLength: 255
+        vagas:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        vagas_disponiveis:
+          type: integer
+          readOnly: true
+        total_inscritos:
+          type: string
+          readOnly: true
+        carga_horaria_total:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          description: Carga horaria estimada em horas
+        data_inicio:
+          type: string
+          format: date
+        data_fim:
+          type: string
+          format: date
+        prazo_inscricao:
+          type: string
+          format: date
+        requer_aprovacao:
+          type: boolean
+          description: Se False, inscricoes sao aprovadas automaticamente
+        status:
+          $ref: '#/components/schemas/OportunidadeStatusEnum'
+        status_display:
+          type: string
+          readOnly: true
+        esta_aberta_inscricao:
+          type: boolean
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - area
+      - area_display
+      - carga_horaria_total
+      - created_at
+      - data_fim
+      - data_inicio
+      - descricao
+      - esta_aberta_inscricao
+      - id
+      - local
+      - organizacao
+      - organizacao_nome
+      - prazo_inscricao
+      - status_display
+      - titulo
+      - total_inscritos
+      - updated_at
+      - vagas_disponiveis
+    OportunidadeRequest:
+      type: object
+      description: Serializa oportunidades de voluntariado.
+      properties:
+        titulo:
+          type: string
+          minLength: 1
+          maxLength: 255
+        descricao:
+          type: string
+          minLength: 1
+        area:
+          $ref: '#/components/schemas/AreaEnum'
+        local:
+          type: string
+          minLength: 1
+          description: Cidade/local de realizacao
+          maxLength: 255
+        vagas:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        carga_horaria_total:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          description: Carga horaria estimada em horas
+        data_inicio:
+          type: string
+          format: date
+        data_fim:
+          type: string
+          format: date
+        prazo_inscricao:
+          type: string
+          format: date
+        requer_aprovacao:
+          type: boolean
+          description: Se False, inscricoes sao aprovadas automaticamente
+        status:
+          $ref: '#/components/schemas/OportunidadeStatusEnum'
+      required:
+      - area
+      - carga_horaria_total
+      - data_fim
+      - data_inicio
+      - descricao
+      - local
+      - prazo_inscricao
+      - titulo
+    OportunidadeStatusEnum:
+      enum:
+      - ativa
+      - encerrada
+      - cancelada
+      type: string
+      description: |-
+        * `ativa` - Ativa
+        * `encerrada` - Encerrada
+        * `cancelada` - Cancelada
+    PapelEnum:
+      enum:
+      - aluno
+      - monitor
+      - professor
+      type: string
+      description: |-
+        * `aluno` - Aluno
+        * `monitor` - Monitor
+        * `professor` - Professor
+    PatchedDisciplinaRequest:
+      type: object
+      properties:
+        codigo:
+          type: string
+          minLength: 1
+          maxLength: 20
+        nome:
+          type: string
+          minLength: 1
+          maxLength: 255
+        curso:
+          type: string
+          minLength: 1
+          maxLength: 100
+        semestre:
+          type: string
+          minLength: 1
+          description: 'Ex: 2026.1'
+          maxLength: 10
+        ativo:
+          type: boolean
+    PatchedOportunidadeRequest:
+      type: object
+      description: Serializa oportunidades de voluntariado.
+      properties:
+        titulo:
+          type: string
+          minLength: 1
+          maxLength: 255
+        descricao:
+          type: string
+          minLength: 1
+        area:
+          $ref: '#/components/schemas/AreaEnum'
+        local:
+          type: string
+          minLength: 1
+          description: Cidade/local de realizacao
+          maxLength: 255
+        vagas:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        carga_horaria_total:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          description: Carga horaria estimada em horas
+        data_inicio:
+          type: string
+          format: date
+        data_fim:
+          type: string
+          format: date
+        prazo_inscricao:
+          type: string
+          format: date
+        requer_aprovacao:
+          type: boolean
+          description: Se False, inscricoes sao aprovadas automaticamente
+        status:
+          $ref: '#/components/schemas/OportunidadeStatusEnum'
+    PatchedPermissaoDisciplinaRequest:
+      type: object
+      properties:
+        usuario:
+          type: string
+          format: uuid
+        disciplina:
+          type: string
+          format: uuid
+        papel:
+          $ref: '#/components/schemas/PapelEnum'
+        ativo:
+          type: boolean
+    PatchedPostRequest:
+      type: object
+      properties:
+        disciplina:
+          type: string
+          format: uuid
+        post_pai:
+          type: string
+          format: uuid
+          nullable: true
+        titulo:
+          type: string
+          description: Vazio em respostas
+          maxLength: 255
+        conteudo:
+          type: string
+          minLength: 1
+    PermissaoDisciplina:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        usuario:
+          type: string
+          format: uuid
+        usuario_cpf:
+          type: string
+          readOnly: true
+        usuario_nome:
+          type: string
+          readOnly: true
+        disciplina:
+          type: string
+          format: uuid
+        disciplina_codigo:
+          type: string
+          readOnly: true
+        disciplina_nome:
+          type: string
+          readOnly: true
+        papel:
+          $ref: '#/components/schemas/PapelEnum'
+        ativo:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - disciplina
+      - disciplina_codigo
+      - disciplina_nome
+      - id
+      - papel
+      - usuario
+      - usuario_cpf
+      - usuario_nome
+    PermissaoDisciplinaRequest:
+      type: object
+      properties:
+        usuario:
+          type: string
+          format: uuid
+        disciplina:
+          type: string
+          format: uuid
+        papel:
+          $ref: '#/components/schemas/PapelEnum'
+        ativo:
+          type: boolean
+      required:
+      - disciplina
+      - papel
+      - usuario
+    Post:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        disciplina:
+          type: string
+          format: uuid
+        disciplina_codigo:
+          type: string
+          readOnly: true
+        autor:
+          type: string
+          format: uuid
+          readOnly: true
+        autor_nome:
+          type: string
+          readOnly: true
+        post_pai:
+          type: string
+          format: uuid
+          nullable: true
+        titulo:
+          type: string
+          description: Vazio em respostas
+          maxLength: 255
+        conteudo:
+          type: string
+        e_melhor:
+          type: boolean
+          readOnly: true
+        e_topico:
+          type: boolean
+          readOnly: true
+        visualizacoes:
+          type: integer
+          readOnly: true
+        pontuacao:
+          type: integer
+          readOnly: true
+          description: Cache de votos
+        total_reacoes_persiste:
+          type: integer
+          readOnly: true
+          description: Cache de quantos usuarios marcaram que a duvida persiste
+        total_respostas:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - autor
+      - autor_nome
+      - conteudo
+      - created_at
+      - disciplina
+      - disciplina_codigo
+      - e_melhor
+      - e_topico
+      - id
+      - pontuacao
+      - total_reacoes_persiste
+      - total_respostas
+      - updated_at
+      - visualizacoes
+    PostRequest:
+      type: object
+      properties:
+        disciplina:
+          type: string
+          format: uuid
+        post_pai:
+          type: string
+          format: uuid
+          nullable: true
+        titulo:
+          type: string
+          description: Vazio em respostas
+          maxLength: 255
+        conteudo:
+          type: string
+          minLength: 1
+      required:
+      - conteudo
+      - disciplina
+    RankingSemestral:
+      type: object
+      description: Serializa uma posicao em um ranking semestral historico.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        disciplina:
+          type: string
+          format: uuid
+          readOnly: true
+        disciplina_codigo:
+          type: string
+          readOnly: true
+        semestre:
+          type: string
+          readOnly: true
+          description: 'Ex: 2026.1'
+        posicao:
+          type: integer
+          readOnly: true
+        usuario:
+          type: string
+          format: uuid
+          readOnly: true
+        nome_usuario:
+          type: string
+          readOnly: true
+        pontos:
+          type: integer
+          readOnly: true
+        gerado_em:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - disciplina
+      - disciplina_codigo
+      - gerado_em
+      - id
+      - nome_usuario
+      - pontos
+      - posicao
+      - semestre
+      - usuario
+    ReenvioCodigoRequest:
+      type: object
+      description: Serializer para reenvio de codigo de ativacao.
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+      required:
+      - email
+    RegistroRequest:
+      type: object
+      description: |-
+        Serializer de registro de novo usuario.
+
+        Aceita CPF com ou sem mascara. Aplica validacoes de senha forte do Django.
+        Cria o usuario com ativo=False; a ativacao acontece via codigo enviado por email.
+      properties:
+        cpf:
+          type: string
+          minLength: 1
+          maxLength: 14
+        email:
+          type: string
+          format: email
+          minLength: 1
+        nome_completo:
+          type: string
+          minLength: 1
+          maxLength: 255
+        password:
+          type: string
+          writeOnly: true
+          minLength: 8
+        password_confirm:
+          type: string
+          writeOnly: true
+          minLength: 8
+      required:
+      - cpf
+      - email
+      - nome_completo
+      - password
+      - password_confirm
+    TipoEnum:
+      enum:
+      - nova_resposta
+      - voto_recebido
+      - melhor_resposta
+      - reacao_persiste
+      - denuncia_resolvida
+      - post_removido
+      - papel_disciplina
+      - inscricao_aprovada
+      - inscricao_rejeitada
+      - inscricao_removida
+      - voluntariado_concluido
+      type: string
+      description: |-
+        * `nova_resposta` - Nova resposta no seu topico
+        * `voto_recebido` - Novo voto no seu post
+        * `melhor_resposta` - Sua resposta foi marcada como melhor
+        * `reacao_persiste` - Reacao "duvida persiste" na sua resposta
+        * `denuncia_resolvida` - Sua denuncia foi resolvida
+        * `post_removido` - Seu post foi removido por moderacao
+        * `papel_disciplina` - Voce foi adicionado a uma disciplina
+        * `inscricao_aprovada` - Sua inscricao em voluntariado foi aprovada
+        * `inscricao_rejeitada` - Sua inscricao em voluntariado foi rejeitada
+        * `inscricao_removida` - Voce foi removido de uma oportunidade
+        * `voluntariado_concluido` - Sua participacao foi concluida e o certificado emitido
+    TokenObtainPair:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+          readOnly: true
+      required:
+      - access
+      - refresh
+    TokenObtainPairRequest:
+      type: object
+      properties:
+        cpf:
+          type: string
+          writeOnly: true
+          minLength: 1
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - cpf
+      - password
+    TokenRefresh:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+      required:
+      - access
+      - refresh
+    TokenRefreshRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+      required:
+      - refresh
+    TokenVerifyRequest:
+      type: object
+      properties:
+        token:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - token
+    UsuarioDisciplinaReputacao:
+      type: object
+      description: Serializa a reputacao de um usuario em uma disciplina.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        usuario:
+          type: string
+          format: uuid
+          readOnly: true
+        usuario_nome:
+          type: string
+          readOnly: true
+        disciplina:
+          type: string
+          format: uuid
+          readOnly: true
+        disciplina_codigo:
+          type: string
+          readOnly: true
+        disciplina_nome:
+          type: string
+          readOnly: true
+        pontos:
+          type: integer
+          readOnly: true
+        total_posts:
+          type: integer
+          readOnly: true
+        total_respostas:
+          type: integer
+          readOnly: true
+        total_votos_recebidos:
+          type: integer
+          readOnly: true
+        total_melhores_respostas:
+          type: integer
+          readOnly: true
+        atualizado_em:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - atualizado_em
+      - disciplina
+      - disciplina_codigo
+      - disciplina_nome
+      - id
+      - pontos
+      - total_melhores_respostas
+      - total_posts
+      - total_respostas
+      - total_votos_recebidos
+      - usuario
+      - usuario_nome
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+tags:
+- name: Autenticacao
+  description: Login, registro e ativacao de conta
+- name: Forum
+  description: Disciplinas, posts, votos, denuncias e arquivos
+- name: Notificacoes
+  description: Notificacoes do usuario
+- name: Auditoria
+  description: Registros de auditoria do sistema
+- name: Voluntariado
+  description: Oportunidades, inscricoes e certificados
+- name: Reputacao
+  description: Reputacao por disciplina e rankings
