@@ -84,7 +84,7 @@ class CodigoAtivacao(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name='codigos')
-    codigo = models.CharField(max_length=6)
+    codigo = models.CharField(max_length=128, help_text='Hash bcrypt do codigo de ativacao')
     tipo = models.CharField(max_length=15, choices=TIPO_CHOICES)
     tentativas = models.IntegerField(default=0)
     data_expiracao = models.DateTimeField()

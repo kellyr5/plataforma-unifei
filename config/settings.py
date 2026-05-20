@@ -40,8 +40,13 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework_simplejwt',
+    'drf_spectacular',
     'autenticacao',
     'forum',
+    'notificacoes',
+    'auditoria',
+    'voluntariado',
+    'reputacao',
 ]
 
 MIDDLEWARE = [
@@ -52,6 +57,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'auditoria.middleware.AuditoriaContextoMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -140,6 +146,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 # ===== Simple JWT =====
@@ -162,3 +169,37 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Limite de tamanho de upload (alinhado com validators do forum)
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB
+
+# ===== Email =====
+# Em desenvolvimento, os emails sao impressos no terminal em vez de enviados.
+# Em producao, trocar EMAIL_BACKEND para SMTP real (Gmail, SendGrid, etc).
+EMAIL_BACKEND = config(
+    'EMAIL_BACKEND',
+    default='django.core.mail.backends.console.EmailBackend',
+)
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='nao-responda@plataforma-unifei.local')
+
+# ===== Codigo de ativacao =====
+CODIGO_ATIVACAO_VALIDADE_MINUTOS = 30
+CODIGO_ATIVACAO_MAX_TENTATIVAS = 5
+
+# ===== drf-spectacular (documentacao OpenAPI) =====
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Plataforma UNIFEI - API',
+    'DESCRIPTION': (
+        'API REST da plataforma que integra forum academico organizado por '
+        'disciplina com sistema de voluntariado universitario. '
+        'Trabalho de Conclusao de Curso - Ciencia da Computacao - UNIFEI.'
+    ),
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'TAGS': [
+        {'name': 'Autenticacao', 'description': 'Login, registro e ativacao de conta'},
+        {'name': 'Forum', 'description': 'Disciplinas, posts, votos, denuncias e arquivos'},
+        {'name': 'Notificacoes', 'description': 'Notificacoes do usuario'},
+        {'name': 'Auditoria', 'description': 'Registros de auditoria do sistema'},
+        {'name': 'Voluntariado', 'description': 'Oportunidades, inscricoes e certificados'},
+        {'name': 'Reputacao', 'description': 'Reputacao por disciplina e rankings'},
+    ],
+}

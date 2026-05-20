@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+:root {
+  --bg-main: #F8F9FB;
+  --bg-card: #FFFFFF;
+  --bg-sidebar: #FFFFFF;
+  --bg-input: #F0F1F5;
+  --bg-hover: #F0F1F5;
+  --border: #E2E4E9;
+  --border-focus: #3B82F6;
+  --text-primary: #1A1D27;
+  --text-secondary: #6B7080;
+  --text-tertiary: #9CA3AF;
+  --accent-blue: #3B82F6;
+  --accent-teal: #10B981;
+  --accent-yellow: #F59E0B;
+  --accent-red: #EF4444;
+  --accent-purple: #8B5CF6;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+  --brand-gradient: linear-gradient(135deg, #1E3A5F 0%, #0F1B2D 100%);
+}
+
+[data-theme="dark"] {
+  --bg-main: #0F1117;
+  --bg-card: #1A1D27;
+  --bg-sidebar: #141620;
+  --bg-input: #252836;
+  --bg-hover: #252836;
+  --border: #2A2D37;
+  --border-focus: #3B82F6;
+  --text-primary: #E8E9ED;
+  --text-secondary: #8B8D97;
+  --text-tertiary: #5A5D67;
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.3);
+  --brand-gradient: linear-gradient(135deg, #0F1B2D 0%, #060A14 100%);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-main);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+input, button, textarea, select {
+  font-family: inherit;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}

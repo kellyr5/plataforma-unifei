@@ -2,14 +2,29 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularSwaggerView,
+    SpectacularRedocView,
+)
 
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+
+    # Documentacao da API
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+
+    # Endpoints da aplicacao
     path('api/auth/', include('autenticacao.api.urls')),
     path('api/forum/', include('forum.api.urls')),
+    path('api/notificacoes/', include('notificacoes.api.urls')),
+    path('api/auditoria/', include('auditoria.api.urls')),
+    path('api/voluntariado/', include('voluntariado.api.urls')),
+    path('api/reputacao/', include('reputacao.api.urls')),
 ]
 
-# Servir arquivos de media em desenvolvimento (em producao, usar nginx/storage)
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
