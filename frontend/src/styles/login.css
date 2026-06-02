@@ -1,0 +1,207 @@
+/* ============================================================
+   ESTILOS DA PAGINA DE LOGIN
+   
+   Contem classes especificas da tela de login/primeiro acesso.
+   Gradientes, overlays e efeitos que nao sao cobertos pelo
+   Tailwind ficam aqui em vez de inline no JSX.
+   ============================================================ */
+
+/* --- Layout split-screen --- */
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  background: var(--bg-main);
+}
+
+/* --- Painel esquerdo (hero) --- */
+.login-hero {
+  perspective: 1000px;
+  background: linear-gradient(160deg, #001233 0%, #001845 40%, #002855 100%);
+}
+
+.login-hero__overlay {
+  background: linear-gradient(
+    180deg,
+    rgba(0, 18, 51, 0.5) 0%,
+    rgba(0, 18, 51, 0.4) 40%,
+    rgba(0, 18, 51, 0.8) 100%
+  );
+}
+
+/* --- Carrossel: ajuste brightness e saturacao aqui --- */
+.login-hero__carousel-img {
+  filter: saturate(0.6) brightness(0.3);
+  /* 
+    Para deixar a foto mais visivel:
+    - brightness(0.45) = mais clara
+    - brightness(0.55) = bem visivel
+    - brightness(0.3) = atual (mais escura)
+  */
+}
+
+/* --- Logo UNIFEI no topo --- */
+.login-hero__logo-top {
+  filter: brightness(1.3) drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5));
+}
+
+/* --- Container 3D do logo central --- */
+.login-hero__logo-3d {
+  transform-style: preserve-3d;
+  transition: transform 0.3s ease-out;
+}
+
+/* --- Glow atras do logo --- */
+.login-hero__glow {
+  background: radial-gradient(
+    circle,
+    rgba(0, 48, 135, 0.2) 0%,
+    transparent 70%
+  );
+  animation: glow 5s ease-in-out infinite;
+}
+
+/* --- Sombra projetada no chao --- */
+.login-hero__shadow {
+  transition: transform 0.3s ease-out;
+}
+
+/* --- Logo principal com drop-shadow --- */
+.login-hero__logo-img {
+  transition: transform 0.3s ease-out;
+  filter: drop-shadow(0 16px 32px rgba(0, 0, 0, 0.4));
+}
+
+/* --- Texto gradiente "Transformando Itajuba" --- */
+.login-hero__gradient-text {
+  background-image: linear-gradient(135deg, #4B9CD3, #93C5E8);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* --- Titulo responsivo --- */
+.login-hero__title {
+  font-size: clamp(30px, 3.2vw, 40px);
+}
+
+/* --- Painel direito --- */
+.login-form__toggle-theme {
+  background: var(--bg-input);
+  border: 2px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.login-form__toggle-theme:hover {
+  transform: scale(1.05);
+}
+
+/* --- Badge institucional --- */
+.login-form__badge {
+  background: rgba(0, 48, 135, 0.04);
+  border: 1px solid rgba(0, 48, 135, 0.08);
+}
+
+.login-form__badge-text {
+  color: #0f141d;
+}
+
+/* --- Botao "Primeiro acesso" --- */
+.login-form__btn-alt {
+  background: rgba(0, 48, 135, 0.06);
+  color: #003087;
+  border: 1px solid rgba(0, 48, 135, 0.1);
+}
+
+.login-form__btn-alt:hover {
+  background: rgba(0, 48, 135, 0.12);
+}
+
+/* --- Botao principal (login) --- */
+.login-form__btn-primary {
+  background: linear-gradient(135deg, #003087 0%, #001845 100%);
+  box-shadow: 0 4px 16px rgba(0, 48, 135, 0.3);
+}
+
+.login-form__btn-primary:hover {
+  filter: brightness(1.1);
+}
+
+.login-form__btn-primary:active {
+  transform: scale(0.98);
+}
+
+/* --- Botao secundario --- */
+.login-form__btn-secondary {
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.login-form__btn-secondary:hover {
+  border-color: #003087;
+  color: #003087;
+}
+
+/* --- Input: estados de foco --- */
+.login-input {
+  background: var(--bg-input);
+  border: 1.5px solid var(--border);
+  transition: all 0.2s ease;
+}
+
+.login-input--focused {
+  border-color: #003087;
+  box-shadow: 0 0 0 3px rgba(0, 48, 135, 0.08);
+}
+
+.login-input__icon {
+  color: var(--text-tertiary);
+  transition: color 0.2s ease;
+}
+
+.login-input__icon--focused {
+  color: #003087;
+}
+
+/* --- Indicador de passos (primeiro acesso) --- */
+.login-steps__active {
+  background: #003087;
+  color: white;
+}
+
+.login-steps__inactive {
+  background: var(--border);
+  color: var(--text-tertiary);
+}
+
+.login-steps__label-active {
+  color: #003087;
+}
+
+.login-steps__completed {
+  background: rgba(0, 48, 135, 0.15);
+  color: #003087;
+}
+
+/* --- Inputs do codigo OTP --- */
+.login-otp__input {
+  background: var(--bg-input);
+  border: 1.5px solid var(--border);
+  color: var(--text-primary);
+  max-width: 56px;
+}
+
+.login-otp__input:focus {
+  border-color: #003087;
+  box-shadow: 0 0 0 3px rgba(0, 48, 135, 0.08);
+}
+
+/* --- Link "Esqueceu a senha?" --- */
+.login-form__link {
+  color: #003087;
+}
+
+/* --- Link "Reenviar codigo" --- */
+.login-form__link-reenviar {
+  color: #003087;
+}

@@ -1,0 +1,84 @@
+/* ============================================================
+   ANIMACOES GLOBAIS DA PLATAFORMA UNIFEI
+   
+   Centraliza todos os @keyframes usados no projeto.
+   Importado uma unica vez no index.css.
+   ============================================================ */
+
+/* --- Engrenagem --- */
+@keyframes gear-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* --- Brilho pulsante --- */
+@keyframes glow {
+  0%, 100% { opacity: 0.1; }
+  50% { opacity: 0.18; }
+}
+
+/* --- Entrada: fade com deslocamento vertical --- */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- Entrada: fade simples --- */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* --- Entrada: slide horizontal (formulario) --- */
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* --- Entrada: logo com escala e rotacao 3D --- */
+@keyframes logo-entry {
+  from {
+    opacity: 0;
+    transform: scale(0.85) rotateY(-12deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotateY(0);
+  }
+}
+
+/* --- Flutuacao continua do logo --- */
+@keyframes logo-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+/* --- Orbita circular --- */
+@keyframes orbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* --- Particulas flutuantes --- */
+@keyframes particle-float {
+  0%, 100% {
+    transform: translate(0, 0);
+    opacity: 0.08;
+  }
+  50% {
+    transform: translate(8px, -25px);
+    opacity: 0.2;
+  }
+}
