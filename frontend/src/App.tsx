@@ -6,6 +6,9 @@ import LoginPage from './pages/auth/LoginPage'
 import DashboardPage from './pages/dashboard/DashboardPage'
 import ForumPage from './pages/forum/ForumPage'
 import TopicPage from './pages/forum/TopicPage'
+import VoluntariadoPage from './pages/voluntariado/VoluntariadoPage'
+import OportunidadePage from './pages/voluntariado/OportunidadePage'
+import NotificacoesPage from './pages/notificacoes/NotificacoesPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth()
@@ -35,6 +38,9 @@ function App() {
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/forum" element={<ForumPage />} />
               <Route path="/forum/:id" element={<TopicPage />} />
+              <Route path="/voluntariado" element={<VoluntariadoPage />} />
+              <Route path="/voluntariado/:id" element={<OportunidadePage />} />
+              <Route path="/notificacoes" element={<NotificacoesPage />} />
               {/* Proximas telas virao aqui */}
             </Route>
           </Routes>
