@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { AppLayout } from './components/layout/AppLayout'
 import LoginPage from './pages/auth/LoginPage'
 import DashboardPage from './pages/dashboard/DashboardPage'
+import ForumPage from './pages/forum/ForumPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth()
@@ -31,6 +32,7 @@ function App() {
             {/* Rotas protegidas (com layout compartilhado) */}
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
               <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/forum" element={<ForumPage />} />
               {/* Proximas telas virao aqui */}
             </Route>
           </Routes>

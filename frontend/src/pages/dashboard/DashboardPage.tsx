@@ -294,7 +294,7 @@ export default function DashboardPage() {
       {/* Saudacao */}
       <div style={{ marginBottom: '28px' }}>
         <h1 className="font-bold tracking-tight" style={{ fontSize: '24px', color: 'var(--text-primary)', marginBottom: '6px' }}>
-          Ola{user?.nome_completo ? `, ${user.nome_completo.split(' ')[0]}` : ''} 👋
+          Olá{user?.nome_completo ? `, ${user.nome_completo.split(' ')[0]}` : ''} 
         </h1>
         <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
           Aqui esta o resumo da sua atividade na plataforma.
