@@ -5,6 +5,7 @@ import { AppLayout } from './components/layout/AppLayout'
 import LoginPage from './pages/auth/LoginPage'
 import DashboardPage from './pages/dashboard/DashboardPage'
 import ForumPage from './pages/forum/ForumPage'
+import TopicPage from './pages/forum/TopicPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth()
@@ -33,6 +34,7 @@ function App() {
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/forum" element={<ForumPage />} />
+              <Route path="/forum/:id" element={<TopicPage />} />
               {/* Proximas telas virao aqui */}
             </Route>
           </Routes>

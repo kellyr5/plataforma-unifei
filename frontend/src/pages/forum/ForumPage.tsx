@@ -51,13 +51,14 @@ function tempoRelativo(dateStr: string): string {
    COMPONENTES INTERNOS
    ============================================================ */
 
-function TopicCard({ post }: { post: Post }) {
+function TopicCard({ post, onClick }: { post: Post; onClick?: () => void }) {
   const [hovered, setHovered] = useState(false)
   const hasAnswers = (post.total_respostas || 0) > 0
 
   return (
     <div
       className="flex rounded-xl cursor-pointer transition-all duration-200"
+      onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -422,7 +423,7 @@ export default function ForumPage() {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {posts.map(post => <TopicCard key={post.id} post={post} />)}
+          {posts.map(post => <TopicCard key={post.id} post={post} onClick={() => navigate(`/forum/${post.id}`)} />)}
         </div>
       )}
     </div>
