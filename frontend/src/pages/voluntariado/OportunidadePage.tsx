@@ -61,7 +61,7 @@ export default function OportunidadePage() {
     api.get(`/voluntariado/oportunidades/${id}/`).then(res => {
       setOp(res.data)
     }).catch(() => {
-      toast.error('Oportunidade nao encontrada')
+      toast.error('Oportunidade não encontrada')
       navigate('/voluntariado')
     }).finally(() => setLoading(false))
   }, [id])
@@ -72,9 +72,9 @@ export default function OportunidadePage() {
       const res = await api.post(`/voluntariado/oportunidades/${id}/inscrever/`, { motivacao })
       const status = res.data.status
       if (status === 'aprovada') {
-        toast.success('Inscricao realizada! Voce foi aprovado automaticamente.')
+        toast.success('Inscrição realizada! Você foi aprovado automaticamente.')
       } else {
-        toast.success('Inscricao enviada! Aguarde aprovacao da organizacao.')
+        toast.success('Inscrição enviada! Aguarde aprovação da organizacao.')
       }
       /* Recarrega dados */
       const updated = await api.get(`/voluntariado/oportunidades/${id}/`)
@@ -129,11 +129,11 @@ export default function OportunidadePage() {
         </span>
         {op.esta_aberta_inscricao ? (
           <span className="rounded-md" style={{ padding: '4px 12px', fontSize: '12px', fontWeight: 500, background: 'rgba(16,185,129,0.06)', color: '#10B981' }}>
-            Inscricoes abertas
+            Inscrições abertas
           </span>
         ) : (
           <span className="rounded-md" style={{ padding: '4px 12px', fontSize: '12px', fontWeight: 500, background: 'rgba(239,68,68,0.06)', color: '#EF4444' }}>
-            Inscricoes encerradas
+            Inscrições encerradas
           </span>
         )}
       </div>
@@ -160,9 +160,9 @@ export default function OportunidadePage() {
             icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>} />
           <InfoRow label="Carga horaria" value={`${op.carga_horaria_total} horas`}
             icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
-          <InfoRow label="Prazo de inscricao" value={formatDate(op.prazo_inscricao)}
+          <InfoRow label="Prazo de inscrição" value={formatDate(op.prazo_inscricao)}
             icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>} />
-          <InfoRow label="Aprovacao" value={op.requer_aprovacao ? 'Requer aprovacao da organizacao' : 'Inscricao automatica (sem aprovacao)'}
+          <InfoRow label="Aprovação" value={op.requer_aprovacao ? 'Requer aprovação da organização' : 'Inscrição automática (sem aprovação)'}
             icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" /></svg>} />
         </div>
 
@@ -199,12 +199,12 @@ export default function OportunidadePage() {
           ) : (
             <div>
               <h3 className="font-semibold" style={{ fontSize: '15px', color: 'var(--text-primary)', marginBottom: '12px' }}>
-                Por que voce quer participar?
+                Por que você quer participar?
               </h3>
               <textarea
                 value={motivacao}
                 onChange={e => setMotivacao(e.target.value)}
-                placeholder="Descreva sua motivacao (opcional)..."
+                placeholder="Descreva sua motivação (opcional)..."
                 rows={3}
                 className="w-full rounded-xl outline-none resize-none"
                 style={{
@@ -224,7 +224,7 @@ export default function OportunidadePage() {
                 <button onClick={handleInscrever} disabled={inscrevendo}
                   className="rounded-xl font-semibold text-white cursor-pointer"
                   style={{ padding: '10px 24px', fontSize: '14px', background: cor, opacity: inscrevendo ? 0.7 : 1 }}>
-                  {inscrevendo ? 'Inscrevendo...' : 'Confirmar inscricao'}
+                  {inscrevendo ? 'Inscrevendo...' : 'Confirmar inscrição'}
                 </button>
               </div>
             </div>

@@ -74,7 +74,7 @@ export default function LoginPage() {
     const digits = cpfDigits(cpf)
 
     if (digits.length !== 11) {
-      toast.error('CPF deve ter 11 digitos.')
+      toast.error('CPF deve ter 11 dígitos.')
       return
     }
     if (!senha) {
@@ -111,7 +111,7 @@ export default function LoginPage() {
       return
     }
     if (digits.length !== 11) {
-      toast.error('CPF deve ter 11 digitos.')
+      toast.error('CPF deve ter 11 dígitos.')
       return
     }
 
@@ -123,7 +123,7 @@ export default function LoginPage() {
         nome_completo: nome || email.split('@')[0],
         password: senha,
       })
-      toast.success('Codigo enviado para seu email!')
+      toast.success('Código enviado para seu email!')
       setMode('codigo')
     } catch (err) {
       toast.error(getErrorMessage(err))
@@ -168,7 +168,7 @@ export default function LoginPage() {
     }
     try {
       await resendCode(email)
-      toast.success('Codigo reenviado!')
+      toast.success('Código reenviado!')
     } catch (err) {
       toast.error(getErrorMessage(err))
     }
@@ -338,12 +338,12 @@ export default function LoginPage() {
               <div className="flex items-center justify-between" style={{ marginBottom: '10px' }}>
                 <div>
                   <h2 className="text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>Primeiro Acesso</h2>
-                  <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '4px' }}>Vincule sua conta do SIGAA a plataforma</p>
+                  <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '4px' }}>Vincule sua conta do SIGAA à plataforma</p>
                 </div>
                 <button type="button" onClick={() => setMode('login')}
                   className="font-medium rounded-2xl transition-all duration-200 cursor-pointer login-form__btn-secondary"
                   style={{ fontSize: '13px', padding: '2px 12px' }}>
-                  Ja tenho conta
+                  Já tenho conta
                 </button>
               </div>
 
@@ -357,7 +357,7 @@ export default function LoginPage() {
                 <div className="flex items-center" style={{ gap: '2px', opacity: 0.4 }}>
                   <div className="rounded-full flex items-center justify-center font-bold login-steps__inactive"
                     style={{ width: '24px', height: '24px', fontSize: '11px' }}>2</div>
-                  <span style={{ fontSize: '14px', color: 'var(--text-tertiary)' }}>Verificacao</span>
+                  <span style={{ fontSize: '14px', color: 'var(--text-tertiary)' }}>Verificação</span>
                 </div>
               </div>
 
@@ -393,7 +393,7 @@ export default function LoginPage() {
                   Verifique seu email
                 </h2>
                 <p className="leading-relaxed" style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-                  Enviamos um codigo de 6 digitos para <strong>{email}</strong>. Insira o codigo abaixo para ativar sua conta.
+                  Enviamos um código de 6 dígitos para <strong>{email}</strong>. Insira o código abaixo para ativar sua conta.
                 </p>
               </div>
 
@@ -407,14 +407,14 @@ export default function LoginPage() {
                 <div className="flex items-center" style={{ gap: '8px' }}>
                   <div className="rounded-full flex items-center justify-center font-bold text-white login-steps__active"
                     style={{ width: '24px', height: '24px', fontSize: '11px' }}>2</div>
-                  <span className="font-medium login-steps__label-active" style={{ fontSize: '12px' }}>Verificacao</span>
+                  <span className="font-medium login-steps__label-active" style={{ fontSize: '12px' }}>Verificação</span>
                 </div>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div>
                   <label className="block font-medium" style={{ fontSize: '14px', color: 'var(--text-primary)', marginBottom: '8px' }}>
-                    Codigo de verificacao
+                    Código de verificação
                   </label>
                   <div className="flex" style={{ gap: '12px' }}>
                     {codigo.map((digit, i) => (
@@ -442,7 +442,7 @@ export default function LoginPage() {
                 </button>
 
                 <p className="text-center" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                  Nao recebeu o codigo?{' '}
+                  Não recebeu o código?{' '}
                   <button type="button" onClick={handleResendCode}
                     className="font-medium cursor-pointer login-form__link-reenviar">Reenviar</button>
                 </p>

@@ -40,7 +40,7 @@ export function Topbar() {
         </svg>
         <input
           type="text"
-          placeholder="Buscar disciplinas, topicos, oportunidades..."
+          placeholder="Buscar disciplinas, tópicos, oportunidades..."
           className="flex-1 bg-transparent outline-none"
           style={{ fontSize: '13px', color: 'var(--text-primary)' }}
         />

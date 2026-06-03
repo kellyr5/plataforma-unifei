@@ -119,7 +119,7 @@ function TopicCard({ post, onClick }: { post: Post; onClick?: () => void }) {
               padding: '3px 10px', fontSize: '11px', fontWeight: 500,
               background: 'rgba(245,158,11,0.06)', color: '#F59E0B',
             }}>
-              {post.total_reacoes_persiste} duvida(s) persiste(m)
+              {post.total_reacoes_persiste} dúvida(s) persiste(m)
             </span>
           )}
         </div>
@@ -190,7 +190,7 @@ export default function ForumPage() {
     }).catch(console.error).finally(() => setLoading(false))
   }, [filtroDisc, busca])
 
-  /* Criar novo topico */
+  /* Criar novo tópico */
   async function handleCriarTopico(e: React.FormEvent) {
     e.preventDefault()
     if (!novoTitulo.trim() || !novoConteudo.trim() || !novoDisciplina) return
@@ -233,10 +233,10 @@ export default function ForumPage() {
       <div className="flex items-center justify-between" style={{ marginBottom: '24px' }}>
         <div>
           <h1 className="font-bold tracking-tight" style={{ fontSize: '24px', color: 'var(--text-primary)', marginBottom: '4px' }}>
-            Forum Academico
+            Fórum Acadêmico
           </h1>
           <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-            {posts.length} topico(s) {filtroDisc ? 'nesta disciplina' : 'no total'}
+            {posts.length} tópico(s) {filtroDisc ? 'nesta disciplina' : 'no total'}
           </p>
         </div>
 
@@ -252,7 +252,7 @@ export default function ForumPage() {
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
-          Novo topico
+          Novo tópico
         </button>
       </div>
 
@@ -263,7 +263,7 @@ export default function ForumPage() {
           background: 'var(--bg-card)', border: '1px solid var(--border)',
         }}>
           <h3 className="font-semibold" style={{ fontSize: '16px', color: 'var(--text-primary)', marginBottom: '16px' }}>
-            Criar novo topico
+            Criar novo tópico
           </h3>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -294,7 +294,7 @@ export default function ForumPage() {
                 type="text"
                 value={novoTitulo}
                 onChange={e => setNovoTitulo(e.target.value)}
-                placeholder="Resuma sua duvida em uma frase"
+                placeholder="Resuma sua dúvida em uma frase"
                 className="w-full rounded-xl outline-none"
                 style={{
                   padding: '10px 14px', fontSize: '14px',
@@ -310,7 +310,7 @@ export default function ForumPage() {
               <textarea
                 value={novoConteudo}
                 onChange={e => setNovoConteudo(e.target.value)}
-                placeholder="Descreva sua duvida com detalhes..."
+                placeholder="Descreva sua dúvida com detalhes..."
                 rows={4}
                 className="w-full rounded-xl outline-none resize-none"
                 style={{
@@ -365,7 +365,7 @@ export default function ForumPage() {
           </svg>
           <input
             type="text"
-            placeholder="Buscar topicos..."
+            placeholder="Buscar tópicos..."
             value={buscaInput}
             onChange={e => setBuscaInput(e.target.value)}
             className="flex-1 bg-transparent outline-none"
@@ -406,7 +406,7 @@ export default function ForumPage() {
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
-            Carregando topicos...
+            Carregando tópicos...
           </div>
         </div>
       ) : posts.length === 0 ? (
@@ -415,10 +415,10 @@ export default function ForumPage() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 01-.825-.242m9.345-8.334a2.126 2.126 0 00-.476-.095 48.64 48.64 0 00-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 1.136.845 2.1 1.976 2.193 1.234.1 2.4.163 3.548.163" />
           </svg>
           <p className="font-medium" style={{ fontSize: '15px', color: 'var(--text-primary)', marginBottom: '4px' }}>
-            {busca ? 'Nenhum topico encontrado' : 'Nenhum topico ainda'}
+            {busca ? 'Nenhum tópico encontrado' : 'Nenhum tópico ainda'}
           </p>
           <p style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>
-            {busca ? 'Tente outra busca.' : 'Seja o primeiro a criar um topico nesta disciplina!'}
+            {busca ? 'Tente outra busca.' : 'Seja o primeiro a criar um tópico nesta disciplina!'}
           </p>
         </div>
       ) : (

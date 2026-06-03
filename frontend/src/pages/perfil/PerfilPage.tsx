@@ -3,7 +3,7 @@
  *
  * Mostra:
  * - Dados do usuario (nome, email, CPF mascarado)
- * - Reputacao total e por disciplina
+ * - Reputação total e por disciplina
  * - Historico de atividades (respostas, melhores respostas)
  * - Certificados emitidos
  */
@@ -186,7 +186,7 @@ export default function PerfilPage() {
 
         {/* Stats resumo */}
         <div className="flex items-center justify-around" style={{ marginTop: '24px', padding: '20px 0 0', borderTop: '1px solid var(--border)' }}>
-          <StatMini label="Reputacao total" value={totalPontos.toString()} color="#003087" />
+          <StatMini label="Reputação total" value={totalPontos.toString()} color="#003087" />
           <div style={{ width: '1px', height: '40px', background: 'var(--border)' }} />
           <StatMini label="Respostas" value={totalRespostas.toString()} color="#10B981" />
           <div style={{ width: '1px', height: '40px', background: 'var(--border)' }} />
@@ -196,11 +196,11 @@ export default function PerfilPage() {
         </div>
       </div>
 
-      {/* Reputacao por disciplina */}
+      {/* Reputação por disciplina */}
       {reputacoes.length > 0 && (
         <div style={{ marginBottom: '24px' }}>
           <div className="flex items-center justify-between" style={{ marginBottom: '14px' }}>
-            <h2 className="font-semibold" style={{ fontSize: '16px', color: 'var(--text-primary)' }}>Reputacao por disciplina</h2>
+            <h2 className="font-semibold" style={{ fontSize: '16px', color: 'var(--text-primary)' }}>Reputação por disciplina</h2>
             <button onClick={() => navigate('/ranking')} className="cursor-pointer font-medium"
               style={{ fontSize: '13px', color: '#003087' }}>Ver ranking geral</button>
           </div>
@@ -214,7 +214,7 @@ export default function PerfilPage() {
       {inscricoes.length > 0 && (
         <div style={{ marginBottom: '24px' }}>
           <h2 className="font-semibold" style={{ fontSize: '16px', color: 'var(--text-primary)', marginBottom: '14px' }}>
-            Minhas inscricoes de voluntariado
+            Minhas inscrições de voluntariado
           </h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {inscricoes.map(insc => {
@@ -276,10 +276,10 @@ export default function PerfilPage() {
       {reputacoes.length === 0 && inscricoes.length === 0 && certificados.length === 0 && (
         <div className="rounded-xl text-center" style={{ padding: '48px', background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
           <p className="font-medium" style={{ fontSize: '15px', color: 'var(--text-primary)', marginBottom: '4px' }}>
-            Seu perfil esta vazio
+            Seu perfil está vazio
           </p>
           <p style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>
-            Participe do forum e do voluntariado para construir sua reputacao!
+            Participe do fórum e do voluntariado para construir sua reputação!
           </p>
         </div>
       )}

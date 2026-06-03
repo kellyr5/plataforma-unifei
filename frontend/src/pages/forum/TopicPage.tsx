@@ -103,14 +103,14 @@ function ResponseCard({ post, topicAuthorId, onAction }: {
     try {
       if (action === 'persiste') {
         const res = await api.post(`/forum/posts/${post.id}/reagir-persiste/`)
-        toast.success(res.data.detail || 'Reacao registrada')
+        toast.success(res.data.detail || 'Reação registrada')
       } else if (action === 'melhor') {
         const res = await api.post(`/forum/posts/${post.id}/marcar-melhor/`)
         toast.success(res.data.detail || 'Melhor resposta atualizada')
       }
       onAction()
     } catch (err: any) {
-      toast.error(err.response?.data?.detail || 'Erro na acao')
+      toast.error(err.response?.data?.detail || 'Erro na ação')
     } finally {
       setLoadingAction('')
     }
@@ -161,7 +161,7 @@ function ResponseCard({ post, topicAuthorId, onAction }: {
 
           {/* Botoes de acao */}
           <div className="flex items-center" style={{ gap: '6px' }}>
-            {/* Duvida persiste */}
+            {/* Dúvida persiste */}
             <button
               onClick={() => handleAction('persiste')}
               disabled={loadingAction === 'persiste'}
@@ -176,7 +176,7 @@ function ResponseCard({ post, topicAuthorId, onAction }: {
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
               </svg>
-              {(post.total_reacoes_persiste || 0) > 0 ? `${post.total_reacoes_persiste} duvida(s)` : 'Duvida persiste'}
+              {(post.total_reacoes_persiste || 0) > 0 ? `${post.total_reacoes_persiste} dúvida(s)` : 'Dúvida persiste'}
             </button>
 
             {/* Marcar melhor (so pra autor do topico ou admin) */}
@@ -229,7 +229,7 @@ export default function TopicPage() {
       setRespostas(resp.sort((a: Post, b: Post) => (b.e_melhor ? 1 : 0) - (a.e_melhor ? 1 : 0)))
     } catch (err) {
       console.error('Erro ao carregar topico:', err)
-      toast.error('Topico nao encontrado')
+      toast.error('Tópico não encontrado')
       navigate('/forum')
     } finally {
       setLoading(false)
@@ -274,7 +274,7 @@ export default function TopicPage() {
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
           </svg>
-          Carregando topico...
+          Carregando tópico...
         </div>
       </div>
     )
