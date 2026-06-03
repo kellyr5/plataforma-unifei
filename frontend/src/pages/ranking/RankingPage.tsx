@@ -24,7 +24,7 @@ interface RankingEntry {
   semestre: string
   posicao: number
   usuario: string
-  nome_usuario: string
+  usuario_nome: string
   pontos: number
   gerado_em: string
 }
@@ -44,7 +44,7 @@ interface RankingSemestralEntry {
   semestre: string
   posicao: number
   usuario: string
-  nome_usuario: string
+  usuario_nome: string
   pontos: number
   gerado_em: string
 }
@@ -80,7 +80,7 @@ export default function RankingPage() {
     if (!selectedDisc) return
     setLoadingRanking(true)
     api.get(`/reputacao/disciplina/${selectedDisc}/`).then(res => {
-      const data = Array.isArray(res.data) ? res.data : res.data.results || []
+      const data = res.data.ranking || (Array.isArray(res.data) ? res.data : [])
       setRanking(data.sort((a: RankingEntry, b: RankingEntry) => b.pontos - a.pontos))
     }).catch(() => setRanking([])).finally(() => setLoadingRanking(false))
   }, [selectedDisc])
@@ -225,10 +225,10 @@ export default function RankingPage() {
                           background: isMe ? '#003087' : 'rgba(0,48,135,0.08)',
                           color: isMe ? 'white' : '#003087',
                         }}>
-                        {entry.nome_usuario?.[0]?.toUpperCase() || 'U'}
+                        {entry.usuario_nome?.[0]?.toUpperCase() || 'U'}
                       </div>
                       <span className="font-medium" style={{ fontSize: '14px', color: 'var(--text-primary)' }}>
-                        {entry.nome_usuario}
+                        {entry.usuario_nome}
                         {isMe && <span style={{ fontSize: '12px', color: '#003087', marginLeft: '6px' }}>(voce)</span>}
                       </span>
                     </div>
@@ -288,7 +288,7 @@ export default function RankingPage() {
                     }}>
                       <span style={{ width: '32px' }}><MedalIcon pos={e.posicao} /></span>
                       <span className="flex-1 font-medium" style={{ fontSize: '14px', color: 'var(--text-primary)' }}>
-                        {e.nome_usuario}
+                        {e.usuario_nome}
                       </span>
                       <span className="font-bold" style={{ fontSize: '15px', color: '#003087' }}>
                         {e.pontos} pts
