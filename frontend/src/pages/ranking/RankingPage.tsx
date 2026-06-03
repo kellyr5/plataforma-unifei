@@ -225,10 +225,10 @@ export default function RankingPage() {
                           background: isMe ? '#003087' : 'rgba(0,48,135,0.08)',
                           color: isMe ? 'white' : '#003087',
                         }}>
-                        {entry.usuario_nome?.[0]?.toUpperCase() || 'U'}
+                        {entry.nome_usuario?.[0]?.toUpperCase() || 'U'}
                       </div>
                       <span className="font-medium" style={{ fontSize: '14px', color: 'var(--text-primary)' }}>
-                        {entry.usuario_nome}
+                        {entry.nome_usuario}
                         {isMe && <span style={{ fontSize: '12px', color: '#003087', marginLeft: '6px' }}>(voce)</span>}
                       </span>
                     </div>
@@ -236,10 +236,10 @@ export default function RankingPage() {
                       {entry.pontos}
                     </span>
                     <span style={{ width: '80px', textAlign: 'center', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                      {entry.total_respostas}
+                      {entry.pontos}
                     </span>
                     <span style={{ width: '80px', textAlign: 'center', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                      {entry.total_melhores_respostas}
+                      {entry.posicao}
                     </span>
                   </div>
                 )

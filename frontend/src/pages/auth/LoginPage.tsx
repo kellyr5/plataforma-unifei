@@ -30,7 +30,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const { theme, toggleTheme } = useTheme()
-  const { isAuthenticated, setUser } = useAuth()
+  const { isAuthenticated, fetchMe } = useAuth()
   const navigate = useNavigate()
   const [mounted, setMounted] = useState(false)
   const parallaxRef = useRef<HTMLDivElement>(null)
@@ -85,14 +85,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const data = await login({ cpf: digits, password: senha })
-      const payload = JSON.parse(atob(data.access.split('.')[1]))
-      setUser({
-        id: payload.user_id,
-        cpf: digits,
-        nome_completo: '',
-        email: '',
-        is_admin: false,
-      })
+      await fetchMe()
       toast.success('Login realizado com sucesso!')
       navigate('/dashboard', { replace: true })
     } catch (err) {
@@ -144,14 +137,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const data = await activate({ email, codigo: codigoStr })
-      const payload = JSON.parse(atob(data.access.split('.')[1]))
-      setUser({
-        id: payload.user_id,
-        cpf: cpfDigits(cpf),
-        nome_completo: nome,
-        email,
-        is_admin: false,
-      })
+      await fetchMe()
       toast.success('Conta ativada com sucesso!')
       navigate('/dashboard', { replace: true })
     } catch (err) {
@@ -253,9 +239,9 @@ export default function LoginPage() {
 
             <div className="text-center" style={{ maxWidth: '32rem', animation: mounted ? 'fade-up 0.7s ease-out 0.5s both' : 'none' }}>
               <h1 className="text-white font-bold tracking-tight login-hero__title" style={{ lineHeight: '1.1', marginBottom: '16px' }}>
-                Conectando mentes.
+                Revelemo-nos, mais por atos do que por palavras,
                 <br />
-                <span className="bg-clip-text text-transparent login-hero__gradient-text">Transformando Itajuba.</span>
+                <span className="bg-clip-text text-transparent login-hero__gradient-text">Dignos de possuir este grande país</span>
               </h1>
               <p className="text-white/35 leading-relaxed" style={{ fontSize: '15px', maxWidth: '28rem', margin: '0 auto' }}>
                 Forum academico por disciplina integrado com voluntariado universitario.

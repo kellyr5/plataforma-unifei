@@ -1,10 +1,3 @@
-/**
- * Contexto de autenticacao.
- *
- * Gerencia o estado do usuario logado, verifica se o token
- * e valido ao carregar a pagina, e expoe funcoes de login/logout.
- */
-
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 import api, { getAccessToken, clearTokens } from '../services/api'
 
@@ -14,6 +7,8 @@ interface User {
   nome_completo: string
   email: string
   is_admin: boolean
+  bio: string
+  reputacao: number
 }
 
 interface AuthContextType {
@@ -22,6 +17,7 @@ interface AuthContextType {
   isAuthenticated: boolean
   setUser: (user: User | null) => void
   logout: () => void
+  fetchMe: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -30,7 +26,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
-  /* Ao carregar, verifica se tem token valido */
+  async function fetchMe() {
+    try {
+      const { data } = await api.get('/auth/me/')
+      setUser(data)
+    } catch {
+      clearTokens()
+      setUser(null)
+    }
+  }
+
   useEffect(() => {
     async function checkAuth() {
       const token = getAccessToken()
@@ -38,28 +43,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false)
         return
       }
-
-      try {
-        /* Tenta buscar dados do usuario autenticado */
-        const { data } = await api.post('/auth/verify/', { token })
-        /* Se o verify retorna 200, o token e valido */
-        /* Por ora, decodificamos o payload do JWT pra pegar dados basicos */
-        const payload = JSON.parse(atob(token.split('.')[1]))
-        setUser({
-          id: payload.user_id,
-          cpf: '',
-          nome_completo: '',
-          email: '',
-          is_admin: false,
-        })
-      } catch {
-        clearTokens()
-        setUser(null)
-      } finally {
-        setLoading(false)
-      }
+      await fetchMe()
+      setLoading(false)
     }
-
     checkAuth()
   }, [])
 
@@ -70,11 +56,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider value={{
-      user,
-      loading,
-      isAuthenticated: !!user,
-      setUser,
-      logout,
+      user, loading, isAuthenticated: !!user,
+      setUser, logout, fetchMe,
     }}>
       {children}
     </AuthContext.Provider>

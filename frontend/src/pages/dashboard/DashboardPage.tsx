@@ -338,7 +338,7 @@ export default function DashboardPage() {
         {posts.length === 0
           ? <EmptyState text="Nenhum tópico encontrado. Seja o primeiro a criar um!" />
           : <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {posts.map(post => <PostCard key={post.id} post={post} onClick={() => {}} />)}
+              {posts.map(post => <PostCard key={post.id} post={post} onClick={() => navigate('/forum/' + post.id)} />)}
             </div>
         }
       </div>
@@ -349,7 +349,11 @@ export default function DashboardPage() {
         {oportunidades.length === 0
           ? <EmptyState text="Nenhuma oportunidade disponivel no momento." />
           : <div className="grid grid-cols-2" style={{ gap: '14px' }}>
-              {oportunidades.map(op => <OpCard key={op.id} op={op} />)}
+              {oportunidades.map(op => (
+                <div key={op.id} onClick={() => navigate('/voluntariado/' + op.id)} className="cursor-pointer">
+                  <OpCard op={op} />
+                </div>
+            ))}
             </div>
         }
       </div>

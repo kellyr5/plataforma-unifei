@@ -11,6 +11,7 @@ import OportunidadePage from './pages/voluntariado/OportunidadePage'
 import NotificacoesPage from './pages/notificacoes/NotificacoesPage'
 import PerfilPage from './pages/perfil/PerfilPage'
 import RankingPage from './pages/ranking/RankingPage'
+import CertificadosPage from './pages/certificados/CertificadosPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth()
@@ -45,6 +46,7 @@ function App() {
               <Route path="/notificacoes" element={<NotificacoesPage />} />
               <Route path="/perfil" element={<PerfilPage />} />
               <Route path="/ranking" element={<RankingPage />} />
+              <Route path="/certificados" element={<CertificadosPage />} />
               {/* Proximas telas virao aqui */}
             </Route>
           </Routes>

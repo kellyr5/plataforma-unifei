@@ -182,3 +182,36 @@ class ReenvioCodigoView(APIView):
             pass  # Falha silenciosa para nao expor erro ao atacante
 
         return resposta_padrao
+
+
+class MeView(APIView):
+    """Retorna dados do usuario autenticado."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        summary="Dados do usuario autenticado",
+        responses={200: {
+            "type": "object",
+            "properties": {
+                "id": {"type": "string"},
+                "nome_completo": {"type": "string"},
+                "cpf": {"type": "string"},
+                "email": {"type": "string"},
+                "is_admin": {"type": "boolean"},
+                "bio": {"type": "string"},
+                "reputacao": {"type": "integer"},
+            }
+        }}
+    )
+    def get(self, request):
+        u = request.user
+        return Response({
+            "id": str(u.id),
+            "nome_completo": u.nome_completo,
+            "cpf": u.cpf,
+            "email": u.email,
+            "is_admin": u.is_admin,
+            "bio": u.bio or "",
+            "reputacao": u.reputacao,
+            "avatar_url": u.avatar_url or "",
+        })

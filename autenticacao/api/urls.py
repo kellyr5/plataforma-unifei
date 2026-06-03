@@ -6,6 +6,7 @@ from rest_framework_simplejwt.views import (
 )
 
 from autenticacao.api.views import (
+    MeView,
     RegistroView,
     AtivacaoView,
     ReenvioCodigoView,
@@ -22,4 +23,5 @@ urlpatterns = [
     path('login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('verify/', TokenVerifyView.as_view(), name='token_verify'),
+    path('me/', MeView.as_view(), name='me'),
 ]

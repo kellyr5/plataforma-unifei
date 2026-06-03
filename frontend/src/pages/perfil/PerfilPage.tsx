@@ -27,7 +27,7 @@ interface Certificado {
   codigo_validacao: string
   oportunidade_titulo: string
   carga_horaria: number
-  data_emissao: string
+  emitido_em: string
 }
 
 interface Inscricao {
@@ -263,7 +263,7 @@ export default function PerfilPage() {
                 <div className="flex-1 min-w-0">
                   <div className="font-medium" style={{ fontSize: '14px', color: 'var(--text-primary)' }}>{cert.oportunidade_titulo}</div>
                   <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
-                    {cert.carga_horaria}h | Emitido em {new Date(cert.data_emissao).toLocaleDateString('pt-BR')} | Codigo: {cert.codigo_validacao}
+                    {cert.carga_horaria}h | Emitido em {new Date(cert.emitido_em).toLocaleDateString('pt-BR')} | Codigo: {cert.codigo_validacao}
                   </div>
                 </div>
               </div>
