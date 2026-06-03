@@ -12,7 +12,7 @@ interface Post {
   id: string
   titulo: string
   conteudo: string
-  total_votos: number
+  pontuacao: number
   total_respostas: number
   e_melhor: boolean
   disciplina_codigo?: string
@@ -115,7 +115,7 @@ function PostCard({ post, onClick }: { post: Post; onClick: () => void }) {
       }}
     >
       <div className="text-center flex-shrink-0" style={{ minWidth: '48px' }}>
-        <div className="font-bold" style={{ fontSize: '20px', color: '#003087' }}>{post.total_votos || 0}</div>
+        <div className="font-bold" style={{ fontSize: '20px', color: '#003087' }}>{post.pontuacao || 0}</div>
         <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>votos</div>
       </div>
       <div className="flex-1 min-w-0">

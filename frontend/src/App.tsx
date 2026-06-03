@@ -9,6 +9,7 @@ import TopicPage from './pages/forum/TopicPage'
 import VoluntariadoPage from './pages/voluntariado/VoluntariadoPage'
 import OportunidadePage from './pages/voluntariado/OportunidadePage'
 import NotificacoesPage from './pages/notificacoes/NotificacoesPage'
+import PerfilPage from './pages/perfil/PerfilPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth()
@@ -41,6 +42,7 @@ function App() {
               <Route path="/voluntariado" element={<VoluntariadoPage />} />
               <Route path="/voluntariado/:id" element={<OportunidadePage />} />
               <Route path="/notificacoes" element={<NotificacoesPage />} />
+              <Route path="/perfil" element={<PerfilPage />} />
               {/* Proximas telas virao aqui */}
             </Route>
           </Routes>

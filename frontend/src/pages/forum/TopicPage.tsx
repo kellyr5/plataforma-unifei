@@ -21,7 +21,7 @@ interface Post {
   id: string
   titulo: string
   conteudo: string
-  total_votos: number
+  pontuacao: number
   total_respostas: number
   total_reacoes_persiste: number
   e_melhor: boolean
@@ -126,7 +126,7 @@ function ResponseCard({ post, topicAuthorId, onAction }: {
       border: `1px solid ${post.e_melhor ? 'rgba(16,185,129,0.2)' : 'var(--border)'}`,
     }}>
       {/* Votos */}
-      <VoteBlock postId={post.id} totalVotos={post.total_votos || 0} onVoted={onAction} />
+      <VoteBlock postId={post.id} totalVotos={post.pontuacao || 0} onVoted={onAction} />
 
       {/* Conteudo */}
       <div className="flex-1 min-w-0">
@@ -234,6 +234,8 @@ export default function TopicPage() {
     } finally {
       setLoading(false)
     }
+    console.log()
+
   }
 
   useEffect(() => { fetchTopic() }, [id])
@@ -326,7 +328,7 @@ export default function TopicPage() {
         padding: '24px', gap: '18px', marginBottom: '24px',
         background: 'var(--bg-card)', border: '1px solid var(--border)',
       }}>
-        <VoteBlock postId={topic.id} totalVotos={topic.total_votos || 0} onVoted={fetchTopic} />
+        <VoteBlock postId={topic.id} totalVotos={topic.pontuacao || 0} onVoted={fetchTopic} />
 
         <div className="flex-1 min-w-0">
           <h1 className="font-bold" style={{ fontSize: '20px', color: 'var(--text-primary)', marginBottom: '12px', lineHeight: 1.4 }}>

@@ -24,7 +24,7 @@ interface Post {
   id: string
   titulo: string
   conteudo: string
-  total_votos: number
+  pontuacao: number
   total_respostas: number
   total_reacoes_persiste: number
   e_melhor: boolean
@@ -70,7 +70,7 @@ function TopicCard({ post, onClick }: { post: Post; onClick?: () => void }) {
     >
       {/* Votos */}
       <div className="flex flex-col items-center flex-shrink-0" style={{ minWidth: '52px', gap: '2px' }}>
-        <div className="font-bold" style={{ fontSize: '22px', color: '#003087' }}>{post.total_votos || 0}</div>
+        <div className="font-bold" style={{ fontSize: '22px', color: '#003087' }}>{post.pontuacao || 0}</div>
         <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>votos</div>
       </div>
 
