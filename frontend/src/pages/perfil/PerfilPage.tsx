@@ -25,8 +25,8 @@ interface Reputacao {
 interface Certificado {
   id: string
   codigo_validacao: string
-  oportunidade_titulo: string
-  carga_horaria: number
+  nome_oportunidade: string
+  horas_realizadas: number
   emitido_em: string
 }
 
@@ -261,9 +261,9 @@ export default function PerfilPage() {
                   </svg>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium" style={{ fontSize: '14px', color: 'var(--text-primary)' }}>{cert.oportunidade_titulo}</div>
+                  <div className="font-medium" style={{ fontSize: '14px', color: 'var(--text-primary)' }}>{cert.nome_oportunidade}</div>
                   <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
-                    {cert.carga_horaria}h | Emitido em {new Date(cert.emitido_em).toLocaleDateString('pt-BR')} | Codigo: {cert.codigo_validacao}
+                    {cert.horas_realizadas}h | Emitido em {new Date(cert.emitido_em).toLocaleDateString('pt-BR')} | Codigo: {cert.codigo_validacao}
                   </div>
                 </div>
               </div>

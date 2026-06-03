@@ -33,10 +33,10 @@ interface Oportunidade {
 
 const areas = [
   { value: '', label: 'Todas' },
-  { value: 'educacao', label: 'Educacao' },
-  { value: 'saude', label: 'Saude' },
+  { value: 'educacao', label: 'Educação' },
+  { value: 'saude', label: 'Saúde' },
   { value: 'meio_ambiente', label: 'Meio Ambiente' },
-  { value: 'assistencia_social', label: 'Assistencia Social' },
+  { value: 'assistencia_social', label: 'Assistência Social' },
   { value: 'direitos_humanos', label: 'Direitos Humanos' },
   { value: 'cultura', label: 'Cultura' },
   { value: 'tecnologia', label: 'Tecnologia' },
