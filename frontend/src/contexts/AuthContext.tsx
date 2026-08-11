@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
-import api, { getAccessToken, clearTokens } from '../services/api'
+import api, { getAccessToken, getRefreshToken, clearTokens } from '../services/api'
 
 interface User {
   id: string
@@ -16,7 +16,7 @@ interface AuthContextType {
   loading: boolean
   isAuthenticated: boolean
   setUser: (user: User | null) => void
-  logout: () => void
+  logout: () => Promise<void>
   fetchMe: () => Promise<void>
 }
 
@@ -49,9 +49,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkAuth()
   }, [])
 
-  function logout() {
-    clearTokens()
-    setUser(null)
+  /**
+   * Encerra a sessão avisando o backend, para que o refresh token entre na
+   * lista de invalidados. Se a chamada falhar, os tokens locais são apagados
+   * mesmo assim: o usuário pediu para sair e precisa sair.
+   */
+  async function logout() {
+    const refresh = getRefreshToken()
+
+    try {
+      if (refresh) await api.post('/auth/logout/', { refresh })
+    } catch {
+      // Sessão já expirada ou servidor fora do ar: segue com a limpeza local.
+    } finally {
+      clearTokens()
+      setUser(null)
+    }
   }
 
   return (

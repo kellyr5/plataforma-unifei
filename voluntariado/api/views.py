@@ -31,6 +31,7 @@ class OportunidadeViewSet(viewsets.ModelViewSet):
     - Filtros: ?area=, ?status=, ?search=, ?aberta=true
     """
 
+    queryset = Oportunidade.objects.none()  # define o tipo da PK para o schema OpenAPI
     serializer_class = OportunidadeSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['titulo', 'descricao', 'local']
@@ -174,6 +175,7 @@ class InscricaoVoluntariadoViewSet(viewsets.ReadOnlyModelViewSet):
     - POST /inscricoes/{id}/desistir/  (apenas o proprio estudante)
     """
 
+    queryset = InscricaoVoluntariado.objects.none()  # define o tipo da PK para o schema OpenAPI
     serializer_class = InscricaoVoluntariadoSerializer
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ['created_at', 'status']
@@ -370,6 +372,7 @@ class CertificadoViewSet(viewsets.ReadOnlyModelViewSet):
     - GET /certificados/validar/{codigo}/ -- endpoint publico de validacao
     """
 
+    queryset = Certificado.objects.none()  # define o tipo da PK para o schema OpenAPI
     serializer_class = CertificadoSerializer
 
     def get_queryset(self):

@@ -38,7 +38,7 @@ class OportunidadeSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at',
         ]
 
-    def get_total_inscritos(self, obj):
+    def get_total_inscritos(self, obj) -> int:
         return obj.inscricoes.count()
 
     def validate(self, data):
@@ -120,7 +120,7 @@ class CertificadoSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = fields
 
-    def get_arquivo_pdf_url(self, obj):
+    def get_arquivo_pdf_url(self, obj) -> str | None:
         request = self.context.get('request')
         if obj.arquivo_pdf and request:
             return request.build_absolute_uri(obj.arquivo_pdf.url)

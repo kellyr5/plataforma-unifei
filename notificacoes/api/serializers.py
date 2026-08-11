@@ -24,7 +24,7 @@ class NotificacaoSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = fields
 
-    def get_objeto_tipo(self, obj):
+    def get_objeto_tipo(self, obj) -> str | None:
         """Retorna o nome do model relacionado para o frontend montar o link."""
         if obj.content_type:
             return obj.content_type.model

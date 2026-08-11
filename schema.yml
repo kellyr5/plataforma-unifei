@@ -26,7 +26,7 @@ paths:
       - name: ordering
         required: false
         in: query
-        description: Which field to use when ordering the results.
+        description: Qual campo usar ao ordenar os resultados.
         schema:
           type: string
       tags:
@@ -63,6 +63,8 @@ paths:
         name: id
         schema:
           type: string
+          format: uuid
+        description: Um string UUID que identifica este Registro de Auditoria.
         required: true
       tags:
       - auditoria
@@ -135,6 +137,37 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TokenObtainPair'
+          description: ''
+  /api/auth/me/:
+    get:
+      operationId: auth_me_retrieve
+      description: Retorna dados do usuario autenticado.
+      summary: Dados do usuario autenticado
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  nome_completo:
+                    type: string
+                  cpf:
+                    type: string
+                  email:
+                    type: string
+                  is_admin:
+                    type: boolean
+                  bio:
+                    type: string
+                  reputacao:
+                    type: integer
           description: ''
   /api/auth/reenviar-codigo/:
     post:
@@ -262,7 +295,7 @@ paths:
       - name: ordering
         required: false
         in: query
-        description: Which field to use when ordering the results.
+        description: Qual campo usar ao ordenar os resultados.
         schema:
           type: string
       tags:
@@ -287,7 +320,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Alerta de Conteudo.
+        description: Um string UUID que identifica este Alerta de Conteudo.
         required: true
       tags:
       - forum
@@ -309,7 +342,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Alerta de Conteudo.
+        description: Um string UUID que identifica este Alerta de Conteudo.
         required: true
       tags:
       - forum
@@ -369,7 +402,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Arquivo.
+        description: Um string UUID que identifica este Arquivo.
         required: true
       tags:
       - forum
@@ -395,7 +428,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Arquivo.
+        description: Um string UUID que identifica este Arquivo.
         required: true
       tags:
       - forum
@@ -411,13 +444,13 @@ paths:
       - name: ordering
         required: false
         in: query
-        description: Which field to use when ordering the results.
+        description: Qual campo usar ao ordenar os resultados.
         schema:
           type: string
       - name: search
         required: false
         in: query
-        description: A search term.
+        description: Um termo de busca.
         schema:
           type: string
       tags:
@@ -467,7 +500,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Disciplina.
+        description: Um string UUID que identifica este Disciplina.
         required: true
       tags:
       - forum
@@ -488,7 +521,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Disciplina.
+        description: Um string UUID que identifica este Disciplina.
         required: true
       tags:
       - forum
@@ -521,7 +554,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Disciplina.
+        description: Um string UUID que identifica este Disciplina.
         required: true
       tags:
       - forum
@@ -553,7 +586,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Disciplina.
+        description: Um string UUID que identifica este Disciplina.
         required: true
       tags:
       - forum
@@ -569,7 +602,7 @@ paths:
       - name: ordering
         required: false
         in: query
-        description: Which field to use when ordering the results.
+        description: Qual campo usar ao ordenar os resultados.
         schema:
           type: string
       tags:
@@ -619,7 +652,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Permissao de Disciplina.
+        description: Um string UUID que identifica este Permissao de Disciplina.
         required: true
       tags:
       - forum
@@ -640,7 +673,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Permissao de Disciplina.
+        description: Um string UUID que identifica este Permissao de Disciplina.
         required: true
       tags:
       - forum
@@ -673,7 +706,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Permissao de Disciplina.
+        description: Um string UUID que identifica este Permissao de Disciplina.
         required: true
       tags:
       - forum
@@ -705,7 +738,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Permissao de Disciplina.
+        description: Um string UUID que identifica este Permissao de Disciplina.
         required: true
       tags:
       - forum
@@ -734,13 +767,13 @@ paths:
       - name: ordering
         required: false
         in: query
-        description: Which field to use when ordering the results.
+        description: Qual campo usar ao ordenar os resultados.
         schema:
           type: string
       - name: search
         required: false
         in: query
-        description: A search term.
+        description: Um termo de busca.
         schema:
           type: string
       tags:
@@ -816,7 +849,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Post.
+        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -850,7 +883,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Post.
+        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -896,7 +929,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Post.
+        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -941,7 +974,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Post.
+        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -964,7 +997,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Post.
+        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -996,7 +1029,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Post.
+        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -1031,7 +1064,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Post.
+        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -1078,7 +1111,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Post.
+        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -1124,7 +1157,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Post.
+        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -1155,7 +1188,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Post.
+        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -1201,7 +1234,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Post.
+        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -1232,7 +1265,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Post.
+        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -1267,7 +1300,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Post.
+        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -1314,7 +1347,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Post.
+        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -1360,7 +1393,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Post.
+        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -1385,7 +1418,7 @@ paths:
       - name: ordering
         required: false
         in: query
-        description: Which field to use when ordering the results.
+        description: Qual campo usar ao ordenar os resultados.
         schema:
           type: string
       tags:
@@ -1418,6 +1451,8 @@ paths:
         name: id
         schema:
           type: string
+          format: uuid
+        description: Um string UUID que identifica este Notificacao.
         required: true
       tags:
       - notificacoes
@@ -1439,6 +1474,8 @@ paths:
         name: id
         schema:
           type: string
+          format: uuid
+        description: Um string UUID que identifica este Notificacao.
         required: true
       tags:
       - notificacoes
@@ -1566,7 +1603,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Ranking Semestral.
+        description: Um string UUID que identifica este Ranking Semestral.
         required: true
       tags:
       - reputacao
@@ -1635,6 +1672,8 @@ paths:
         name: id
         schema:
           type: string
+          format: uuid
+        description: Um string UUID que identifica este Certificado de Voluntariado.
         required: true
       tags:
       - voluntariado
@@ -1695,7 +1734,7 @@ paths:
       - name: ordering
         required: false
         in: query
-        description: Which field to use when ordering the results.
+        description: Qual campo usar ao ordenar os resultados.
         schema:
           type: string
       tags:
@@ -1733,6 +1772,8 @@ paths:
         name: id
         schema:
           type: string
+          format: uuid
+        description: Um string UUID que identifica este Inscricao em Voluntariado.
         required: true
       tags:
       - voluntariado
@@ -1754,6 +1795,8 @@ paths:
         name: id
         schema:
           type: string
+          format: uuid
+        description: Um string UUID que identifica este Inscricao em Voluntariado.
         required: true
       tags:
       - voluntariado
@@ -1787,6 +1830,8 @@ paths:
         name: id
         schema:
           type: string
+          format: uuid
+        description: Um string UUID que identifica este Inscricao em Voluntariado.
         required: true
       tags:
       - voluntariado
@@ -1820,6 +1865,8 @@ paths:
         name: id
         schema:
           type: string
+          format: uuid
+        description: Um string UUID que identifica este Inscricao em Voluntariado.
         required: true
       tags:
       - voluntariado
@@ -1853,6 +1900,8 @@ paths:
         name: id
         schema:
           type: string
+          format: uuid
+        description: Um string UUID que identifica este Inscricao em Voluntariado.
         required: true
       tags:
       - voluntariado
@@ -1886,6 +1935,8 @@ paths:
         name: id
         schema:
           type: string
+          format: uuid
+        description: Um string UUID que identifica este Inscricao em Voluntariado.
         required: true
       tags:
       - voluntariado
@@ -1923,13 +1974,13 @@ paths:
       - name: ordering
         required: false
         in: query
-        description: Which field to use when ordering the results.
+        description: Qual campo usar ao ordenar os resultados.
         schema:
           type: string
       - name: search
         required: false
         in: query
-        description: A search term.
+        description: Um termo de busca.
         schema:
           type: string
       tags:
@@ -1991,7 +2042,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Oportunidade de Voluntariado.
+        description: Um string UUID que identifica este Oportunidade de Voluntariado.
         required: true
       tags:
       - voluntariado
@@ -2018,7 +2069,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Oportunidade de Voluntariado.
+        description: Um string UUID que identifica este Oportunidade de Voluntariado.
         required: true
       tags:
       - voluntariado
@@ -2057,7 +2108,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Oportunidade de Voluntariado.
+        description: Um string UUID que identifica este Oportunidade de Voluntariado.
         required: true
       tags:
       - voluntariado
@@ -2095,7 +2146,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Oportunidade de Voluntariado.
+        description: Um string UUID que identifica este Oportunidade de Voluntariado.
         required: true
       tags:
       - voluntariado
@@ -2114,7 +2165,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Oportunidade de Voluntariado.
+        description: Um string UUID que identifica este Oportunidade de Voluntariado.
         required: true
       tags:
       - voluntariado
@@ -2149,7 +2200,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: A UUID string identifying this Oportunidade de Voluntariado.
+        description: Um string UUID que identifica este Oportunidade de Voluntariado.
         required: true
       tags:
       - voluntariado
@@ -2333,6 +2384,7 @@ components:
           format: uri
         arquivo_url:
           type: string
+          nullable: true
           readOnly: true
         nome_original:
           type: string
@@ -2342,6 +2394,7 @@ components:
           readOnly: true
         tamanho_legivel:
           type: string
+          description: Converte bytes em formato legivel (KB ou MB).
           readOnly: true
         tipo_mime:
           type: string
@@ -2409,6 +2462,7 @@ components:
           nullable: true
         objeto_tipo:
           type: string
+          nullable: true
           readOnly: true
         dados_anteriores:
           readOnly: true
@@ -2487,6 +2541,7 @@ components:
           readOnly: true
         arquivo_pdf_url:
           type: string
+          nullable: true
           readOnly: true
         emitido_em:
           type: string
@@ -2721,6 +2776,9 @@ components:
           nullable: true
         objeto_tipo:
           type: string
+          nullable: true
+          description: Retorna o nome do model relacionado para o frontend montar
+            o link.
           readOnly: true
         lida:
           type: boolean
@@ -2785,7 +2843,7 @@ components:
           type: integer
           readOnly: true
         total_inscritos:
-          type: string
+          type: integer
           readOnly: true
         carga_horaria_total:
           type: integer
@@ -3110,7 +3168,7 @@ components:
           readOnly: true
           description: Cache de quantos usuarios marcaram que a duvida persiste
         total_respostas:
-          type: string
+          type: integer
           readOnly: true
         created_at:
           type: string

@@ -37,7 +37,7 @@ class PostSerializer(serializers.ModelSerializer):
             'e_melhor', 'e_topico', 'created_at', 'updated_at',
         ]
 
-    def get_total_respostas(self, obj):
+    def get_total_respostas(self, obj) -> int:
         return obj.respostas.filter(deleted_at__isnull=True).count()
 
     def validate(self, data):
@@ -73,7 +73,7 @@ class AlertaConteudoSerializer(serializers.ModelSerializer):
             'resolucao', 'created_at', 'resolvido_em',
         ]
 
-    def get_post_titulo(self, obj):
+    def get_post_titulo(self, obj) -> str:
         if obj.post.titulo:
             return obj.post.titulo
         return f'Resposta em: {obj.post.post_pai.titulo[:50]}' if obj.post.post_pai else '(sem titulo)'
@@ -130,13 +130,13 @@ class ArquivoSerializer(serializers.ModelSerializer):
             'tamanho_bytes', 'tamanho_legivel', 'tipo_mime', 'created_at',
         ]
 
-    def get_arquivo_url(self, obj):
+    def get_arquivo_url(self, obj) -> str | None:
         request = self.context.get('request')
         if obj.arquivo and request:
             return request.build_absolute_uri(obj.arquivo.url)
         return None
 
-    def get_tamanho_legivel(self, obj):
+    def get_tamanho_legivel(self, obj) -> str:
         """Converte bytes em formato legivel (KB ou MB)."""
         bytes_total = obj.tamanho_bytes
         if bytes_total < 1024 * 1024:

@@ -241,7 +241,8 @@ export default function LoginPage() {
               <h1 className="text-white font-bold tracking-tight login-hero__title" style={{ lineHeight: '1.1', marginBottom: '16px' }}>
                 Revelemo-nos, mais por atos do que por palavras,
                 <br />
-                <span className="bg-clip-text text-transparent login-hero__gradient-text">Dignos de possuir este grande país</span>
+                <span className="bg-clip-text text-transparent login-hero__gradient-text">D
+                ignos de possuir este grande país</span>
               </h1>
               <p className="text-white/35 leading-relaxed" style={{ fontSize: '15px', maxWidth: '28rem', margin: '0 auto' }}>
                 Forum academico por disciplina integrado com voluntariado universitario.

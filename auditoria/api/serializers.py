@@ -25,7 +25,7 @@ class AuditLogSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = fields
 
-    def get_objeto_tipo(self, obj):
+    def get_objeto_tipo(self, obj) -> str | None:
         if obj.content_type:
             return obj.content_type.model
         return None

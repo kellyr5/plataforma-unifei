@@ -2,8 +2,12 @@ import re
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
+from rest_framework_simplejwt.exceptions import InvalidToken
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from autenticacao.models import Usuario
+from autenticacao.tokens import esta_invalidado, invalidar
 
 
 def cpf_apenas_numeros(cpf):
@@ -75,3 +79,34 @@ class ReenvioCodigoSerializer(serializers.Serializer):
     """Serializer para reenvio de codigo de ativacao."""
 
     email = serializers.EmailField()
+
+
+class RefreshComListaRedisSerializer(TokenRefreshSerializer):
+    """
+    Renovacao de acesso com invalidacao do refresh token no Redis.
+
+    O SimpleJWT rotaciona o token, ou seja, devolve um refresh novo a cada
+    renovacao. Sem invalidar o antigo, ele continuaria valido ate expirar, e
+    quem o tivesse interceptado poderia usa-lo em paralelo. Aqui o token
+    apresentado e recusado se ja constar na lista, e passa a constar assim que
+    a rotacao acontece.
+    """
+
+    def validate(self, attrs):
+        token_apresentado = RefreshToken(attrs['refresh'])
+
+        if esta_invalidado(token_apresentado):
+            raise InvalidToken(
+                'Este refresh token ja foi utilizado. Faca login novamente.'
+            )
+
+        dados = super().validate(attrs)
+        invalidar(token_apresentado)
+
+        return dados
+
+
+class LogoutSerializer(serializers.Serializer):
+    """Recebe o refresh token que sera invalidado no encerramento da sessao."""
+
+    refresh = serializers.CharField()

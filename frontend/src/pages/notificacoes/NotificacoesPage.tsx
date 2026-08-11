@@ -12,6 +12,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../services/api'
 import toast, { Toaster } from 'react-hot-toast'
+import { useNotificacoes } from '../../contexts/NotificacoesContext'
 
 interface Notificacao {
   id: string
@@ -130,6 +131,10 @@ export default function NotificaçõesPage() {
   const [loading, setLoading] = useState(true)
   const [filtro, setFiltro] = useState<'todas' | 'nao_lidas' | 'lidas'>('todas')
 
+  // O badge do sino vive no contexto do WebSocket. Como a marcação de leitura
+  // acontece pela API REST, avisamos o contexto para ele recontar.
+  const { ultimas, atualizarContador } = useNotificacoes()
+
   async function fetchNotificações() {
     try {
       const res = await api.get('/notificacoes/', { params: { ordering: '-created_at' } })
@@ -144,10 +149,16 @@ export default function NotificaçõesPage() {
 
   useEffect(() => { fetchNotificações() }, [])
 
+  // Notificação que chega pelo WebSocket entra na lista sem recarregar a tela.
+  useEffect(() => {
+    if (ultimas.length > 0) fetchNotificações()
+  }, [ultimas.length])
+
   async function marcarLida(id: string) {
     try {
       await api.post(`/notificacoes/${id}/marcar-lida/`)
       setNotificações(prev => prev.map(n => n.id === id ? { ...n, lida: true } : n))
+      atualizarContador()
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Erro ao marcar como lida')
     }
@@ -157,6 +168,7 @@ export default function NotificaçõesPage() {
     try {
       await api.post('/notificacoes/marcar-todas-lidas/')
       setNotificações(prev => prev.map(n => ({ ...n, lida: true })))
+      atualizarContador()
       toast.success('Todas as notificações marcadas como lidas')
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Erro')

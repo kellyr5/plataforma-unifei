@@ -20,6 +20,7 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     - ?data_fim=2026-05-31
     """
 
+    queryset = AuditLog.objects.none()  # define o tipo da PK para o schema OpenAPI
     serializer_class = AuditLogSerializer
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ['created_at', 'acao']

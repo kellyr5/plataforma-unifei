@@ -1,14 +1,22 @@
 """
-Servico de notificacoes.
+Serviço de notificações.
 
-Centraliza a logica de criacao de notificacoes, isolando o resto do
-sistema dos detalhes de implementacao. Quando WebSockets forem
-implementados (Fase B), basta plugar o broadcast no metodo
-_disparar_realtime() sem alterar quem chama o servico.
+Centraliza a criação de notificações e isola o resto do sistema dos detalhes
+de implementação. Quem dispara um evento chama apenas criar_notificacao(), sem
+saber se o aviso vai por banco, por WebSocket ou pelos dois.
+
+A entrega tem duas camadas: o registro no PostgreSQL, que é a fonte da verdade
+e sustenta a lista de notificações da tela, e o broadcast pelo Channels, que
+faz o aviso aparecer na hora para quem estiver com a plataforma aberta. Uma
+falha no broadcast nunca impede a persistência, porque o usuário precisa ver a
+notificação ao recarregar a página mesmo que o Redis esteja fora do ar.
 """
 
 import logging
 from typing import Optional
+
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 
@@ -27,14 +35,14 @@ def criar_notificacao(
     objeto_relacionado: Optional[models.Model] = None,
 ) -> Optional[Notificacao]:
     """
-    Cria uma notificacao no banco e dispara o broadcast em tempo real.
+    Cria uma notificação no banco e dispara o broadcast em tempo real.
 
-    Regras de negocio:
-    - Nao notifica o usuario sobre acoes que ele mesmo realizou (auto-eventos).
-    - Falhas no disparo realtime nao impedem a persistencia no banco.
+    Regras de negócio:
+    - Não notifica o usuário sobre ações que ele mesmo realizou.
+    - Falhas no disparo em tempo real não impedem a persistência no banco.
     """
 
-    # Anti auto-notificacao: nao notifica o proprio usuario
+    # Anti auto-notificação: ninguém precisa ser avisado do que fez.
     if remetente and remetente.id == destinatario.id:
         return None
 
@@ -58,32 +66,58 @@ def criar_notificacao(
         _disparar_realtime(notificacao)
     except Exception as exc:
         logger.warning(
-            f'Falha ao disparar notificacao em tempo real (id={notificacao.id}): {exc}'
+            f'Falha ao disparar notificação em tempo real (id={notificacao.id}): {exc}'
         )
 
     return notificacao
 
 
+def _serializar_para_broadcast(notificacao: Notificacao) -> dict:
+    """
+    Monta o payload enviado pelo WebSocket.
+
+    É um recorte enxuto do serializer REST, com o necessário para o frontend
+    montar o item da lista e o link de destino sem uma nova requisição.
+    """
+    return {
+        'id': str(notificacao.id),
+        'tipo': notificacao.tipo,
+        'titulo': notificacao.titulo,
+        'mensagem': notificacao.mensagem,
+        'lida': notificacao.lida,
+        'created_at': notificacao.created_at.isoformat(),
+        'remetente_nome': (
+            notificacao.remetente.nome_completo if notificacao.remetente else None
+        ),
+        'objeto_tipo': (
+            notificacao.content_type.model if notificacao.content_type else None
+        ),
+        'objeto_id': str(notificacao.objeto_id) if notificacao.objeto_id else None,
+    }
+
+
 def _disparar_realtime(notificacao: Notificacao) -> None:
     """
-    Hook para disparo de notificacao em tempo real.
+    Publica a notificação no grupo do destinatário.
 
-    Implementacao atual: no-op (Fase A, REST polling).
-
-    Quando Django Channels for habilitado (Fase B), substituir por:
-
-        from channels.layers import get_channel_layer
-        from asgiref.sync import async_to_sync
-
-        channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(
-            f'notificacoes_{notificacao.destinatario.id}',
-            {'type': 'notificacao.nova', 'notificacao_id': str(notificacao.id)},
-        )
+    O group_send é assíncrono, mas quem chama está numa view síncrona, por isso
+    o async_to_sync. Se a camada de canais não estiver configurada, o
+    get_channel_layer devolve None e o disparo é silenciosamente ignorado.
     """
-    pass
+    channel_layer = get_channel_layer()
+
+    if channel_layer is None:
+        return
+
+    async_to_sync(channel_layer.group_send)(
+        f'notificacoes_{notificacao.destinatario_id}',
+        {
+            'type': 'notificacao.nova',
+            'notificacao': _serializar_para_broadcast(notificacao),
+        },
+    )
 
 
 def contar_nao_lidas(usuario) -> int:
-    """Retorna o numero de notificacoes nao lidas de um usuario."""
+    """Retorna o número de notificações não lidas de um usuário."""
     return Notificacao.objects.filter(destinatario=usuario, lida=False).count()

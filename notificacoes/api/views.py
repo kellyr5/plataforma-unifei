@@ -20,6 +20,7 @@ class NotificacaoViewSet(viewsets.ReadOnlyModelViewSet):
     - POST /notificacoes/marcar-todas-lidas/ -- marca todas como lidas
     """
 
+    queryset = Notificacao.objects.none()  # define o tipo da PK para o schema OpenAPI
     serializer_class = NotificacaoSerializer
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ['created_at', 'lida']

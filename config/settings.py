@@ -32,6 +32,10 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv())
 # Application definition
 
 INSTALLED_APPS = [
+    # O daphne precisa vir antes do staticfiles para assumir o runserver
+    # e atender WebSocket em desenvolvimento.
+    'daphne',
+    'channels',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -78,6 +82,67 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
+ASGI_APPLICATION = 'config.asgi.application'
+
+
+# ===== Log das conexoes WebSocket =====
+# Mostra no terminal por que uma conexao foi aceita ou recusada, o que evita
+# depurar handshake no escuro quando o frontend so reporta erro de conexao.
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {'class': 'logging.StreamHandler'},
+    },
+    'loggers': {
+        'config.ws_auth': {'handlers': ['console'], 'level': 'INFO'},
+        'notificacoes': {'handlers': ['console'], 'level': 'INFO'},
+    },
+}
+
+
+# ===== Redis e camada de canais (Django Channels) =====
+# O Redis intermedia as mensagens entre os processos do servidor, de modo que
+# uma notificacao criada em uma requisicao HTTP alcance o WebSocket do usuario
+# mesmo que ele esteja conectado em outro worker.
+#
+# Usamos o backend de publicacao e assinatura (pub/sub) em vez do backend de
+# filas. Nosso uso e difusao para um grupo, sem necessidade de guardar a
+# mensagem: quem nao estava conectado no momento vai ver a notificacao pela
+# API, que le do PostgreSQL. O backend de filas manteria uma leitura
+# bloqueante no Redis, que estoura o tempo limite em conexoes ociosas.
+
+REDIS_HOST = config('REDIS_HOST', default='127.0.0.1')
+REDIS_PORT = config('REDIS_PORT', default=6379, cast=int)
+REDIS_DB_CHANNELS = config('REDIS_DB_CHANNELS', default=1, cast=int)
+
+REDIS_URL_CHANNELS = f'redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB_CHANNELS}'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.pubsub.RedisPubSubChannelLayer',
+        'CONFIG': {
+            'hosts': [REDIS_URL_CHANNELS],
+        },
+    },
+}
+
+
+# ===== Cache =====
+# Banco separado do usado pelos canais, para que um flush em um nao derrube o
+# outro. E aqui que fica a lista de refresh tokens invalidados: sao registros
+# de vida curta, consultados a cada renovacao e descartados na expiracao, o que
+# o TTL do Redis resolve sozinho, sem tabela crescendo no PostgreSQL.
+
+REDIS_DB_CACHE = config('REDIS_DB_CACHE', default=2, cast=int)
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': f'redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB_CACHE}',
+    },
+}
 
 
 # Database
@@ -117,9 +182,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'pt-br'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/Sao_Paulo'
 
 USE_I18N = True
 
@@ -130,6 +195,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -156,7 +222,9 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': True,
+    # A invalidacao nao usa a tabela do SimpleJWT: e feita no Redis, pela
+    # lista implementada em autenticacao/tokens.py.
+    'BLACKLIST_AFTER_ROTATION': False,
     'AUTH_HEADER_TYPES': ('Bearer',),
     'USER_ID_FIELD': 'id',
     'USER_ID_CLAIM': 'user_id',

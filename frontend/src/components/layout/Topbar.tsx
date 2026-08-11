@@ -2,13 +2,18 @@
  * Topbar — Barra superior com busca, notificacoes e avatar.
  */
 
+import { useNavigate } from 'react-router-dom'
+
 import { useAuth } from '../../contexts/AuthContext'
+import { useNotificacoes } from '../../contexts/NotificacoesContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import { SunIcon, MoonIcon } from '../ui/Icons'
 
 export function Topbar() {
   const { user } = useAuth()
   const { theme, toggleTheme } = useTheme()
+  const { naoLidas } = useNotificacoes()
+  const navigate = useNavigate()
 
   const initials = user?.nome_completo
     ? user.nome_completo.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
@@ -57,19 +62,36 @@ export function Topbar() {
           {theme === 'light' ? MoonIcon : SunIcon}
         </button>
 
-        {/* Notificacoes */}
+        {/* Notificações — o contador chega pelo WebSocket, sem recarregar a página */}
         <button
+          onClick={() => navigate('/notificacoes')}
+          aria-label={
+            naoLidas > 0
+              ? `Notificações: ${naoLidas} não lidas`
+              : 'Notificações'
+          }
           className="relative flex items-center justify-center rounded-lg cursor-pointer"
           style={{ width: '36px', height: '36px', color: 'var(--text-secondary)' }}
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
           </svg>
-          <div style={{
-            position: 'absolute', top: '4px', right: '4px',
-            width: '8px', height: '8px', borderRadius: '50%',
-            background: 'var(--accent-red)', border: '2px solid var(--bg-card)',
-          }} />
+
+          {naoLidas > 0 && (
+            <span
+              className="flex items-center justify-center"
+              style={{
+                position: 'absolute', top: '2px', right: '2px',
+                minWidth: '17px', height: '17px', padding: '0 4px',
+                borderRadius: '9px',
+                background: 'var(--accent-red)', color: 'white',
+                fontSize: '10px', fontWeight: 600, lineHeight: 1,
+                border: '2px solid var(--bg-card)',
+              }}
+            >
+              {naoLidas > 99 ? '99+' : naoLidas}
+            </span>
+          )}
         </button>
 
         {/* Avatar */}

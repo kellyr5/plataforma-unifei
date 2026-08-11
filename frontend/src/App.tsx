@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { NotificacoesProvider } from './contexts/NotificacoesContext'
 import { AppLayout } from './components/layout/AppLayout'
 import LoginPage from './pages/auth/LoginPage'
 import DashboardPage from './pages/dashboard/DashboardPage'
@@ -32,6 +33,7 @@ function App() {
     <BrowserRouter>
       <ThemeProvider>
         <AuthProvider>
+          <NotificacoesProvider>
           <Routes>
             {/* Rota publica */}
             <Route path="/" element={<LoginPage />} />
@@ -50,6 +52,7 @@ function App() {
               {/* Proximas telas virao aqui */}
             </Route>
           </Routes>
+          </NotificacoesProvider>
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>

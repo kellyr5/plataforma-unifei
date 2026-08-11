@@ -94,6 +94,14 @@ api.interceptors.response.use(
       const newAccess = data.access
 
       localStorage.setItem('access_token', newAccess)
+
+      /* O backend rotaciona o refresh e invalida o anterior no Redis, entao o
+         token novo precisa substituir o antigo aqui. Sem isso, a proxima
+         renovacao apresentaria um token ja invalidado e derrubaria a sessao. */
+      if (data.refresh) {
+        localStorage.setItem('refresh_token', data.refresh)
+      }
+
       api.defaults.headers.common.Authorization = `Bearer ${newAccess}`
       processQueue(null, newAccess)
 

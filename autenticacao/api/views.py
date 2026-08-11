@@ -14,11 +14,17 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from drf_spectacular.utils import extend_schema
 
 from autenticacao.models import Usuario
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.views import TokenRefreshView
+
 from autenticacao.api.serializers import (
     RegistroSerializer,
     AtivacaoSerializer,
     ReenvioCodigoSerializer,
+    LogoutSerializer,
+    RefreshComListaRedisSerializer,
 )
+from autenticacao.tokens import invalidar
 from autenticacao.utils import (
     criar_codigo_ativacao,
     enviar_email_ativacao,
@@ -182,6 +188,57 @@ class ReenvioCodigoView(APIView):
             pass  # Falha silenciosa para nao expor erro ao atacante
 
         return resposta_padrao
+
+
+class RefreshView(TokenRefreshView):
+    """
+    POST /api/auth/refresh/
+
+    Renova o token de acesso e invalida o refresh apresentado, que passa a
+    constar na lista mantida no Redis.
+    """
+
+    serializer_class = RefreshComListaRedisSerializer
+
+
+class LogoutView(APIView):
+    """
+    POST /api/auth/logout/
+
+    Encerra a sessao invalidando o refresh token informado.
+
+    Nao ha como revogar um token de acesso ja emitido, porque ele e validado
+    apenas pela assinatura. O que o logout garante e que nenhum acesso novo
+    sera emitido a partir daquela sessao, e o acesso em circulacao expira em
+    ate uma hora.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        request=LogoutSerializer,
+        responses={205: dict},
+        tags=['Autenticacao'],
+        summary='Encerrar sessao',
+    )
+    def post(self, request):
+        serializer = LogoutSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            token = RefreshToken(serializer.validated_data['refresh'])
+        except TokenError:
+            return Response(
+                {'detail': 'Refresh token invalido ou ja expirado.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        invalidar(token)
+
+        return Response(
+            {'detail': 'Sessao encerrada.'},
+            status=status.HTTP_205_RESET_CONTENT,
+        )
 
 
 class MeView(APIView):
