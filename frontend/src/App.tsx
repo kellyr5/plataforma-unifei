@@ -10,6 +10,7 @@ import TopicPage from './pages/forum/TopicPage'
 import VoluntariadoPage from './pages/voluntariado/VoluntariadoPage'
 import OportunidadePage from './pages/voluntariado/OportunidadePage'
 import NotificacoesPage from './pages/notificacoes/NotificacoesPage'
+import ModeracaoPage from './pages/moderacao/ModeracaoPage'
 import PerfilPage from './pages/perfil/PerfilPage'
 import RankingPage from './pages/ranking/RankingPage'
 import CertificadosPage from './pages/certificados/CertificadosPage'
@@ -46,6 +47,7 @@ function App() {
               <Route path="/voluntariado" element={<VoluntariadoPage />} />
               <Route path="/voluntariado/:id" element={<OportunidadePage />} />
               <Route path="/notificacoes" element={<NotificacoesPage />} />
+              <Route path="/moderacao" element={<ModeracaoPage />} />
               <Route path="/perfil" element={<PerfilPage />} />
               <Route path="/ranking" element={<RankingPage />} />
               <Route path="/certificados" element={<CertificadosPage />} />

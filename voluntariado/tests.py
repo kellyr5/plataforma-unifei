@@ -17,7 +17,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from config.testing import criar_oportunidade, criar_usuario
+from config.testing import criar_oportunidade, criar_usuario, itens
 from voluntariado.models import Certificado, InscricaoVoluntariado
 
 
@@ -145,7 +145,7 @@ class AprovacaoTests(APITestCase):
 
         resposta = self.client.get(reverse('inscricao-list'))
 
-        self.assertEqual(len(resposta.data), 0)
+        self.assertEqual(len(itens(resposta)), 0)
 
 
 @override_settings(MEDIA_ROOT=MEDIA_TEMPORARIA)

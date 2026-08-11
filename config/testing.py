@@ -33,6 +33,25 @@ SENHA_PADRAO = 'SenhaForte2026.'
 _contador_cpf = {'valor': 10000000000}
 
 
+# ===== Leitura de respostas paginadas =====
+
+def itens(resposta):
+    """
+    Devolve a lista de registros de uma resposta da API.
+
+    Com a paginação ativa, uma listagem retorna um dicionário com count, next,
+    previous e results. Endpoints que não passam pelo paginador, como as views
+    avulsas de reputação, continuam devolvendo a lista direta. Este auxiliar
+    aceita os dois formatos, para que os testes não precisem saber qual é qual.
+    """
+    dados = resposta.data
+
+    if isinstance(dados, dict) and 'results' in dados:
+        return dados['results']
+
+    return dados
+
+
 # ===== Usuários =====
 
 def proximo_cpf():

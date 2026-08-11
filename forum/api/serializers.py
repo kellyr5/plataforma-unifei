@@ -56,20 +56,25 @@ class PostSerializer(serializers.ModelSerializer):
 class AlertaConteudoSerializer(serializers.ModelSerializer):
     denunciante_nome = serializers.CharField(source='denunciante.nome_completo', read_only=True)
     post_titulo = serializers.SerializerMethodField()
+    disciplina_codigo = serializers.CharField(source='post.disciplina.codigo', read_only=True)
+    assumido_por_nome = serializers.CharField(source='assumido_por.nome_completo', read_only=True)
     resolvido_por_nome = serializers.CharField(source='resolvido_por.nome_completo', read_only=True)
 
     class Meta:
         model = AlertaConteudo
         fields = [
             'id', 'denunciante', 'denunciante_nome',
-            'post', 'post_titulo',
+            'post', 'post_titulo', 'disciplina_codigo',
             'motivo', 'status',
+            'assumido_por', 'assumido_por_nome', 'assumido_em',
             'resolvido_por', 'resolvido_por_nome',
             'resolucao', 'created_at', 'resolvido_em',
         ]
         read_only_fields = [
             'id', 'denunciante', 'denunciante_nome', 'post_titulo',
-            'status', 'resolvido_por', 'resolvido_por_nome',
+            'disciplina_codigo', 'status',
+            'assumido_por', 'assumido_por_nome', 'assumido_em',
+            'resolvido_por', 'resolvido_por_nome',
             'resolucao', 'created_at', 'resolvido_em',
         ]
 

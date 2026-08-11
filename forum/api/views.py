@@ -5,8 +5,12 @@ from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
+from django.db import transaction
 from django.utils import timezone
 from django.db.models import F
+
+from auditoria.services import registrar_acao
+from notificacoes.services import criar_notificacao
 
 from forum.models import (
     Disciplina, Post, HistoricoEdicao, Voto,
@@ -26,7 +30,12 @@ from forum.validators import (
     validar_tamanho_arquivo,
     validar_tipo_arquivo,
 )
-from config.permissions import IsAdminOrSuperuser
+from config.permissions import (
+    IsAdminOrSuperuser,
+    PodeModerar,
+    disciplinas_que_modera,
+    e_administrador,
+)
 
 
 def usuario_pode_marcar_melhor_resposta(usuario, topico):
@@ -301,10 +310,26 @@ class PostViewSet(viewsets.ModelViewSet):
                 {'detail': 'Marcacao removida.'},
                 status=status.HTTP_200_OK
             )
+        # Guarda quem perdeu a marcacao antes de desmarcar. O update em massa
+        # nao dispara signals, entao a reputacao desses autores precisa ser
+        # recalculada na mao, senao eles ficariam com os 15 pontos da melhor
+        # resposta ate o proximo recalculo total.
+        anteriores = list(
+            Post.objects.filter(post_pai=topico, e_melhor=True)
+            .exclude(pk=resposta.pk)
+            .select_related('autor', 'disciplina')
+        )
+
         Post.objects.filter(
             post_pai=topico,
             e_melhor=True,
         ).exclude(pk=resposta.pk).update(e_melhor=False)
+
+        from reputacao.services import atualizar_reputacao
+
+        for anterior in anteriores:
+            atualizar_reputacao(anterior.autor, anterior.disciplina)
+
         resposta.e_melhor = True
         resposta.save(update_fields=['e_melhor'])
         return Response(
@@ -425,48 +450,176 @@ class ArquivoViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class AlertaConteudoViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Fila de moderacao de conteudo.
+
+    A moderacao e descentralizada: cada monitor ou professor cuida das
+    denuncias das disciplinas em que atua, porque e quem tem contexto para
+    julgar se o conteudo e mesmo impróprio. O administrador enxerga tudo.
+
+    Fluxo: pendente -> em_analise -> procedente ou improcedente.
+
+    - GET  /alertas/                 lista a fila (filtros: status, disciplina)
+    - POST /alertas/{id}/assumir/    marca que o moderador esta cuidando do caso
+    - POST /alertas/{id}/liberar/    devolve o caso para a fila
+    - POST /alertas/{id}/resolver/   decide e encerra
+    """
+
     serializer_class = AlertaConteudoSerializer
-    permission_classes = [IsAdminOrSuperuser]
+    permission_classes = [PodeModerar]
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ['created_at', 'status']
     ordering = ['-created_at']
 
     def get_queryset(self):
         queryset = AlertaConteudo.objects.select_related(
-            'denunciante', 'post', 'post__post_pai', 'resolvido_por'
+            'denunciante', 'post', 'post__post_pai', 'post__disciplina',
+            'assumido_por', 'resolvido_por',
         )
+
+        # Recorte por disciplina: o moderador so ve o que lhe cabe julgar.
+        if not e_administrador(self.request.user):
+            queryset = queryset.filter(
+                post__disciplina_id__in=disciplinas_que_modera(self.request.user)
+            )
+
         status_filtro = self.request.query_params.get('status')
         if status_filtro:
             queryset = queryset.filter(status=status_filtro)
+
+        disciplina_id = self.request.query_params.get('disciplina')
+        if disciplina_id:
+            queryset = queryset.filter(post__disciplina_id=disciplina_id)
+
         return queryset
 
     @action(detail=True, methods=['post'])
-    def resolver(self, request, pk=None):
+    def assumir(self, request, pk=None):
+        """Sinaliza aos demais moderadores que o caso ja tem responsavel."""
         alerta = self.get_object()
+
         if alerta.status in ['procedente', 'improcedente']:
             return Response(
                 {'detail': 'Esta denuncia ja foi resolvida.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+        if alerta.assumido_por_id and alerta.assumido_por_id != request.user.id:
+            return Response(
+                {
+                    'detail': 'Esta denuncia ja esta sendo analisada por '
+                              f'{alerta.assumido_por.nome_completo}.'
+                },
+                status=status.HTTP_409_CONFLICT
+            )
+
+        alerta.status = 'em_analise'
+        alerta.assumido_por = request.user
+        alerta.assumido_em = timezone.now()
+        alerta.save(update_fields=['status', 'assumido_por', 'assumido_em'])
+
+        return Response(self.get_serializer(alerta).data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def liberar(self, request, pk=None):
+        """Devolve o caso para a fila, quando o moderador nao vai concluir."""
+        alerta = self.get_object()
+
+        if alerta.assumido_por_id != request.user.id:
+            return Response(
+                {'detail': 'Apenas quem assumiu a denuncia pode libera-la.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        alerta.status = 'pendente'
+        alerta.assumido_por = None
+        alerta.assumido_em = None
+        alerta.save(update_fields=['status', 'assumido_por', 'assumido_em'])
+
+        return Response(self.get_serializer(alerta).data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def resolver(self, request, pk=None):
+        """
+        Encerra a denuncia.
+
+        Procedente remove o post por soft delete e avisa o autor. Nos dois
+        casos o denunciante e informado do desfecho, para que a denuncia nao
+        pareca ter caido no vazio.
+        """
+        alerta = self.get_object()
+
+        if alerta.status in ['procedente', 'improcedente']:
+            return Response(
+                {'detail': 'Esta denuncia ja foi resolvida.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if alerta.assumido_por_id and alerta.assumido_por_id != request.user.id:
+            return Response(
+                {
+                    'detail': 'Esta denuncia esta sendo analisada por '
+                              f'{alerta.assumido_por.nome_completo}.'
+                },
+                status=status.HTTP_409_CONFLICT
+            )
+
         decisao = request.data.get('decisao')
         if decisao not in ['procedente', 'improcedente']:
             return Response(
                 {'detail': 'Campo "decisao" e obrigatorio e deve ser "procedente" ou "improcedente".'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
         resolucao = request.data.get('resolucao', '').strip()
         if not resolucao:
             return Response(
                 {'detail': 'O campo "resolucao" e obrigatorio.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        alerta.status = decisao
-        alerta.resolvido_por = request.user
-        alerta.resolucao = resolucao
-        alerta.resolvido_em = timezone.now()
-        alerta.save()
-        if decisao == 'procedente':
-            alerta.post.deleted_at = timezone.now()
-            alerta.post.save(update_fields=['deleted_at'])
-        serializer = self.get_serializer(alerta)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+
+        with transaction.atomic():
+            alerta.status = decisao
+            alerta.resolvido_por = request.user
+            alerta.resolucao = resolucao
+            alerta.resolvido_em = timezone.now()
+            alerta.save()
+
+            if decisao == 'procedente':
+                alerta.post.deleted_at = timezone.now()
+                alerta.post.save(update_fields=['deleted_at'])
+
+                criar_notificacao(
+                    destinatario=alerta.post.autor,
+                    tipo='post_removido',
+                    titulo='Seu post foi removido pela moderacao',
+                    mensagem=(
+                        f'Um conteudo seu em {alerta.post.disciplina.codigo} foi '
+                        f'removido apos analise de denuncia. Motivo: {resolucao}'
+                    ),
+                    remetente=request.user,
+                    objeto_relacionado=alerta.post.disciplina,
+                )
+
+            criar_notificacao(
+                destinatario=alerta.denunciante,
+                tipo='denuncia_resolvida',
+                titulo='Sua denuncia foi analisada',
+                mensagem=(
+                    f'A denuncia que voce registrou foi julgada {alerta.get_status_display().lower()}. '
+                    f'{resolucao}'
+                ),
+                remetente=request.user,
+                objeto_relacionado=alerta.post.disciplina,
+            )
+
+            registrar_acao(
+                acao='denuncia_resolvida',
+                objeto_afetado=alerta.post,
+                descricao=(
+                    f'Denuncia julgada {decisao} por {request.user.nome_completo} '
+                    f'em {alerta.post.disciplina.codigo}.'
+                ),
+            )
+
+        return Response(self.get_serializer(alerta).data, status=status.HTTP_200_OK)

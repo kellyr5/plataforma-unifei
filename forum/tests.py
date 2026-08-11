@@ -16,9 +16,11 @@ from config.testing import (
     criar_resposta,
     criar_topico,
     criar_usuario,
+    itens,
     vincular,
 )
-from forum.models import Post, Voto
+from forum.models import AlertaConteudo, Post, Voto
+from notificacoes.models import Notificacao
 
 
 class PermissaoDisciplinaTests(APITestCase):
@@ -255,6 +257,217 @@ class ReacaoPersisteTests(APITestCase):
         self.assertEqual(self.resposta.total_reacoes_persiste, 1)
 
 
+class ModeracaoTests(APITestCase):
+    """
+    /api/forum/alertas/
+
+    A moderação é descentralizada por disciplina: quem julga o conteúdo é o
+    monitor ou o professor que acompanha a matéria, e não um administrador
+    global sem contexto. O fluxo passa por pendente, em análise e decisão, e
+    tanto o autor do post quanto o denunciante são avisados do desfecho.
+    """
+
+    def setUp(self):
+        self.disciplina = criar_disciplina()
+        self.outra_disciplina = criar_disciplina(codigo='XAHC02', nome='Cálculo I')
+
+        self.autor = criar_usuario(nome='Autor do Post')
+        self.denunciante = criar_usuario(nome='Denunciante')
+        self.professor = criar_usuario(nome='Professor da Disciplina')
+        self.professor_alheio = criar_usuario(nome='Professor de Outra Matéria')
+        self.aluno = criar_usuario(nome='Aluno Comum')
+        self.admin = criar_usuario(nome='Administrador', admin=True)
+
+        vincular(self.professor, self.disciplina, papel='professor')
+        vincular(self.professor_alheio, self.outra_disciplina, papel='professor')
+        vincular(self.aluno, self.disciplina, papel='aluno')
+
+        self.topico = criar_topico(self.autor, self.disciplina)
+        self.alerta = AlertaConteudo.objects.create(
+            denunciante=self.denunciante,
+            post=self.topico,
+            motivo='Conteúdo ofensivo.',
+        )
+
+    def url(self, acao):
+        return reverse(f'alerta-{acao}', args=[self.alerta.id])
+
+    # --- acesso à fila ---
+
+    def test_aluno_nao_acessa_a_fila_de_moderacao(self):
+        self.client.force_authenticate(user=self.aluno)
+
+        resposta = self.client.get(reverse('alerta-list'))
+
+        self.assertEqual(resposta.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_professor_ve_as_denuncias_da_propria_disciplina(self):
+        self.client.force_authenticate(user=self.professor)
+
+        resposta = self.client.get(reverse('alerta-list'))
+
+        self.assertEqual(resposta.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(itens(resposta)), 1)
+
+    def test_professor_nao_ve_denuncias_de_outra_disciplina(self):
+        self.client.force_authenticate(user=self.professor_alheio)
+
+        resposta = self.client.get(reverse('alerta-list'))
+
+        self.assertEqual(len(itens(resposta)), 0)
+
+    def test_admin_ve_todas_as_denuncias(self):
+        self.client.force_authenticate(user=self.admin)
+
+        resposta = self.client.get(reverse('alerta-list'))
+
+        self.assertEqual(len(itens(resposta)), 1)
+
+    # --- fila de trabalho ---
+
+    def test_assumir_marca_a_denuncia_como_em_analise(self):
+        self.client.force_authenticate(user=self.professor)
+
+        resposta = self.client.post(self.url('assumir'))
+
+        self.assertEqual(resposta.status_code, status.HTTP_200_OK)
+        self.alerta.refresh_from_db()
+        self.assertEqual(self.alerta.status, 'em_analise')
+        self.assertEqual(self.alerta.assumido_por, self.professor)
+
+    def test_denuncia_ja_assumida_por_outro_retorna_conflito(self):
+        self.client.force_authenticate(user=self.professor)
+        self.client.post(self.url('assumir'))
+
+        self.client.force_authenticate(user=self.admin)
+        resposta = self.client.post(self.url('assumir'))
+
+        self.assertEqual(resposta.status_code, status.HTTP_409_CONFLICT)
+
+    def test_liberar_devolve_a_denuncia_para_a_fila(self):
+        self.client.force_authenticate(user=self.professor)
+        self.client.post(self.url('assumir'))
+
+        resposta = self.client.post(self.url('liberar'))
+
+        self.assertEqual(resposta.status_code, status.HTTP_200_OK)
+        self.alerta.refresh_from_db()
+        self.assertEqual(self.alerta.status, 'pendente')
+        self.assertIsNone(self.alerta.assumido_por)
+
+    def test_apenas_quem_assumiu_pode_liberar(self):
+        self.client.force_authenticate(user=self.professor)
+        self.client.post(self.url('assumir'))
+
+        self.client.force_authenticate(user=self.admin)
+        resposta = self.client.post(self.url('liberar'))
+
+        self.assertEqual(resposta.status_code, status.HTTP_403_FORBIDDEN)
+
+    # --- resolução ---
+
+    def test_procedente_remove_o_post_por_soft_delete(self):
+        self.client.force_authenticate(user=self.professor)
+
+        resposta = self.client.post(self.url('resolver'), {
+            'decisao': 'procedente',
+            'resolucao': 'Conteúdo desrespeitoso com colegas.',
+        })
+
+        self.assertEqual(resposta.status_code, status.HTTP_200_OK)
+        self.topico.refresh_from_db()
+        self.assertIsNotNone(self.topico.deleted_at)
+
+    def test_improcedente_mantem_o_post(self):
+        self.client.force_authenticate(user=self.professor)
+
+        self.client.post(self.url('resolver'), {
+            'decisao': 'improcedente',
+            'resolucao': 'A crítica é dura, porém pertinente ao conteúdo.',
+        })
+
+        self.topico.refresh_from_db()
+        self.assertIsNone(self.topico.deleted_at)
+
+    def test_autor_e_avisado_quando_o_post_e_removido(self):
+        self.client.force_authenticate(user=self.professor)
+
+        self.client.post(self.url('resolver'), {
+            'decisao': 'procedente',
+            'resolucao': 'Conteúdo desrespeitoso.',
+        })
+
+        self.assertTrue(
+            Notificacao.objects.filter(
+                destinatario=self.autor,
+                tipo='post_removido',
+            ).exists()
+        )
+
+    def test_denunciante_e_avisado_nas_duas_decisoes(self):
+        self.client.force_authenticate(user=self.professor)
+
+        self.client.post(self.url('resolver'), {
+            'decisao': 'improcedente',
+            'resolucao': 'Não houve violação.',
+        })
+
+        self.assertTrue(
+            Notificacao.objects.filter(
+                destinatario=self.denunciante,
+                tipo='denuncia_resolvida',
+            ).exists()
+        )
+
+    def test_denuncia_resolvida_nao_pode_ser_resolvida_de_novo(self):
+        self.client.force_authenticate(user=self.professor)
+        dados = {'decisao': 'improcedente', 'resolucao': 'Sem violação.'}
+        self.client.post(self.url('resolver'), dados)
+
+        resposta = self.client.post(self.url('resolver'), dados)
+
+        self.assertEqual(resposta.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_resolucao_e_obrigatoria(self):
+        self.client.force_authenticate(user=self.professor)
+
+        resposta = self.client.post(self.url('resolver'), {'decisao': 'procedente'})
+
+        self.assertEqual(resposta.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_decisao_invalida_e_rejeitada(self):
+        self.client.force_authenticate(user=self.professor)
+
+        resposta = self.client.post(self.url('resolver'), {
+            'decisao': 'talvez',
+            'resolucao': 'Em dúvida.',
+        })
+
+        self.assertEqual(resposta.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_moderador_de_outra_disciplina_nao_resolve(self):
+        self.client.force_authenticate(user=self.professor_alheio)
+
+        resposta = self.client.post(self.url('resolver'), {
+            'decisao': 'procedente',
+            'resolucao': 'Removendo.',
+        })
+
+        self.assertEqual(resposta.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_nao_resolve_caso_assumido_por_outro_moderador(self):
+        self.client.force_authenticate(user=self.professor)
+        self.client.post(self.url('assumir'))
+
+        self.client.force_authenticate(user=self.admin)
+        resposta = self.client.post(self.url('resolver'), {
+            'decisao': 'procedente',
+            'resolucao': 'Removendo.',
+        })
+
+        self.assertEqual(resposta.status_code, status.HTTP_409_CONFLICT)
+
+
 class SoftDeleteTests(APITestCase):
     """
     O post removido sai da listagem, mas continua no banco com deleted_at
@@ -281,5 +494,5 @@ class SoftDeleteTests(APITestCase):
 
         resposta = self.client.get(reverse('post-list'))
 
-        ids = [item['id'] for item in resposta.data]
+        ids = [item['id'] for item in itens(resposta)]
         self.assertNotIn(str(self.topico.id), ids)

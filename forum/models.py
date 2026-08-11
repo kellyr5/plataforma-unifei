@@ -230,6 +230,18 @@ class AlertaConteudo(models.Model):
     )
     motivo = models.TextField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pendente')
+
+    # Registra quem esta cuidando da denuncia enquanto ela nao e resolvida.
+    # Sem isso, dois moderadores podem analisar o mesmo caso sem saber.
+    assumido_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='denuncias_assumidas',
+    )
+    assumido_em = models.DateTimeField(null=True, blank=True)
+
     resolvido_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,

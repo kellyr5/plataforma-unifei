@@ -111,11 +111,6 @@ class RankingSemestralViewSet(viewsets.ReadOnlyModelViewSet):
         methods=['post'],
         permission_classes=[IsAdminOrSuperuser],
     )
-    @action(
-        detail=False,
-        methods=['post'],
-        permission_classes=[IsAdminOrSuperuser],
-    )
     def gerar(self, request):
         """
         Gera um snapshot do ranking semestral de uma disciplina.

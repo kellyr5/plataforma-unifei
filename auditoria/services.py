@@ -19,20 +19,34 @@ from auditoria.middleware import get_request_contexto
 logger = logging.getLogger(__name__)
 
 
+# Campos que nunca entram no log, independentemente do model.
+CAMPOS_SENSIVEIS_GLOBAIS = {'password', 'last_login'}
+
+# Campos sensiveis apenas em models especificos. A distincao importa: o campo
+# 'codigo' e segredo em CodigoAtivacao, mas em Disciplina e justamente o dado
+# que identifica o registro, e remover indistintamente pelo nome deixava o log
+# de disciplina sem informacao util.
+CAMPOS_SENSIVEIS_POR_MODELO = {
+    'CodigoAtivacao': {'codigo'},
+}
+
+
 def serializar_objeto(objeto: Optional[models.Model]) -> Optional[dict]:
     """
     Converte uma instancia de model em dict serializavel para JSON.
 
-    Remove campos sensiveis (password, codigo de ativacao) e converte
-    UUIDs/datas para strings.
+    Remove campos sensiveis e converte UUIDs e datas para texto.
     """
     if objeto is None:
         return None
 
     dados = model_to_dict(objeto)
 
-    # Campos sensiveis nunca devem ir para o audit log
-    campos_sensiveis = {'password', 'codigo', 'last_login'}
+    campos_sensiveis = set(CAMPOS_SENSIVEIS_GLOBAIS)
+    campos_sensiveis |= CAMPOS_SENSIVEIS_POR_MODELO.get(
+        objeto.__class__.__name__, set()
+    )
+
     for campo in campos_sensiveis:
         dados.pop(campo, None)
 

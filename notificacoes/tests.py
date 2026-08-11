@@ -16,7 +16,7 @@ from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from config.asgi import application
-from config.testing import criar_usuario
+from config.testing import criar_usuario, itens
 from notificacoes.models import Notificacao
 from notificacoes.services import contar_nao_lidas, criar_notificacao
 
@@ -116,7 +116,7 @@ class NotificacaoAPITests(APITestCase):
         resposta = self.client.get(reverse('notificacao-list'))
 
         self.assertEqual(resposta.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(resposta.data), 1)
+        self.assertEqual(len(itens(resposta)), 1)
 
     def test_listagem_exige_autenticacao(self):
         resposta = self.client.get(reverse('notificacao-list'))

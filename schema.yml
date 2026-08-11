@@ -29,6 +29,18 @@ paths:
         description: Qual campo usar ao ordenar os resultados.
         schema:
           type: string
+      - name: page
+        required: false
+        in: query
+        description: Um número de página dentro do conjunto de resultados paginado.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Número de resultados a serem retornados por página.
+        schema:
+          type: integer
       tags:
       - auditoria
       security:
@@ -38,9 +50,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/AuditLog'
+                $ref: '#/components/schemas/PaginatedAuditLogList'
           description: ''
   /api/auditoria/{id}/:
     get:
@@ -138,6 +148,43 @@ paths:
               schema:
                 $ref: '#/components/schemas/TokenObtainPair'
           description: ''
+  /api/auth/logout/:
+    post:
+      operationId: auth_logout_create
+      description: |-
+        POST /api/auth/logout/
+
+        Encerra a sessao invalidando o refresh token informado.
+
+        Nao ha como revogar um token de acesso ja emitido, porque ele e validado
+        apenas pela assinatura. O que o logout garante e que nenhum acesso novo
+        sera emitido a partir daquela sessao, e o acesso em circulacao expira em
+        ate uma hora.
+      summary: Encerrar sessao
+      tags:
+      - Autenticacao
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '205':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
   /api/auth/me/:
     get:
       operationId: auth_me_retrieve
@@ -208,28 +255,30 @@ paths:
     post:
       operationId: auth_refresh_create
       description: |-
-        Takes a refresh type JSON web token and returns an access type JSON web
-        token if the refresh token is valid.
+        POST /api/auth/refresh/
+
+        Renova o token de acesso e invalida o refresh apresentado, que passa a
+        constar na lista mantida no Redis.
       tags:
       - auth
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/TokenRefreshRequest'
+              $ref: '#/components/schemas/RefreshComListaRedisRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/TokenRefreshRequest'
+              $ref: '#/components/schemas/RefreshComListaRedisRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/TokenRefreshRequest'
+              $ref: '#/components/schemas/RefreshComListaRedisRequest'
         required: true
       responses:
         '200':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TokenRefresh'
+                $ref: '#/components/schemas/RefreshComListaRedis'
           description: ''
   /api/auth/register/:
     post:
@@ -291,6 +340,19 @@ paths:
   /api/forum/alertas/:
     get:
       operationId: forum_alertas_list
+      description: |-
+        Fila de moderacao de conteudo.
+
+        A moderacao e descentralizada: cada monitor ou professor cuida das
+        denuncias das disciplinas em que atua, porque e quem tem contexto para
+        julgar se o conteudo e mesmo impróprio. O administrador enxerga tudo.
+
+        Fluxo: pendente -> em_analise -> procedente ou improcedente.
+
+        - GET  /alertas/                 lista a fila (filtros: status, disciplina)
+        - POST /alertas/{id}/assumir/    marca que o moderador esta cuidando do caso
+        - POST /alertas/{id}/liberar/    devolve o caso para a fila
+        - POST /alertas/{id}/resolver/   decide e encerra
       parameters:
       - name: ordering
         required: false
@@ -298,6 +360,18 @@ paths:
         description: Qual campo usar ao ordenar os resultados.
         schema:
           type: string
+      - name: page
+        required: false
+        in: query
+        description: Um número de página dentro do conjunto de resultados paginado.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Número de resultados a serem retornados por página.
+        schema:
+          type: integer
       tags:
       - forum
       security:
@@ -307,20 +381,29 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/AlertaConteudo'
+                $ref: '#/components/schemas/PaginatedAlertaConteudoList'
           description: ''
   /api/forum/alertas/{id}/:
     get:
       operationId: forum_alertas_retrieve
+      description: |-
+        Fila de moderacao de conteudo.
+
+        A moderacao e descentralizada: cada monitor ou professor cuida das
+        denuncias das disciplinas em que atua, porque e quem tem contexto para
+        julgar se o conteudo e mesmo impróprio. O administrador enxerga tudo.
+
+        Fluxo: pendente -> em_analise -> procedente ou improcedente.
+
+        - GET  /alertas/                 lista a fila (filtros: status, disciplina)
+        - POST /alertas/{id}/assumir/    marca que o moderador esta cuidando do caso
+        - POST /alertas/{id}/liberar/    devolve o caso para a fila
+        - POST /alertas/{id}/resolver/   decide e encerra
       parameters:
       - in: path
         name: id
         schema:
           type: string
-          format: uuid
-        description: Um string UUID que identifica este Alerta de Conteudo.
         required: true
       tags:
       - forum
@@ -333,16 +416,86 @@ paths:
               schema:
                 $ref: '#/components/schemas/AlertaConteudo'
           description: ''
-  /api/forum/alertas/{id}/resolver/:
+  /api/forum/alertas/{id}/assumir/:
     post:
-      operationId: forum_alertas_resolver_create
+      operationId: forum_alertas_assumir_create
+      description: Sinaliza aos demais moderadores que o caso ja tem responsavel.
       parameters:
       - in: path
         name: id
         schema:
           type: string
-          format: uuid
-        description: Um string UUID que identifica este Alerta de Conteudo.
+        required: true
+      tags:
+      - forum
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertaConteudoRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AlertaConteudoRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AlertaConteudoRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertaConteudo'
+          description: ''
+  /api/forum/alertas/{id}/liberar/:
+    post:
+      operationId: forum_alertas_liberar_create
+      description: Devolve o caso para a fila, quando o moderador nao vai concluir.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - forum
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertaConteudoRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AlertaConteudoRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AlertaConteudoRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertaConteudo'
+          description: ''
+  /api/forum/alertas/{id}/resolver/:
+    post:
+      operationId: forum_alertas_resolver_create
+      description: |-
+        Encerra a denuncia.
+
+        Procedente remove o post por soft delete e avisa o autor. Nos dois
+        casos o denunciante e informado do desfecho, para que a denuncia nao
+        pareca ter caido no vazio.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
         required: true
       tags:
       - forum
@@ -375,6 +528,19 @@ paths:
 
         A criacao e feita via POST /posts/{id}/anexar/ (que usa multipart).
         Aqui apenas read e delete.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: Um número de página dentro do conjunto de resultados paginado.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Número de resultados a serem retornados por página.
+        schema:
+          type: integer
       tags:
       - forum
       security:
@@ -384,9 +550,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Arquivo'
+                $ref: '#/components/schemas/PaginatedArquivoList'
           description: ''
   /api/forum/arquivos/{id}/:
     get:
@@ -447,6 +611,18 @@ paths:
         description: Qual campo usar ao ordenar os resultados.
         schema:
           type: string
+      - name: page
+        required: false
+        in: query
+        description: Um número de página dentro do conjunto de resultados paginado.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Número de resultados a serem retornados por página.
+        schema:
+          type: integer
       - name: search
         required: false
         in: query
@@ -462,9 +638,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Disciplina'
+                $ref: '#/components/schemas/PaginatedDisciplinaList'
           description: ''
     post:
       operationId: forum_disciplinas_create
@@ -605,6 +779,18 @@ paths:
         description: Qual campo usar ao ordenar os resultados.
         schema:
           type: string
+      - name: page
+        required: false
+        in: query
+        description: Um número de página dentro do conjunto de resultados paginado.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Número de resultados a serem retornados por página.
+        schema:
+          type: integer
       tags:
       - forum
       security:
@@ -614,9 +800,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/PermissaoDisciplina'
+                $ref: '#/components/schemas/PaginatedPermissaoDisciplinaList'
           description: ''
     post:
       operationId: forum_permissoes_create
@@ -770,6 +954,18 @@ paths:
         description: Qual campo usar ao ordenar os resultados.
         schema:
           type: string
+      - name: page
+        required: false
+        in: query
+        description: Um número de página dentro do conjunto de resultados paginado.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Número de resultados a serem retornados por página.
+        schema:
+          type: integer
       - name: search
         required: false
         in: query
@@ -785,9 +981,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Post'
+                $ref: '#/components/schemas/PaginatedPostList'
           description: ''
     post:
       operationId: forum_posts_create
@@ -1421,6 +1615,18 @@ paths:
         description: Qual campo usar ao ordenar os resultados.
         schema:
           type: string
+      - name: page
+        required: false
+        in: query
+        description: Um número de página dentro do conjunto de resultados paginado.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Número de resultados a serem retornados por página.
+        schema:
+          type: integer
       tags:
       - notificacoes
       security:
@@ -1430,9 +1636,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Notificacao'
+                $ref: '#/components/schemas/PaginatedNotificacaoList'
           description: ''
   /api/notificacoes/{id}/:
     get:
@@ -1576,6 +1780,19 @@ paths:
 
         - GET /api/reputacao/ranking-semestral/ -- lista (filtros: disciplina, semestre)
         - POST /api/reputacao/ranking-semestral/gerar/ -- gera snapshot (so admin)
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: Um número de página dentro do conjunto de resultados paginado.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Número de resultados a serem retornados por página.
+        schema:
+          type: integer
       tags:
       - reputacao
       security:
@@ -1585,9 +1802,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/RankingSemestral'
+                $ref: '#/components/schemas/PaginatedRankingSemestralList'
           description: ''
   /api/reputacao/ranking-semestral/{id}/:
     get:
@@ -1645,6 +1860,19 @@ paths:
         - GET /certificados/ -- estudante ve os proprios
         - GET /certificados/{id}/ -- detalha
         - GET /certificados/validar/{codigo}/ -- endpoint publico de validacao
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: Um número de página dentro do conjunto de resultados paginado.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Número de resultados a serem retornados por página.
+        schema:
+          type: integer
       tags:
       - voluntariado
       security:
@@ -1654,9 +1882,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Certificado'
+                $ref: '#/components/schemas/PaginatedCertificadoList'
           description: ''
   /api/voluntariado/certificados/{id}/:
     get:
@@ -1737,6 +1963,18 @@ paths:
         description: Qual campo usar ao ordenar os resultados.
         schema:
           type: string
+      - name: page
+        required: false
+        in: query
+        description: Um número de página dentro do conjunto de resultados paginado.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Número de resultados a serem retornados por página.
+        schema:
+          type: integer
       tags:
       - voluntariado
       security:
@@ -1746,9 +1984,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/InscricaoVoluntariado'
+                $ref: '#/components/schemas/PaginatedInscricaoVoluntariadoList'
           description: ''
   /api/voluntariado/inscricoes/{id}/:
     get:
@@ -1977,6 +2213,18 @@ paths:
         description: Qual campo usar ao ordenar os resultados.
         schema:
           type: string
+      - name: page
+        required: false
+        in: query
+        description: Um número de página dentro do conjunto de resultados paginado.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Número de resultados a serem retornados por página.
+        schema:
+          type: integer
       - name: search
         required: false
         in: query
@@ -1992,9 +2240,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Oportunidade'
+                $ref: '#/components/schemas/PaginatedOportunidadeList'
           description: ''
     post:
       operationId: voluntariado_oportunidades_create
@@ -2279,12 +2525,28 @@ components:
         post_titulo:
           type: string
           readOnly: true
+        disciplina_codigo:
+          type: string
+          readOnly: true
         motivo:
           type: string
         status:
           allOf:
           - $ref: '#/components/schemas/AlertaConteudoStatusEnum'
           readOnly: true
+        assumido_por:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        assumido_por_nome:
+          type: string
+          readOnly: true
+        assumido_em:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
         resolvido_por:
           type: string
           format: uuid
@@ -2306,9 +2568,13 @@ components:
           readOnly: true
           nullable: true
       required:
+      - assumido_em
+      - assumido_por
+      - assumido_por_nome
       - created_at
       - denunciante
       - denunciante_nome
+      - disciplina_codigo
       - id
       - motivo
       - post
@@ -2738,6 +3004,15 @@ components:
         * `removida` - Removida
         * `desistente` - Desistente
         * `concluida` - Concluida
+    LogoutRequest:
+      type: object
+      description: Recebe o refresh token que sera invalidado no encerramento da sessao.
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+      required:
+      - refresh
     Notificacao:
       type: object
       description: Serializa notificacoes para a API.
@@ -2957,6 +3232,259 @@ components:
         * `ativa` - Ativa
         * `encerrada` - Encerrada
         * `cancelada` - Cancelada
+    PaginatedAlertaConteudoList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlertaConteudo'
+    PaginatedArquivoList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Arquivo'
+    PaginatedAuditLogList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditLog'
+    PaginatedCertificadoList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Certificado'
+    PaginatedDisciplinaList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Disciplina'
+    PaginatedInscricaoVoluntariadoList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/InscricaoVoluntariado'
+    PaginatedNotificacaoList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notificacao'
+    PaginatedOportunidadeList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Oportunidade'
+    PaginatedPermissaoDisciplinaList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PermissaoDisciplina'
+    PaginatedPostList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Post'
+    PaginatedRankingSemestralList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/RankingSemestral'
     PapelEnum:
       enum:
       - aluno
@@ -3269,6 +3797,41 @@ components:
           minLength: 1
       required:
       - email
+    RefreshComListaRedis:
+      type: object
+      description: |-
+        Renovacao de acesso com invalidacao do refresh token no Redis.
+
+        O SimpleJWT rotaciona o token, ou seja, devolve um refresh novo a cada
+        renovacao. Sem invalidar o antigo, ele continuaria valido ate expirar, e
+        quem o tivesse interceptado poderia usa-lo em paralelo. Aqui o token
+        apresentado e recusado se ja constar na lista, e passa a constar assim que
+        a rotacao acontece.
+      properties:
+        refresh:
+          type: string
+        access:
+          type: string
+          readOnly: true
+      required:
+      - access
+      - refresh
+    RefreshComListaRedisRequest:
+      type: object
+      description: |-
+        Renovacao de acesso com invalidacao do refresh token no Redis.
+
+        O SimpleJWT rotaciona o token, ou seja, devolve um refresh novo a cada
+        renovacao. Sem invalidar o antigo, ele continuaria valido ate expirar, e
+        quem o tivesse interceptado poderia usa-lo em paralelo. Aqui o token
+        apresentado e recusado se ja constar na lista, e passa a constar assim que
+        a rotacao acontece.
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+      required:
+      - refresh
     RegistroRequest:
       type: object
       description: |-
@@ -3355,25 +3918,6 @@ components:
       required:
       - cpf
       - password
-    TokenRefresh:
-      type: object
-      properties:
-        access:
-          type: string
-          readOnly: true
-        refresh:
-          type: string
-      required:
-      - access
-      - refresh
-    TokenRefreshRequest:
-      type: object
-      properties:
-        refresh:
-          type: string
-          minLength: 1
-      required:
-      - refresh
     TokenVerifyRequest:
       type: object
       properties:
