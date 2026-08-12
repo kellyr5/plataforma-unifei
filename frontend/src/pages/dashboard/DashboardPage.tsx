@@ -12,8 +12,8 @@ interface Oportunidade {
   id: string; titulo: string; area: string; area_display: string
   local: string; carga_horaria_total: number; vagas: number; vagas_disponiveis: number
 }
-interface Reputacao {
-  disciplina_codigo: string; disciplina_nome: string; pontos: number
+interface Andamento {
+  disciplina_codigo: string; disciplina_nome: string; total_posts: number
   total_respostas: number; total_melhores_respostas: number
 }
 interface Notificacao { id: string; titulo: string; lida: boolean; created_at: string }
@@ -199,7 +199,7 @@ export default function DashboardPage() {
   const navigate = useNavigate()
   const [posts, setPosts] = useState<Post[]>([])
   const [oportunidades, setOportunidades] = useState<Oportunidade[]>([])
-  const [reputacoes, setReputacoes] = useState<Reputacao[]>([])
+  const [andamento, setAndamento] = useState<Andamento[]>([])
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([])
   const [naoLidas, setNaoLidas] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -210,7 +210,7 @@ export default function DashboardPage() {
         const [p, o, r, n, nl] = await Promise.allSettled([
           api.get('/forum/posts/', { params: { ordering: '-created_at' } }),
           api.get('/voluntariado/oportunidades/', { params: { status: 'ativa', ordering: '-created_at' } }),
-          api.get('/reputacao/minha/'),
+          api.get('/forum/andamento/'),
           api.get('/notificacoes/', { params: { ordering: '-created_at' } }),
           api.get('/notificacoes/nao-lidas/'),
         ])
@@ -225,7 +225,7 @@ export default function DashboardPage() {
           })
           setOportunidades(list)
         }
-        if (r.status === 'fulfilled') setReputacoes(Array.isArray(r.value.data) ? r.value.data : [])
+        if (r.status === 'fulfilled') setAndamento(Array.isArray(r.value.data) ? r.value.data : [])
         if (n.status === 'fulfilled') { const d = n.value.data; setNotificacoes((Array.isArray(d) ? d : d.results || []).filter((x: Notificacao) => !x.lida).slice(0, 4)) }
         if (nl.status === 'fulfilled') setNaoLidas(nl.value.data.total || nl.value.data.count || 0)
       } catch (e) { console.error(e) }
@@ -234,9 +234,9 @@ export default function DashboardPage() {
     f()
   }, [])
 
-  const totalPontos = reputacoes.reduce((s, r) => s + r.pontos, 0)
-  const totalRespostas = reputacoes.reduce((s, r) => s + r.total_respostas, 0)
-  const totalMelhores = reputacoes.reduce((s, r) => s + r.total_melhores_respostas, 0)
+  const totalTopicos = andamento.reduce((s, r) => s + r.total_posts, 0)
+  const totalRespostas = andamento.reduce((s, r) => s + r.total_respostas, 0)
+  const totalMelhores = andamento.reduce((s, r) => s + r.total_melhores_respostas, 0)
   const firstName = user?.nome_completo?.split(' ')[0] || ''
 
   if (loading) {
@@ -275,13 +275,13 @@ export default function DashboardPage() {
           </p>
 
           <div className="flex items-center" style={{ gap: '32px' }}>
-            {/* Reputacao - ring */}
+            {/* Topicos abertos - ring */}
             <div className="flex items-center" style={{ gap: '12px' }}>
               <div className="relative flex items-center justify-center">
-                <ProgressRing value={totalPontos} max={100} color="#60A5FA" />
-                <span className="absolute font-bold text-white" style={{ fontSize: '13px' }}>{totalPontos}</span>
+                <ProgressRing value={totalTopicos} max={20} color="#60A5FA" />
+                <span className="absolute font-bold text-white" style={{ fontSize: '13px' }}>{totalTopicos}</span>
               </div>
-              <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.45)' }}>Reputação</span>
+              <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.45)' }}>Dúvidas</span>
             </div>
 
             {/* Respostas - ring */}
@@ -299,7 +299,7 @@ export default function DashboardPage() {
                 <ProgressRing value={totalMelhores} max={10} color="#FBBF24" />
                 <span className="absolute font-bold text-white" style={{ fontSize: '13px' }}>{totalMelhores}</span>
               </div>
-              <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.45)' }}>Melhor resposta</span>
+              <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.45)' }}>Ajudaram colegas</span>
             </div>
 
             {/* Notificacoes - alerta pulsante */}
@@ -351,21 +351,21 @@ export default function DashboardPage() {
       {/* ===== SEGUNDA LINHA ===== */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
         <TiltCard>
-          <SectionHeader title="Reputação" linkText="Ranking" onLink={() => navigate('/ranking')} />
+          <SectionHeader title="Andamento" linkText="Ver tudo" onLink={() => navigate('/andamento')} />
           <div style={{ padding: '0 14px 12px' }}>
-            {reputacoes.length === 0
-              ? <div className="text-center" style={{ padding: '20px', color: 'var(--text-tertiary)', fontSize: '12px' }}>Participe do fórum para ganhar pontos.</div>
-              : reputacoes.map((r, i) => (
+            {andamento.length === 0
+              ? <div className="text-center" style={{ padding: '20px', color: 'var(--text-tertiary)', fontSize: '12px' }}>Participe do fórum para acompanhar seu percurso.</div>
+              : andamento.map((r, i) => (
                 <div key={i} className="flex items-center justify-between" style={{
-                  padding: '10px 0', borderBottom: i < reputacoes.length - 1 ? '1px solid var(--border)' : 'none',
+                  padding: '10px 0', borderBottom: i < andamento.length - 1 ? '1px solid var(--border)' : 'none',
                 }}>
                   <div>
                     <span className="font-medium" style={{ fontSize: '13px', color: '#003087' }}>{r.disciplina_codigo}</span>
                     <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
-                      {r.total_respostas} resp. / {r.total_melhores_respostas} melhores
+                      {r.total_respostas} resp. / {r.total_melhores_respostas} ajudaram
                     </div>
                   </div>
-                  <span className="font-bold" style={{ fontSize: '16px', color: 'var(--text-primary)' }}>{r.pontos}</span>
+                  <span className="font-bold" style={{ fontSize: '16px', color: 'var(--text-primary)' }}>{r.total_posts}</span>
                 </div>
               ))
             }
@@ -392,8 +392,8 @@ export default function DashboardPage() {
                 icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>} />
               <QuickLink label="Meu perfil" onClick={() => navigate('/perfil')}
                 icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>} />
-              <QuickLink label="Ver ranking" onClick={() => navigate('/ranking')}
-                icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 01-.982-3.172M9.497 14.25a7.454 7.454 0 00.981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 007.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M18.75 4.236c.982.143 1.954.317 2.916.52A6.003 6.003 0 0016.27 9.728M18.75 4.236V4.5c0 2.108-.966 3.99-2.48 5.228m0 0a6.003 6.003 0 01-5.54 0" /></svg>} />
+              <QuickLink label="Meu andamento" onClick={() => navigate('/andamento')}
+                icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>} />
             </div>
           </div>
         </TiltCard>

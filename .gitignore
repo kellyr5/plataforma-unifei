@@ -37,3 +37,4 @@ Thumbs.db
 *.egg-info/
 dist/
 build/
+docs/saida-testes.txt

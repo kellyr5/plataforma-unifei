@@ -404,6 +404,8 @@ paths:
         name: id
         schema:
           type: string
+          format: uuid
+        description: Um string UUID que identifica este Alerta de Conteudo.
         required: true
       tags:
       - forum
@@ -425,6 +427,8 @@ paths:
         name: id
         schema:
           type: string
+          format: uuid
+        description: Um string UUID que identifica este Alerta de Conteudo.
         required: true
       tags:
       - forum
@@ -458,6 +462,8 @@ paths:
         name: id
         schema:
           type: string
+          format: uuid
+        description: Um string UUID que identifica este Alerta de Conteudo.
         required: true
       tags:
       - forum
@@ -496,6 +502,8 @@ paths:
         name: id
         schema:
           type: string
+          format: uuid
+        description: Um string UUID que identifica este Alerta de Conteudo.
         required: true
       tags:
       - forum

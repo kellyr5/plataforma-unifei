@@ -197,6 +197,82 @@ class LoginTests(APITestCase):
         self.assertEqual(resposta.data['cpf'], usuario.cpf)
 
 
+class PapeisDoUsuarioTests(APITestCase):
+    """
+    GET /api/auth/me/
+
+    A resposta traz os papéis do usuário para que a interface saiba o que
+    exibir. É apresentação, não autorização: cada requisição continua sendo
+    verificada no backend.
+    """
+
+    def setUp(self):
+        from config.testing import criar_disciplina, vincular
+
+        self.url = reverse('me')
+        self.disciplina = criar_disciplina()
+        self.outra = criar_disciplina(codigo='XAHC02', nome='Cálculo I')
+        self.vincular = vincular
+
+    def test_aluno_comum_nao_pode_moderar(self):
+        aluno = criar_usuario(nome='Aluno Comum')
+        self.vincular(aluno, self.disciplina, papel='aluno')
+        self.client.force_authenticate(user=aluno)
+
+        resposta = self.client.get(self.url)
+
+        self.assertFalse(resposta.data['pode_moderar'])
+        self.assertFalse(resposta.data['e_monitor'])
+        self.assertFalse(resposta.data['e_coordenacao'])
+
+    def test_monitor_e_reconhecido_como_moderador(self):
+        monitor = criar_usuario(nome='Monitor')
+        self.vincular(monitor, self.disciplina, papel='monitor')
+        self.client.force_authenticate(user=monitor)
+
+        resposta = self.client.get(self.url)
+
+        self.assertTrue(resposta.data['e_monitor'])
+        self.assertTrue(resposta.data['pode_moderar'])
+
+    def test_monitor_tambem_e_aluno_em_outras_disciplinas(self):
+        """
+        O monitor não deixa de ser estudante, então acumula papéis diferentes
+        conforme a disciplina.
+        """
+        monitor = criar_usuario(nome='Monitor')
+        self.vincular(monitor, self.disciplina, papel='monitor')
+        self.vincular(monitor, self.outra, papel='aluno')
+        self.client.force_authenticate(user=monitor)
+
+        resposta = self.client.get(self.url)
+
+        papeis = {
+            item['disciplina_codigo']: item['papel']
+            for item in resposta.data['papeis_disciplina']
+        }
+        self.assertEqual(papeis['XAHC01'], 'monitor')
+        self.assertEqual(papeis['XAHC02'], 'aluno')
+
+    def test_coordenacao_e_reconhecida(self):
+        admin = criar_usuario(nome='Coordenação', admin=True)
+        self.client.force_authenticate(user=admin)
+
+        resposta = self.client.get(self.url)
+
+        self.assertTrue(resposta.data['e_coordenacao'])
+        self.assertTrue(resposta.data['pode_moderar'])
+
+    def test_organizacao_e_reconhecida(self):
+        ong = criar_usuario(nome='ONG Parceira', ong=True)
+        self.client.force_authenticate(user=ong)
+
+        resposta = self.client.get(self.url)
+
+        self.assertTrue(resposta.data['e_organizacao'])
+        self.assertFalse(resposta.data['pode_moderar'])
+
+
 @override_settings(CACHES=CACHE_EM_MEMORIA)
 class RotacaoDeTokenTests(APITestCase):
     """

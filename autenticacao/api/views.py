@@ -242,33 +242,69 @@ class LogoutView(APIView):
 
 
 class MeView(APIView):
-    """Retorna dados do usuario autenticado."""
+    """
+    GET /api/auth/me/
+
+    Dados do usuario autenticado, incluindo os papeis que ele exerce.
+
+    Os papeis vao juntos de proposito. A interface precisa saber, logo no
+    carregamento, se deve exibir a area de moderacao ou as acoes de
+    coordenacao, e buscar isso em uma chamada separada por tela produziria
+    um piscar de itens aparecendo e sumindo. A permissao continua sendo
+    verificada no backend a cada requisicao; isto aqui e apresentacao.
+    """
+
     permission_classes = [permissions.IsAuthenticated]
 
     @extend_schema(
-        summary="Dados do usuario autenticado",
-        responses={200: {
-            "type": "object",
-            "properties": {
-                "id": {"type": "string"},
-                "nome_completo": {"type": "string"},
-                "cpf": {"type": "string"},
-                "email": {"type": "string"},
-                "is_admin": {"type": "boolean"},
-                "bio": {"type": "string"},
-                "reputacao": {"type": "integer"},
-            }
-        }}
+        summary='Dados do usuario autenticado',
+        responses={200: dict},
+        tags=['Autenticacao'],
     )
     def get(self, request):
+        from forum.models import PermissaoDisciplina
+
         u = request.user
+
+        vinculos = list(
+            PermissaoDisciplina.objects.filter(usuario=u, ativo=True)
+            .select_related('disciplina')
+        )
+
+        papeis_disciplina = [
+            {
+                'disciplina_id': str(v.disciplina_id),
+                'disciplina_codigo': v.disciplina.codigo,
+                'disciplina_nome': v.disciplina.nome,
+                'papel': v.papel,
+            }
+            for v in vinculos
+        ]
+
+        papeis_globais = list(
+            u.roles_globais.values_list('role', flat=True)
+        )
+
+        e_coordenacao = bool(u.is_admin or u.is_superuser)
+        e_monitor = any(v.papel == 'monitor' for v in vinculos)
+        e_professor = any(v.papel == 'professor' for v in vinculos)
+
         return Response({
-            "id": str(u.id),
-            "nome_completo": u.nome_completo,
-            "cpf": u.cpf,
-            "email": u.email,
-            "is_admin": u.is_admin,
-            "bio": u.bio or "",
-            "reputacao": u.reputacao,
-            "avatar_url": u.avatar_url or "",
+            'id': str(u.id),
+            'nome_completo': u.nome_completo,
+            'cpf': u.cpf,
+            'email': u.email,
+            'is_admin': u.is_admin,
+            'bio': u.bio or '',
+            'avatar_url': u.avatar_url or '',
+
+            'papeis_globais': papeis_globais,
+            'papeis_disciplina': papeis_disciplina,
+
+            # Atalhos usados pela interface para decidir o que exibir.
+            'e_coordenacao': e_coordenacao,
+            'e_monitor': e_monitor,
+            'e_professor': e_professor,
+            'e_organizacao': 'ong' in papeis_globais,
+            'pode_moderar': e_coordenacao or e_monitor or e_professor,
         })

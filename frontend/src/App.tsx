@@ -12,7 +12,7 @@ import OportunidadePage from './pages/voluntariado/OportunidadePage'
 import NotificacoesPage from './pages/notificacoes/NotificacoesPage'
 import ModeracaoPage from './pages/moderacao/ModeracaoPage'
 import PerfilPage from './pages/perfil/PerfilPage'
-import RankingPage from './pages/ranking/RankingPage'
+import AndamentoPage from './pages/andamento/AndamentoPage'
 import CertificadosPage from './pages/certificados/CertificadosPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -49,7 +49,7 @@ function App() {
               <Route path="/notificacoes" element={<NotificacoesPage />} />
               <Route path="/moderacao" element={<ModeracaoPage />} />
               <Route path="/perfil" element={<PerfilPage />} />
-              <Route path="/ranking" element={<RankingPage />} />
+              <Route path="/andamento" element={<AndamentoPage />} />
               <Route path="/certificados" element={<CertificadosPage />} />
               {/* Proximas telas virao aqui */}
             </Route>

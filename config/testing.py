@@ -19,7 +19,7 @@ from datetime import timedelta
 from django.utils import timezone
 
 from autenticacao.models import RoleGlobal, Usuario
-from forum.models import Disciplina, PermissaoDisciplina, Post
+from forum.models import Curso, Disciplina, PermissaoDisciplina, Post
 from voluntariado.models import Oportunidade
 
 
@@ -89,12 +89,34 @@ def criar_usuario(nome='Usuário Teste', email=None, ativo=True, admin=False, on
 
 # ===== Fórum =====
 
-def criar_disciplina(codigo='XAHC01', nome='Algoritmos e Estruturas de Dados'):
-    """Cria uma disciplina ativa do semestre corrente."""
+def criar_curso(codigo='CCO', nome='Ciência da Computação'):
+    """
+    Cria o curso, reaproveitando se já existir.
+
+    A maior parte dos testes precisa de disciplina, e disciplina precisa de
+    curso. Como o código é único, usar get_or_create evita que cada fábrica
+    tente criar o mesmo curso de novo.
+    """
+    curso, _ = Curso.objects.get_or_create(
+        codigo=codigo,
+        defaults={'nome': nome, 'versao_ppc': 'Jan/2025'},
+    )
+    return curso
+
+
+def criar_disciplina(
+    codigo='XAHC01',
+    nome='Algoritmos e Estruturas de Dados',
+    periodo=1,
+    curso=None,
+):
+    """Cria uma disciplina ativa, vinculada ao curso e ao período da matriz."""
     return Disciplina.objects.create(
         codigo=codigo,
         nome=nome,
-        curso='Ciência da Computação',
+        curso=curso or criar_curso(),
+        periodo_sugerido=periodo,
+        carga_horaria=64,
         semestre='2026.1',
     )
 

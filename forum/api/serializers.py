@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from forum.models import (
+    Curso,
     Disciplina, Post, AlertaConteudo, ReacaoPersiste,
     PermissaoDisciplina, Arquivo,
 )
@@ -10,11 +11,41 @@ from forum.validators import (
 )
 
 
+class CursoSerializer(serializers.ModelSerializer):
+    total_disciplinas = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Curso
+        fields = [
+            'id', 'codigo', 'nome', 'grau', 'versao_ppc',
+            'periodos', 'ativo', 'total_disciplinas', 'created_at',
+        ]
+        read_only_fields = ['id', 'total_disciplinas', 'created_at']
+
+    def get_total_disciplinas(self, obj) -> int:
+        return obj.disciplinas.filter(deleted_at__isnull=True).count()
+
+
 class DisciplinaSerializer(serializers.ModelSerializer):
+    curso_nome = serializers.CharField(source='curso.nome', read_only=True, default=None)
+    curso_codigo = serializers.CharField(source='curso.codigo', read_only=True, default=None)
+    pre_requisitos_codigos = serializers.SerializerMethodField()
+
     class Meta:
         model = Disciplina
-        fields = ['id', 'codigo', 'nome', 'curso', 'semestre', 'ativo', 'created_at']
-        read_only_fields = ['id', 'created_at']
+        fields = [
+            'id', 'codigo', 'nome',
+            'curso', 'curso_codigo', 'curso_nome',
+            'periodo_sugerido', 'carga_horaria', 'optativa',
+            'pre_requisitos', 'pre_requisitos_codigos',
+            'semestre', 'ativo', 'created_at',
+        ]
+        read_only_fields = [
+            'id', 'curso_codigo', 'curso_nome', 'pre_requisitos_codigos', 'created_at',
+        ]
+
+    def get_pre_requisitos_codigos(self, obj) -> list:
+        return list(obj.pre_requisitos.values_list('codigo', flat=True))
 
 
 class PostSerializer(serializers.ModelSerializer):
@@ -41,8 +72,25 @@ class PostSerializer(serializers.ModelSerializer):
         return obj.respostas.filter(deleted_at__isnull=True).count()
 
     def validate(self, data):
-        post_pai = data.get('post_pai')
-        titulo = data.get('titulo', '').strip()
+        """
+        Topico precisa de titulo; resposta nao tem titulo.
+
+        Numa atualizacao parcial o corpo costuma trazer so o campo alterado,
+        entao os valores ausentes vem do registro que ja esta no banco. Sem
+        isso, editar apenas o conteudo de um topico seria recusado por falta
+        de titulo, mesmo com o titulo gravado.
+        """
+        instancia = self.instance
+
+        if 'post_pai' in data:
+            post_pai = data['post_pai']
+        else:
+            post_pai = instancia.post_pai if instancia else None
+
+        if 'titulo' in data:
+            titulo = (data['titulo'] or '').strip()
+        else:
+            titulo = (instancia.titulo if instancia else '').strip()
 
         if post_pai is None and not titulo:
             raise serializers.ValidationError({'titulo': 'O titulo e obrigatorio para topicos.'})

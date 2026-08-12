@@ -123,6 +123,68 @@ class NotificacaoAPITests(APITestCase):
 
         self.assertEqual(resposta.status_code, status.HTTP_401_UNAUTHORIZED)
 
+    def test_usuario_exclui_a_propria_notificacao(self):
+        notificacao = criar_notificacao_simples(self.usuario)
+        self.client.force_authenticate(user=self.usuario)
+
+        resposta = self.client.delete(
+            reverse('notificacao-detail', args=[notificacao.id])
+        )
+
+        self.assertEqual(resposta.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Notificacao.objects.filter(id=notificacao.id).exists())
+
+    def test_usuario_nao_exclui_notificacao_alheia(self):
+        alheia = criar_notificacao_simples(self.outro)
+        self.client.force_authenticate(user=self.usuario)
+
+        resposta = self.client.delete(
+            reverse('notificacao-detail', args=[alheia.id])
+        )
+
+        self.assertEqual(resposta.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertTrue(Notificacao.objects.filter(id=alheia.id).exists())
+
+    def test_limpar_remove_apenas_as_lidas(self):
+        """O padrão preserva o que ainda não foi visto."""
+        lida = criar_notificacao_simples(self.usuario)
+        lida.marcar_como_lida()
+        nao_lida = criar_notificacao_simples(self.usuario)
+        self.client.force_authenticate(user=self.usuario)
+
+        resposta = self.client.post(reverse('notificacao-limpar'))
+
+        self.assertEqual(resposta.status_code, status.HTTP_200_OK)
+        self.assertFalse(Notificacao.objects.filter(id=lida.id).exists())
+        self.assertTrue(Notificacao.objects.filter(id=nao_lida.id).exists())
+
+    def test_limpar_com_todas_remove_tudo_do_usuario(self):
+        criar_notificacao_simples(self.usuario)
+        criar_notificacao_simples(self.usuario)
+        do_outro = criar_notificacao_simples(self.outro)
+        self.client.force_authenticate(user=self.usuario)
+
+        self.client.post(reverse('notificacao-limpar'), {'todas': True}, format='json')
+
+        self.assertEqual(
+            Notificacao.objects.filter(destinatario=self.usuario).count(), 0
+        )
+        self.assertTrue(Notificacao.objects.filter(id=do_outro.id).exists())
+
+    def test_limpar_com_ids_remove_apenas_as_indicadas(self):
+        alvo = criar_notificacao_simples(self.usuario)
+        preservada = criar_notificacao_simples(self.usuario)
+        self.client.force_authenticate(user=self.usuario)
+
+        self.client.post(
+            reverse('notificacao-limpar'),
+            {'ids': [str(alvo.id)]},
+            format='json',
+        )
+
+        self.assertFalse(Notificacao.objects.filter(id=alvo.id).exists())
+        self.assertTrue(Notificacao.objects.filter(id=preservada.id).exists())
+
 
 @override_settings(CHANNEL_LAYERS=CAMADA_EM_MEMORIA)
 class NotificacaoWebSocketTests(TransactionTestCase):

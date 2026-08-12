@@ -50,12 +50,27 @@ def serializar_objeto(objeto: Optional[models.Model]) -> Optional[dict]:
     for campo in campos_sensiveis:
         dados.pop(campo, None)
 
-    # Converte UUIDs e outros tipos nao-serializaveis para string
     for chave, valor in list(dados.items()):
-        if hasattr(valor, 'hex') or hasattr(valor, 'isoformat'):
-            dados[chave] = str(valor)
+        dados[chave] = _para_texto(valor)
 
     return dados
+
+
+def _para_texto(valor):
+    """
+    Converte para texto o que o JSON nao aceita.
+
+    Campos ManyToMany chegam como lista de chaves, entao a conversao precisa
+    descer um nivel. Sem isso, auditar uma disciplina com pre-requisitos
+    quebraria na gravacao, e o erro so apareceria em producao.
+    """
+    if isinstance(valor, (list, tuple)):
+        return [_para_texto(item) for item in valor]
+
+    if hasattr(valor, 'hex') or hasattr(valor, 'isoformat'):
+        return str(valor)
+
+    return valor
 
 
 def registrar_acao(

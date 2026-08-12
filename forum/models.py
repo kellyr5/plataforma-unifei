@@ -3,14 +3,95 @@ from django.db import models
 from django.conf import settings
 
 
-class Disciplina(models.Model):
-    """Disciplinas oferecidas pela universidade, organizadas por curso e semestre."""
+class Curso(models.Model):
+    """
+    Curso de graduacao, conforme o Projeto Pedagogico de Curso (PPC).
+
+    Antes desta tabela, o curso era um texto livre dentro de Disciplina, o que
+    impedia a coordenacao de trabalhar por curso e permitia que a mesma
+    graduacao aparecesse escrita de tres maneiras diferentes.
+    """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     codigo = models.CharField(max_length=20, unique=True, db_index=True)
     nome = models.CharField(max_length=255)
-    curso = models.CharField(max_length=100)
-    semestre = models.CharField(max_length=10, help_text='Ex: 2026.1')
+    grau = models.CharField(
+        max_length=30,
+        default='bacharelado',
+        help_text='Bacharelado, licenciatura, tecnologico',
+    )
+    versao_ppc = models.CharField(
+        max_length=30,
+        blank=True,
+        help_text='Versao do PPC que originou a matriz, ex: Jan/2025',
+    )
+    periodos = models.PositiveSmallIntegerField(
+        default=8,
+        help_text='Quantidade de periodos previstos na matriz',
+    )
+    ativo = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'curso'
+        verbose_name = 'Curso'
+        verbose_name_plural = 'Cursos'
+        ordering = ['nome']
+
+    def __str__(self):
+        return f'{self.codigo} - {self.nome}'
+
+
+class Disciplina(models.Model):
+    """
+    Disciplinas oferecidas pela universidade.
+
+    O periodo sugerido vem da matriz do PPC e indica onde a disciplina se
+    encaixa na trajetoria do curso. Ele nao se confunde com o semestre de
+    oferta: uma disciplina de terceiro periodo pode ser ofertada em 2026.1 ou
+    em 2026.2, e a coordenacao pode reposicionar a oferta em situacoes
+    extraordinarias sem alterar a matriz.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    codigo = models.CharField(max_length=20, unique=True, db_index=True)
+    nome = models.CharField(max_length=255)
+
+    curso = models.ForeignKey(
+        Curso,
+        on_delete=models.PROTECT,
+        related_name='disciplinas',
+        null=True,
+        blank=True,
+        help_text='Nulo em disciplinas de outros institutos ainda nao cadastradas',
+    )
+    periodo_sugerido = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        help_text='Periodo previsto na matriz curricular',
+    )
+    carga_horaria = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        help_text='Carga horaria total em horas',
+    )
+    optativa = models.BooleanField(default=False)
+
+    pre_requisitos = models.ManyToManyField(
+        'self',
+        symmetrical=False,
+        blank=True,
+        related_name='libera',
+        help_text='Disciplinas que precisam ser cursadas antes',
+    )
+    co_requisitos = models.ManyToManyField(
+        'self',
+        symmetrical=True,
+        blank=True,
+        help_text='Disciplinas cursadas no mesmo periodo, como TCC1 e Metodologia Cientifica',
+    )
+
+    semestre = models.CharField(max_length=10, help_text='Semestre de oferta, ex: 2026.1')
     ativo = models.BooleanField(default=True)
     deleted_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -19,7 +100,10 @@ class Disciplina(models.Model):
         db_table = 'disciplina'
         verbose_name = 'Disciplina'
         verbose_name_plural = 'Disciplinas'
-        ordering = ['codigo']
+        ordering = ['periodo_sugerido', 'codigo']
+        indexes = [
+            models.Index(fields=['curso', 'periodo_sugerido']),
+        ]
 
     def __str__(self):
         return f'{self.codigo} - {self.nome}'

@@ -1,10 +1,13 @@
 import os
 import magic
 
-from rest_framework import viewsets, filters, status
+from rest_framework import viewsets, filters, permissions, status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
+from rest_framework.views import APIView
+from drf_spectacular.utils import extend_schema
 from django.db import transaction
 from django.utils import timezone
 from django.db.models import F
@@ -13,10 +16,11 @@ from auditoria.services import registrar_acao
 from notificacoes.services import criar_notificacao
 
 from forum.models import (
-    Disciplina, Post, HistoricoEdicao, Voto,
+    Curso, Disciplina, Post, HistoricoEdicao, Voto,
     ReacaoPersiste, AlertaConteudo, PermissaoDisciplina, Arquivo,
 )
 from forum.api.serializers import (
+    CursoSerializer,
     DisciplinaSerializer,
     PostSerializer,
     AlertaConteudoSerializer,
@@ -35,6 +39,7 @@ from config.permissions import (
     PodeModerar,
     disciplinas_que_modera,
     e_administrador,
+    pode_moderar_disciplina,
 )
 
 
@@ -51,15 +56,159 @@ def usuario_pode_marcar_melhor_resposta(usuario, topico):
     ).exists()
 
 
-class DisciplinaViewSet(viewsets.ModelViewSet):
-    serializer_class = DisciplinaSerializer
+class CursoViewSet(viewsets.ModelViewSet):
+    """
+    Cursos de graduacao.
+
+    Consulta liberada a qualquer pessoa autenticada, porque a lista organiza a
+    navegacao do forum. Manutencao restrita a coordenacao.
+    """
+
+    serializer_class = CursoSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['codigo', 'nome', 'curso']
-    ordering_fields = ['codigo', 'nome', 'created_at']
-    ordering = ['codigo']
+    search_fields = ['codigo', 'nome']
+    ordering_fields = ['nome', 'codigo']
+    ordering = ['nome']
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [permissions.IsAuthenticated()]
+        return [IsAdminOrSuperuser()]
 
     def get_queryset(self):
-        return Disciplina.objects.filter(deleted_at__isnull=True)
+        return Curso.objects.all()
+
+
+class MeuAndamentoView(APIView):
+    """
+    GET /api/forum/andamento/
+
+    Painel de acompanhamento do usuario, por disciplina.
+
+    Substitui a antiga area de reputacao. A diferenca nao e apenas de nome: em
+    vez de atribuir pontos e comparar pessoas, aqui o usuario ve o proprio
+    percurso na materia, quantas duvidas levantou, quantas respondeu e quantas
+    das suas respostas ajudaram alguem. O objetivo e o acompanhamento
+    individual, nao a competicao.
+
+    Alem dos totais, devolve a lista das interacoes com o identificador do
+    topico correspondente, para que a tela consiga levar o usuario direto a
+    discussao em que ele participou. Numa resposta, o topico e o post pai;
+    numa duvida, e o proprio post.
+
+    Aceita ?desde=AAAA-MM-DD e ?ate=AAAA-MM-DD para recortar por periodo.
+    """
+
+    # Teto de interacoes devolvidas por disciplina, para que um usuario muito
+    # ativo nao gere uma resposta gigante. As contagens continuam completas.
+    LIMITE_POR_DISCIPLINA = 50
+
+    @extend_schema(
+        responses={200: dict},
+        tags=['Forum'],
+        summary='Meu andamento por disciplina',
+    )
+    def get(self, request):
+        posts = Post.objects.filter(
+            autor=request.user,
+            deleted_at__isnull=True,
+        ).select_related('disciplina', 'post_pai').order_by('-created_at')
+
+        desde = request.query_params.get('desde')
+        ate = request.query_params.get('ate')
+        if desde:
+            posts = posts.filter(created_at__date__gte=desde)
+        if ate:
+            posts = posts.filter(created_at__date__lte=ate)
+
+        # Agrupa em memoria porque o volume por usuario e pequeno e assim
+        # evitamos tres consultas agregadas separadas por disciplina.
+        resumo = {}
+        for post in posts:
+            item = resumo.setdefault(post.disciplina_id, {
+                'disciplina_id': str(post.disciplina_id),
+                'disciplina_codigo': post.disciplina.codigo,
+                'disciplina_nome': post.disciplina.nome,
+                'total_posts': 0,
+                'total_respostas': 0,
+                'total_melhores_respostas': 0,
+                'ultima_interacao': None,
+                'interacoes': [],
+            })
+
+            e_duvida = post.post_pai_id is None
+
+            if e_duvida:
+                item['total_posts'] += 1
+            else:
+                item['total_respostas'] += 1
+                if post.e_melhor:
+                    item['total_melhores_respostas'] += 1
+
+            if len(item['interacoes']) < self.LIMITE_POR_DISCIPLINA:
+                item['interacoes'].append({
+                    'post_id': str(post.id),
+                    # Destino do clique: a tela do topico sempre.
+                    'topico_id': str(post.id if e_duvida else post.post_pai_id),
+                    'titulo': post.titulo if e_duvida else (
+                        post.post_pai.titulo if post.post_pai else '(tópico removido)'
+                    ),
+                    'tipo': 'duvida' if e_duvida else 'resposta',
+                    'e_melhor': post.e_melhor,
+                    'created_at': post.created_at.isoformat(),
+                })
+
+            momento = post.created_at.isoformat()
+            if item['ultima_interacao'] is None or momento > item['ultima_interacao']:
+                item['ultima_interacao'] = momento
+
+        dados = sorted(
+            resumo.values(),
+            key=lambda item: item['ultima_interacao'],
+            reverse=True,
+        )
+
+        return Response(dados)
+
+
+class DisciplinaViewSet(viewsets.ModelViewSet):
+    """
+    Disciplinas da universidade.
+
+    Qualquer pessoa autenticada consulta, porque a lista alimenta a navegacao
+    do forum. Criar, alterar e remover cabe apenas a coordenacao, que e quem
+    conhece a oferta do curso no semestre.
+    """
+
+    serializer_class = DisciplinaSerializer
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['codigo', 'nome', 'curso__nome']
+    ordering_fields = ['codigo', 'nome', 'periodo_sugerido', 'created_at']
+    ordering = ['periodo_sugerido', 'codigo']
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [permissions.IsAuthenticated()]
+        return [IsAdminOrSuperuser()]
+
+    def get_queryset(self):
+        queryset = Disciplina.objects.filter(
+            deleted_at__isnull=True
+        ).select_related('curso')
+
+        curso_id = self.request.query_params.get('curso')
+        if curso_id:
+            queryset = queryset.filter(curso_id=curso_id)
+
+        periodo = self.request.query_params.get('periodo')
+        if periodo:
+            queryset = queryset.filter(periodo_sugerido=periodo)
+
+        semestre = self.request.query_params.get('semestre')
+        if semestre:
+            queryset = queryset.filter(semestre=semestre)
+
+        return queryset
 
     def perform_destroy(self, instance):
         instance.deleted_at = timezone.now()
@@ -123,8 +272,48 @@ class PostViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(post_pai__isnull=True)
         return queryset
 
+    def get_object(self):
+        """
+        Verifica a autoria antes de qualquer validacao de dados.
+
+        O DRF chama este metodo no inicio de update e destroy, entao a checagem
+        aqui garante 403 para quem nao tem direito sobre o post, em vez de um
+        400 sobre o conteudo enviado. Recusar por permissao e mais preciso, e
+        evita informar a quem nao pode mexer o que estaria errado no corpo.
+        """
+        post = super().get_object()
+
+        if self.action in ['update', 'partial_update']:
+            self._exigir_autoria_ou_moderacao(post, acao='editar')
+        elif self.action == 'destroy':
+            self._exigir_autoria_ou_moderacao(post, acao='remover')
+
+        return post
+
     def perform_create(self, serializer):
         serializer.save(autor=self.request.user)
+
+    def _exigir_autoria_ou_moderacao(self, post, acao):
+        """
+        Somente o autor mexe no proprio conteudo.
+
+        A excecao e a moderacao da disciplina, que precisa poder remover
+        conteudo improprio. Sem essa checagem, qualquer pessoa autenticada
+        conseguiria editar ou apagar o post de outra.
+        """
+        usuario = self.request.user
+
+        if post.autor_id == usuario.id:
+            return
+
+        if acao == 'remover' and pode_moderar_disciplina(usuario, post.disciplina):
+            return
+
+        raise PermissionDenied(
+            'Apenas o autor pode editar o proprio post.'
+            if acao == 'editar'
+            else 'Apenas o autor ou a moderacao da disciplina podem remover este post.'
+        )
 
     def perform_update(self, serializer):
         post_atual = self.get_object()
@@ -310,25 +499,10 @@ class PostViewSet(viewsets.ModelViewSet):
                 {'detail': 'Marcacao removida.'},
                 status=status.HTTP_200_OK
             )
-        # Guarda quem perdeu a marcacao antes de desmarcar. O update em massa
-        # nao dispara signals, entao a reputacao desses autores precisa ser
-        # recalculada na mao, senao eles ficariam com os 15 pontos da melhor
-        # resposta ate o proximo recalculo total.
-        anteriores = list(
-            Post.objects.filter(post_pai=topico, e_melhor=True)
-            .exclude(pk=resposta.pk)
-            .select_related('autor', 'disciplina')
-        )
-
         Post.objects.filter(
             post_pai=topico,
             e_melhor=True,
         ).exclude(pk=resposta.pk).update(e_melhor=False)
-
-        from reputacao.services import atualizar_reputacao
-
-        for anterior in anteriores:
-            atualizar_reputacao(anterior.autor, anterior.disciplina)
 
         resposta.e_melhor = True
         resposta.save(update_fields=['e_melhor'])
@@ -465,6 +639,7 @@ class AlertaConteudoViewSet(viewsets.ReadOnlyModelViewSet):
     - POST /alertas/{id}/resolver/   decide e encerra
     """
 
+    queryset = AlertaConteudo.objects.none()  # define o tipo da PK para o schema OpenAPI
     serializer_class = AlertaConteudoSerializer
     permission_classes = [PodeModerar]
     filter_backends = [filters.OrderingFilter]

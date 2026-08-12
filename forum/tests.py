@@ -69,6 +69,151 @@ class PermissaoDisciplinaTests(APITestCase):
         self.assertEqual(resposta.status_code, status.HTTP_400_BAD_REQUEST)
 
 
+class DisciplinaTests(APITestCase):
+    """
+    /api/forum/disciplinas/
+
+    Todo mundo consulta, porque a lista alimenta a navegação do fórum, mas a
+    oferta do semestre é responsabilidade da coordenação.
+    """
+
+    def setUp(self):
+        self.url = reverse('disciplina-list')
+        self.aluno = criar_usuario(nome='Aluno Comum')
+        self.professor = criar_usuario(nome='Professor')
+        self.admin = criar_usuario(nome='Coordenação', admin=True)
+        self.disciplina = criar_disciplina()
+
+        vincular(self.professor, self.disciplina, papel='professor')
+
+        self.payload = {
+            'codigo': 'XAHC99',
+            'nome': 'Compiladores',
+            'curso': str(self.disciplina.curso_id),
+            'periodo_sugerido': 6,
+            'carga_horaria': 64,
+            'semestre': '2026.2',
+        }
+
+    def test_aluno_consulta_a_lista(self):
+        self.client.force_authenticate(user=self.aluno)
+
+        resposta = self.client.get(self.url)
+
+        self.assertEqual(resposta.status_code, status.HTTP_200_OK)
+
+    def test_aluno_nao_cria_disciplina(self):
+        self.client.force_authenticate(user=self.aluno)
+
+        resposta = self.client.post(self.url, self.payload)
+
+        self.assertEqual(resposta.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_professor_nao_cria_disciplina(self):
+        """Criar oferta é da coordenação, não de quem leciona."""
+        self.client.force_authenticate(user=self.professor)
+
+        resposta = self.client.post(self.url, self.payload)
+
+        self.assertEqual(resposta.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_coordenacao_cria_disciplina(self):
+        self.client.force_authenticate(user=self.admin)
+
+        resposta = self.client.post(self.url, self.payload)
+
+        self.assertEqual(resposta.status_code, status.HTTP_201_CREATED)
+
+    def test_aluno_nao_remove_disciplina(self):
+        self.client.force_authenticate(user=self.aluno)
+
+        resposta = self.client.delete(
+            reverse('disciplina-detail', args=[self.disciplina.id])
+        )
+
+        self.assertEqual(resposta.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class AutoriaDePostTests(APITestCase):
+    """
+    Quem mexe no conteúdo.
+
+    Antes desta verificação, qualquer pessoa autenticada conseguia editar ou
+    apagar o post de outra, porque as views só checavam autenticação.
+    """
+
+    def setUp(self):
+        self.disciplina = criar_disciplina()
+        self.autor = criar_usuario(nome='Autor do Post')
+        self.intruso = criar_usuario(nome='Outro Aluno')
+        self.professor = criar_usuario(nome='Professor da Disciplina')
+        vincular(self.professor, self.disciplina, papel='professor')
+
+        self.topico = criar_topico(self.autor, self.disciplina)
+        self.url = reverse('post-detail', args=[self.topico.id])
+
+    def test_autor_edita_o_proprio_post(self):
+        """
+        A edição parcial precisa funcionar sem reenviar o título, que é o modo
+        como a tela envia a alteração de conteúdo.
+        """
+        self.client.force_authenticate(user=self.autor)
+
+        resposta = self.client.patch(self.url, {'conteudo': 'Texto revisado.'})
+
+        self.assertEqual(resposta.status_code, status.HTTP_200_OK)
+        self.topico.refresh_from_db()
+        self.assertEqual(self.topico.conteudo, 'Texto revisado.')
+        self.assertEqual(self.topico.titulo, 'Dúvida sobre complexidade')
+
+    def test_edicao_registra_o_historico(self):
+        from forum.models import HistoricoEdicao
+
+        self.client.force_authenticate(user=self.autor)
+        conteudo_original = self.topico.conteudo
+
+        self.client.patch(self.url, {'conteudo': 'Texto revisado.'})
+
+        historico = HistoricoEdicao.objects.filter(post=self.topico).first()
+        self.assertIsNotNone(historico)
+        self.assertEqual(historico.conteudo_anterior, conteudo_original)
+
+    def test_outro_aluno_nao_edita_post_alheio(self):
+        self.client.force_authenticate(user=self.intruso)
+
+        resposta = self.client.patch(self.url, {'conteudo': 'Texto adulterado.'})
+
+        self.assertEqual(resposta.status_code, status.HTTP_403_FORBIDDEN)
+        self.topico.refresh_from_db()
+        self.assertNotEqual(self.topico.conteudo, 'Texto adulterado.')
+
+    def test_professor_nao_edita_post_alheio(self):
+        """Moderar é remover conteúdo impróprio, não reescrever o que o aluno disse."""
+        self.client.force_authenticate(user=self.professor)
+
+        resposta = self.client.patch(self.url, {'conteudo': 'Texto alterado.'})
+
+        self.assertEqual(resposta.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_outro_aluno_nao_remove_post_alheio(self):
+        self.client.force_authenticate(user=self.intruso)
+
+        resposta = self.client.delete(self.url)
+
+        self.assertEqual(resposta.status_code, status.HTTP_403_FORBIDDEN)
+        self.topico.refresh_from_db()
+        self.assertIsNone(self.topico.deleted_at)
+
+    def test_professor_da_disciplina_remove_post(self):
+        self.client.force_authenticate(user=self.professor)
+
+        resposta = self.client.delete(self.url)
+
+        self.assertEqual(resposta.status_code, status.HTTP_204_NO_CONTENT)
+        self.topico.refresh_from_db()
+        self.assertIsNotNone(self.topico.deleted_at)
+
+
 class VotoTests(APITestCase):
     """
     POST e DELETE em /api/forum/posts/{id}/votar/

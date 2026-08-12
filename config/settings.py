@@ -50,7 +50,6 @@ INSTALLED_APPS = [
     'notificacoes',
     'auditoria',
     'voluntariado',
-    'reputacao',
 ]
 
 MIDDLEWARE = [
@@ -196,6 +195,57 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+
+# ===== Seguranca em producao =====
+# Estes ajustes dependem de HTTPS e por isso ficam condicionados ao DEBUG.
+# Ativa-los em desenvolvimento redirecionaria o localhost para https e
+# impediria o navegador de enviar os cookies, derrubando o ambiente local.
+
+if not DEBUG:
+    # Redireciona qualquer acesso http para https.
+    SECURE_SSL_REDIRECT = True
+
+    # Cookies de sessao e de CSRF trafegam apenas por conexao cifrada, o que
+    # impede que sejam capturados por quem estiver observando a rede.
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    CSRF_COOKIE_HTTPONLY = False  # o frontend precisa ler o token para envia-lo
+
+    # HSTS instrui o navegador a nunca mais acessar o dominio por http.
+    # O valor comeca baixo de proposito: o navegador guarda essa instrucao
+    # pelo tempo indicado, e um prazo longo com o certificado mal configurado
+    # deixaria o site inacessivel ate o prazo vencer. Aumentar para 31536000
+    # (um ano) depois de confirmar que o https esta estavel.
+    SECURE_HSTS_SECONDS = config('SECURE_HSTS_SECONDS', default=3600, cast=int)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+
+    # Preload permanece desligado por decisao de projeto. Entrar na lista de
+    # pre-carregamento dos navegadores exige max-age de no minimo um ano e a
+    # saida leva meses para propagar, ja que a instrucao vai embutida na
+    # proxima versao de cada navegador. Nao e uma escolha compativel com um
+    # dominio institucional que ainda passara por validacao com usuarios.
+    SECURE_HSTS_PRELOAD = False
+
+    # Atras de nginx ou load balancer, o Django recebe a requisicao por http
+    # e precisa deste cabecalho para saber que a conexao original era https.
+    # Sem isso, o SECURE_SSL_REDIRECT entraria em laco infinito.
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+    # Impede que o navegador tente adivinhar o tipo do arquivo, o que evita
+    # que um upload seja interpretado como script.
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+
+    # Bloqueia a exibicao do site dentro de iframe de terceiros (clickjacking).
+    X_FRAME_OPTIONS = 'DENY'
+
+    SECURE_REFERRER_POLICY = 'same-origin'
+
+    # W021 alerta que o preload esta desligado. E intencional, pelo motivo
+    # descrito acima, entao silenciamos para que o check --deploy volte a
+    # sinalizar apenas problemas reais.
+    SILENCED_SYSTEM_CHECKS = ['security.W021']
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

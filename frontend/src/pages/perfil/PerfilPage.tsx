@@ -13,13 +13,12 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import api from '../../services/api'
 
-interface Reputacao {
+interface Andamento {
   disciplina_codigo: string
   disciplina_nome: string
-  pontos: number
+  total_posts: number
   total_respostas: number
   total_melhores_respostas: number
-  pontuacao_recebidos: number
 }
 
 interface Certificado {
@@ -47,7 +46,7 @@ function StatMini({ label, value, color }: { label: string; value: string; color
   )
 }
 
-function RepCard({ rep }: { rep: Reputacao }) {
+function RepCard({ rep }: { rep: Andamento }) {
   const [hovered, setHovered] = useState(false)
   return (
     <div className="rounded-xl transition-all duration-200"
@@ -61,7 +60,9 @@ function RepCard({ rep }: { rep: Reputacao }) {
         <span className="rounded-md font-medium" style={{ padding: '3px 10px', fontSize: '12px', background: 'rgba(0,48,135,0.06)', color: '#003087' }}>
           {rep.disciplina_codigo}
         </span>
-        <span className="font-bold" style={{ fontSize: '20px', color: '#003087' }}>{rep.pontos} pts</span>
+        <span className="font-bold" style={{ fontSize: '20px', color: '#003087' }}>
+          {rep.total_posts} dúvida(s)
+        </span>
       </div>
       <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px' }}>
         {rep.disciplina_nome}
@@ -102,7 +103,7 @@ const statusCores: Record<string, { bg: string; text: string }> = {
 export default function PerfilPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [reputacoes, setReputacoes] = useState<Reputacao[]>([])
+  const [reputacoes, setReputacoes] = useState<Andamento[]>([])
   const [certificados, setCertificados] = useState<Certificado[]>([])
   const [inscricoes, setInscricoes] = useState<Inscricao[]>([])
   const [loading, setLoading] = useState(true)
@@ -111,7 +112,7 @@ export default function PerfilPage() {
     async function fetchPerfil() {
       try {
         const [repRes, certRes, inscRes] = await Promise.allSettled([
-          api.get('/reputacao/minha/'),
+          api.get('/forum/andamento/'),
           api.get('/voluntariado/certificados/'),
           api.get('/voluntariado/inscricoes/'),
         ])
@@ -134,7 +135,7 @@ export default function PerfilPage() {
     fetchPerfil()
   }, [])
 
-  const totalPontos = reputacoes.reduce((s, r) => s + r.pontos, 0)
+  const totalTopicos = reputacoes.reduce((s, r) => s + r.total_posts, 0)
   const totalRespostas = reputacoes.reduce((s, r) => s + r.total_respostas, 0)
   const totalMelhores = reputacoes.reduce((s, r) => s + r.total_melhores_respostas, 0)
 
@@ -186,11 +187,11 @@ export default function PerfilPage() {
 
         {/* Stats resumo */}
         <div className="flex items-center justify-around" style={{ marginTop: '24px', padding: '20px 0 0', borderTop: '1px solid var(--border)' }}>
-          <StatMini label="Reputação total" value={totalPontos.toString()} color="#003087" />
+          <StatMini label="Dúvidas levantadas" value={totalTopicos.toString()} color="#003087" />
           <div style={{ width: '1px', height: '40px', background: 'var(--border)' }} />
           <StatMini label="Respostas" value={totalRespostas.toString()} color="#10B981" />
           <div style={{ width: '1px', height: '40px', background: 'var(--border)' }} />
-          <StatMini label="Melhores respostas" value={totalMelhores.toString()} color="#F59E0B" />
+          <StatMini label="Ajudaram colegas" value={totalMelhores.toString()} color="#F59E0B" />
           <div style={{ width: '1px', height: '40px', background: 'var(--border)' }} />
           <StatMini label="Certificados" value={certificados.length.toString()} color="#C8102E" />
         </div>
@@ -200,9 +201,9 @@ export default function PerfilPage() {
       {reputacoes.length > 0 && (
         <div style={{ marginBottom: '24px' }}>
           <div className="flex items-center justify-between" style={{ marginBottom: '14px' }}>
-            <h2 className="font-semibold" style={{ fontSize: '16px', color: 'var(--text-primary)' }}>Reputação por disciplina</h2>
-            <button onClick={() => navigate('/ranking')} className="cursor-pointer font-medium"
-              style={{ fontSize: '13px', color: '#003087' }}>Ver ranking geral</button>
+            <h2 className="font-semibold" style={{ fontSize: '16px', color: 'var(--text-primary)' }}>Andamento por disciplina</h2>
+            <button onClick={() => navigate('/andamento')} className="cursor-pointer font-medium"
+              style={{ fontSize: '13px', color: '#003087' }}>Ver painel completo</button>
           </div>
           <div className="grid grid-cols-2" style={{ gap: '12px' }}>
             {reputacoes.map((r, i) => <RepCard key={i} rep={r} />)}

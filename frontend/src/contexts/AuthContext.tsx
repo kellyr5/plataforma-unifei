@@ -1,6 +1,13 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 import api, { getAccessToken, getRefreshToken, clearTokens } from '../services/api'
 
+interface PapelDisciplina {
+  disciplina_id: string
+  disciplina_codigo: string
+  disciplina_nome: string
+  papel: 'aluno' | 'monitor' | 'professor'
+}
+
 interface User {
   id: string
   cpf: string
@@ -8,7 +15,19 @@ interface User {
   email: string
   is_admin: boolean
   bio: string
-  reputacao: number
+  avatar_url: string
+
+  papeis_globais: string[]
+  papeis_disciplina: PapelDisciplina[]
+
+  /* Atalhos calculados no backend, usados para decidir o que a interface
+     exibe. A permissão de verdade continua sendo verificada a cada
+     requisição; isto aqui evita mostrar um caminho que levaria a um erro. */
+  e_coordenacao: boolean
+  e_monitor: boolean
+  e_professor: boolean
+  e_organizacao: boolean
+  pode_moderar: boolean
 }
 
 interface AuthContextType {

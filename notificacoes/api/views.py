@@ -1,4 +1,4 @@
-from rest_framework import viewsets, filters, status
+from rest_framework import filters, mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
@@ -8,16 +8,27 @@ from notificacoes.api.serializers import NotificacaoSerializer
 from notificacoes.services import contar_nao_lidas
 
 
-class NotificacaoViewSet(viewsets.ReadOnlyModelViewSet):
+class NotificacaoViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.DestroyModelMixin,
+    viewsets.GenericViewSet,
+):
     """
     Notificacoes do usuario autenticado.
 
+    A notificacao pertence a quem a recebeu, entao ele pode descarta-la. Nao
+    ha soft delete aqui: o aviso e efemero por natureza, e o que precisa ficar
+    registrado para prestacao de contas ja esta no log de auditoria.
+
     Acoes:
-    - GET /notificacoes/ -- lista todas (com filtro ?lida=true|false)
-    - GET /notificacoes/{id}/ -- detalha
-    - GET /notificacoes/nao-lidas/ -- contador rapido
-    - POST /notificacoes/{id}/marcar-lida/ -- marca uma como lida
-    - POST /notificacoes/marcar-todas-lidas/ -- marca todas como lidas
+    - GET    /notificacoes/                        lista (filtros ?lida= e ?tipo=)
+    - GET    /notificacoes/{id}/                   detalha
+    - DELETE /notificacoes/{id}/                   exclui uma
+    - GET    /notificacoes/nao-lidas/              contador rapido
+    - POST   /notificacoes/{id}/marcar-lida/       marca uma como lida
+    - POST   /notificacoes/marcar-todas-lidas/     marca todas como lidas
+    - POST   /notificacoes/limpar/                 exclui varias de uma vez
     """
 
     queryset = Notificacao.objects.none()  # define o tipo da PK para o schema OpenAPI
@@ -40,6 +51,37 @@ class NotificacaoViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(tipo=tipo)
 
         return queryset
+
+    @action(detail=False, methods=['post'])
+    def limpar(self, request):
+        """
+        Exclui notificacoes em lote.
+
+        Sem parametros, remove apenas as ja lidas, que e o caso comum de
+        arrumar a caixa sem perder o que ainda nao foi visto. Com
+        {"ids": [...]}, remove as indicadas. Com {"todas": true}, remove tudo.
+        """
+        base = Notificacao.objects.filter(destinatario=request.user)
+
+        ids = request.data.get('ids')
+        todas = request.data.get('todas') is True
+
+        if ids:
+            alvo = base.filter(id__in=ids)
+        elif todas:
+            alvo = base
+        else:
+            alvo = base.filter(lida=True)
+
+        removidas, _ = alvo.delete()
+
+        return Response(
+            {
+                'detail': f'{removidas} notificacao(oes) removida(s).',
+                'removidas': removidas,
+            },
+            status=status.HTTP_200_OK,
+        )
 
     @action(detail=False, methods=['get'], url_path='nao-lidas')
     def nao_lidas(self, request):
