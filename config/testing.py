@@ -122,22 +122,33 @@ def criar_disciplina(
 
 
 def vincular(usuario, disciplina, papel='aluno'):
-    """Vincula um usuário a uma disciplina com o papel informado."""
-    return PermissaoDisciplina.objects.create(
+    """
+    Define o papel do usuário na disciplina.
+
+    Usa update_or_create porque a pessoa tem um único vínculo por disciplina,
+    e as fábricas de post já matriculam o autor automaticamente. Com create,
+    promover a monitor quem já apareceu como aluno estouraria a constraint —
+    e é justamente esse o cenário que vários testes precisam montar.
+    """
+    vinculo, _ = PermissaoDisciplina.objects.update_or_create(
         usuario=usuario,
         disciplina=disciplina,
-        papel=papel,
+        defaults={'papel': papel, 'ativo': True},
     )
+    return vinculo
 
 
 def matricular(usuario, disciplina, papel='aluno'):
     """
-    Garante o vínculo do usuário com a disciplina, sem duplicar.
+    Garante o vínculo do usuário com a disciplina, preservando o papel atual.
 
     Existe porque o fórum só mostra as discussões das disciplinas em que a
     pessoa participa. Quem escreve numa turma faz parte dela, então a fábrica
     de post cuida disso sozinha e os testes não precisam repetir a matrícula
     a cada cenário.
+
+    Diferente de vincular, não rebaixa quem já é monitor ou professor: usa
+    get_or_create justamente para não sobrescrever um papel já definido.
     """
     vinculo, _ = PermissaoDisciplina.objects.get_or_create(
         usuario=usuario,
