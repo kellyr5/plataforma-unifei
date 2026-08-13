@@ -28,6 +28,18 @@ interface User {
   e_professor: boolean
   e_organizacao: boolean
   pode_moderar: boolean
+
+  /* Nome do perfil já flexionado pelo backend, como "Coordenadora" ou
+     "Professor". Vem pronto para que a interface não precise conhecer as
+     regras de concordância. */
+  rotulo_perfil: string
+  genero: 'f' | 'm' | 'n'
+  matricula: string
+
+  /* Preenchidos apenas para a organização parceira, e usados na assinatura
+     do certificado que ela emite. */
+  nome_responsavel?: string
+  cargo_responsavel?: string
 }
 
 interface AuthContextType {

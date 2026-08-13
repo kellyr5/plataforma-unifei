@@ -37,6 +37,7 @@ class AuditLog(models.Model):
         ('post_criado', 'Post criado'),
         ('post_editado', 'Post editado'),
         ('post_removido', 'Post removido'),
+        ('post_restrito', 'Publicacao restrita pela disciplina'),
         ('marcou_melhor', 'Marcou resposta como melhor'),
         ('desmarcou_melhor', 'Desmarcou melhor resposta'),
         ('denunciou', 'Denunciou conteudo'),

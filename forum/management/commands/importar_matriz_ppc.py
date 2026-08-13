@@ -58,6 +58,11 @@ PADRAO_CODIGO = re.compile(rf'\b{CODIGO}\b')
 # Marcadores de nota de rodape que acompanham alguns nomes no PPC.
 PADRAO_RODAPE = re.compile(r'[*†∗]+\s*$')
 
+# Cabecalho da ementa, no formato "XDES01 - Fundamentos de Programacao".
+# Depois dele vem o texto descritivo, ate a bibliografia, que comeca com o
+# marcador de lista, ou ate o proximo cabecalho.
+PADRAO_EMENTA = re.compile(rf'^\s*({CODIGO})\s*[-–]\s*(.+?)\s*$')
+
 # Linhas que nao descrevem disciplina.
 DESCARTAR = ('CÓDIGO', 'CODIGO', 'Total', 'CARGA HORÁRIA', 'PERÍODO')
 
@@ -69,12 +74,35 @@ class Command(BaseCommand):
         parser.add_argument('arquivo', help='Caminho do texto extraido do PPC')
         parser.add_argument('--curso', required=True, help='Codigo do curso, ex: CCO')
         parser.add_argument('--nome', required=True, help='Nome do curso')
-        parser.add_argument('--semestre', default='2026.1', help='Semestre de oferta inicial')
+        parser.add_argument(
+            '--ano',
+            type=int,
+            default=None,
+            help=(
+                'Ano de referencia. Com ele, o semestre de cada disciplina e '
+                'deduzido pela paridade do periodo: periodos impares sao '
+                'ofertados no primeiro semestre e pares no segundo.'
+            ),
+        )
+        parser.add_argument(
+            '--semestre',
+            default='2026.2',
+            help='Semestre fixo para todas, usado quando --ano nao e informado',
+        )
         parser.add_argument('--versao-ppc', default='', help='Versao do PPC, ex: Jan/2025')
         parser.add_argument(
             '--simular',
             action='store_true',
             help='Mostra o que seria importado sem gravar nada',
+        )
+        parser.add_argument(
+            '--com-optativas',
+            action='store_true',
+            help=(
+                'Inclui as vagas de optativa da matriz. Por padrao elas ficam '
+                'de fora, porque sao ofertadas por outros institutos e nao '
+                'compoem o forum do curso.'
+            ),
         )
 
     def handle(self, *args, **opcoes):
@@ -85,6 +113,13 @@ class Command(BaseCommand):
 
         linhas = caminho.read_text(encoding='utf-8', errors='ignore').splitlines()
         registros = self._extrair(linhas)
+
+        if not opcoes['com_optativas']:
+            registros = [r for r in registros if not r['optativa']]
+
+        ementas = self._extrair_ementas(linhas)
+        for registro in registros:
+            registro['ementa'] = ementas.get(registro['codigo'], '')
 
         if not registros:
             raise CommandError(
@@ -175,6 +210,51 @@ class Command(BaseCommand):
             'co_requisitos': [],
         }
 
+    def _extrair_ementas(self, linhas):
+        """
+        Coleta o texto descritivo que segue cada disciplina no PPC.
+
+        A ementa aparece depois de um cabecalho no formato "CODIGO - Nome" e
+        vai ate a bibliografia, que comeca com o marcador de lista, ou ate o
+        proximo cabecalho. Rodapes de pagina sao descartados porque o extrator
+        de texto os intercala no meio dos paragrafos.
+        """
+        ementas = {}
+        codigo_atual = None
+        acumulado = []
+
+        def fechar():
+            if codigo_atual and acumulado:
+                texto = ' '.join(acumulado).strip()
+                # So guarda se ja houver texto suficiente para ser descricao,
+                # evitando capturar sobras de tabela.
+                if len(texto) > 40:
+                    ementas.setdefault(codigo_atual, texto)
+
+        for linha in linhas:
+            limpa = linha.strip()
+
+            # Bibliografia e rodape encerram a ementa em andamento.
+            if limpa.startswith('■') or 'Projeto Pedagógico' in limpa:
+                fechar()
+                codigo_atual = None
+                acumulado = []
+                continue
+
+            cabecalho = PADRAO_EMENTA.match(limpa)
+            if cabecalho and len(limpa) < 90:
+                fechar()
+                codigo_atual = cabecalho.group(1)
+                acumulado = []
+                continue
+
+            if codigo_atual and limpa:
+                acumulado.append(limpa)
+
+        fechar()
+
+        return ementas
+
     def _separar_co_requisitos(self, registros):
         """
         Move as referencias mutuas de pre-requisito para co-requisito.
@@ -201,13 +281,33 @@ class Command(BaseCommand):
             pre = ', '.join(registro['pre_requisitos']) or '-'
             co = ', '.join(registro['co_requisitos'])
             sufixo = f'  co: {co}' if co else ''
+            ementa = 'com ementa' if registro.get('ementa') else 'SEM EMENTA'
             self.stdout.write(
                 f"  {registro['periodo']}º  {registro['codigo']:<8} "
-                f"{registro['nome'][:45]:<45} {registro['carga_horaria']:>3}h  "
-                f"pre: {pre}{sufixo}"
+                f"{registro['nome'][:40]:<40} {registro['carga_horaria']:>3}h  "
+                f"{ementa:<10} pre: {pre}{sufixo}"
             )
 
     # ===== Gravacao =====
+
+    @staticmethod
+    def _semestre_de(periodo, opcoes):
+        """
+        Deduz o semestre de oferta a partir da paridade do periodo.
+
+        A matriz e cursada em oito periodos ao longo de quatro anos, entao os
+        periodos impares caem sempre no primeiro semestre e os pares no
+        segundo. Sem essa regra, todas as disciplinas entrariam no mesmo
+        semestre e o painel da coordenacao mostraria oitenta materias sendo
+        ofertadas ao mesmo tempo, o que nunca acontece.
+
+        Reofertas fora do padrao existem e sao ajustadas pela coordenacao caso
+        a caso, como o SIGAA tambem faz.
+        """
+        if not opcoes.get('ano'):
+            return opcoes['semestre']
+
+        return f"{opcoes['ano']}.{1 if periodo % 2 else 2}"
 
     @transaction.atomic
     def _gravar(self, registros, opcoes):
@@ -231,7 +331,8 @@ class Command(BaseCommand):
                     'periodo_sugerido': registro['periodo'],
                     'carga_horaria': registro['carga_horaria'],
                     'optativa': registro['optativa'],
-                    'semestre': opcoes['semestre'],
+                    'ementa': registro.get('ementa', ''),
+                    'semestre': self._semestre_de(registro['periodo'], opcoes),
                 },
             )
             criadas += int(foi_criada)

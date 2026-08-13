@@ -33,6 +33,138 @@ interface Post {
   created_at: string
   updated_at: string
   post_pai: string | null
+  restrito: boolean
+  motivo_restricao: string
+  restrito_por_nome: string | null
+}
+
+/* ============================================================
+   COMPONENTE: Aviso e controle de restrição
+   ============================================================ */
+function BlocoRestricao({ post, podeModerar, onMudou }: {
+  post: Post
+  podeModerar: boolean
+  onMudou: () => void
+}) {
+  const [abrindo, setAbrindo] = useState(false)
+  const [motivo, setMotivo] = useState('')
+  const [enviando, setEnviando] = useState(false)
+
+  async function restringir() {
+    if (!motivo.trim()) {
+      toast.error('Descreva o motivo. O autor recebe este texto.')
+      return
+    }
+    setEnviando(true)
+    try {
+      await api.post(`/forum/posts/${post.id}/restringir/`, { motivo: motivo.trim() })
+      toast.success('Publicação restrita. O autor foi notificado.')
+      setAbrindo(false)
+      setMotivo('')
+      onMudou()
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || 'Não foi possível restringir')
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  async function liberar() {
+    try {
+      await api.delete(`/forum/posts/${post.id}/restringir/`)
+      toast.success('Restrição removida.')
+      onMudou()
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || 'Não foi possível liberar')
+    }
+  }
+
+  if (post.restrito) {
+    return (
+      <div className="rounded-lg" style={{
+        padding: '12px 14px', marginTop: '12px',
+        background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)',
+      }}>
+        <div className="font-medium" style={{ fontSize: '13px', color: '#B45309', marginBottom: '3px' }}>
+          Publicação restrita
+        </div>
+        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+          {post.motivo_restricao}
+          {post.restrito_por_nome ? ` — ${post.restrito_por_nome}` : ''}
+        </div>
+        <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '6px' }}>
+          Somente você e a moderação da disciplina conseguem ver esta publicação.
+        </div>
+
+        {podeModerar && (
+          <button
+            onClick={liberar}
+            className="cursor-pointer"
+            style={{
+              marginTop: '10px', fontSize: '12px', fontWeight: 500,
+              background: 'none', border: 'none', color: '#003087',
+            }}
+          >
+            Remover restrição
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  if (!podeModerar) return null
+
+  if (!abrindo) {
+    return (
+      <button
+        onClick={() => setAbrindo(true)}
+        className="cursor-pointer"
+        style={{
+          marginTop: '12px', fontSize: '12px', fontWeight: 500,
+          background: 'none', border: 'none', color: 'var(--text-tertiary)',
+        }}
+      >
+        Restringir publicação
+      </button>
+    )
+  }
+
+  return (
+    <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <textarea
+        value={motivo}
+        onChange={(e) => setMotivo(e.target.value)}
+        placeholder="Por que esta publicação não está adequada? O autor recebe este texto."
+        rows={2}
+        className="w-full rounded-lg outline-none"
+        style={{
+          padding: '9px 12px', fontSize: '13px', resize: 'vertical',
+          background: 'var(--bg-input)', color: 'var(--text-primary)',
+          border: '1px solid var(--border)',
+        }}
+      />
+      <div className="flex items-center" style={{ gap: '8px' }}>
+        <button
+          onClick={restringir}
+          disabled={enviando}
+          className="rounded-lg font-medium cursor-pointer"
+          style={{
+            padding: '7px 14px', fontSize: '13px', border: 'none',
+            background: '#F59E0B', color: 'white', opacity: enviando ? 0.6 : 1,
+          }}
+        >
+          Confirmar restrição
+        </button>
+        <button
+          onClick={() => { setAbrindo(false); setMotivo('') }}
+          className="cursor-pointer"
+          style={{ fontSize: '12px', background: 'none', border: 'none', color: 'var(--text-tertiary)' }}
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+  )
 }
 
 function tempoRelativo(dateStr: string): string {
@@ -215,6 +347,7 @@ export default function TopicPage() {
   const [respostas, setRespostas] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
   const [novaResposta, setNovaResposta] = useState('')
+  const [anexos, setAnexos] = useState<File[]>([])
   const [enviando, setEnviando] = useState(false)
 
   async function fetchTopic() {
@@ -251,12 +384,28 @@ export default function TopicPage() {
 
     setEnviando(true)
     try {
-      await api.post('/forum/posts/', {
+      const { data: resposta } = await api.post('/forum/posts/', {
         conteudo: novaResposta,
         disciplina: topic.disciplina,
         post_pai: topic.id,
       })
+
+      /* Os anexos vão depois, porque o arquivo precisa de um post ao qual se
+         vincular. Falha em um deles não descarta a resposta já publicada. */
+      for (const arquivo of anexos) {
+        const corpo = new FormData()
+        corpo.append('arquivo', arquivo)
+        try {
+          await api.post(`/forum/posts/${resposta.id}/anexar/`, corpo, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          })
+        } catch {
+          toast.error(`Não foi possível anexar ${arquivo.name}.`)
+        }
+      }
+
       setNovaResposta('')
+      setAnexos([])
       toast.success('Resposta publicada!')
       fetchTopic()
     } catch (err: any) {
@@ -283,6 +432,16 @@ export default function TopicPage() {
   if (!topic) return null
 
   const hasResolved = respostas.some(r => r.e_melhor)
+
+  /* Restringir é atribuição de quem acompanha a matéria. A coordenação
+     também pode, por ser instância superior em qualquer disciplina. */
+  const podeModerarEsta = !!user && (
+    user.e_coordenacao ||
+    user.papeis_disciplina?.some(
+      p => p.disciplina_id === topic.disciplina &&
+           (p.papel === 'monitor' || p.papel === 'professor')
+    )
+  )
 
   return (
     <div style={{ maxWidth: '900px' }}>
@@ -348,6 +507,12 @@ export default function TopicPage() {
             <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>{topic.autor_nome}</span>
             <span>{tempoRelativo(topic.created_at)}</span>
           </div>
+
+          <BlocoRestricao
+            post={topic}
+            podeModerar={podeModerarEsta}
+            onMudou={fetchTopic}
+          />
         </div>
       </div>
 
@@ -399,6 +564,80 @@ export default function TopicPage() {
             onFocus={e => e.target.style.borderColor = '#003087'}
             onBlur={e => e.target.style.borderColor = 'var(--border)'}
           />
+          {/* Anexo na resposta: material de apoio costuma explicar melhor do
+              que o texto, e o endpoint já existia sem caminho na interface. */}
+          {/* O campo de arquivo nativo passa despercebido. Escondemos o
+              controle e usamos um rótulo com aparência de botão, que é o que
+              a pessoa procura quando quer anexar algo. */}
+          <div className="flex items-center" style={{ gap: '12px', marginBottom: '14px' }}>
+            <label
+              htmlFor="anexo-resposta"
+              className="flex items-center rounded-lg font-medium cursor-pointer"
+              style={{
+                padding: '8px 14px', gap: '7px', fontSize: '13px',
+                color: '#003087',
+                background: 'rgba(0,48,135,0.06)',
+                border: '1px solid rgba(0,48,135,0.25)',
+              }}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
+              </svg>
+              Anexar arquivo
+            </label>
+
+            <input
+              id="anexo-resposta"
+              type="file"
+              multiple
+              accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+              onChange={(e) => {
+                const escolhidos = Array.from(e.target.files || [])
+                  .filter(arquivo => {
+                    if (arquivo.size > 10 * 1024 * 1024) {
+                      toast.error(`${arquivo.name} passa de 10 MB.`)
+                      return false
+                    }
+                    return true
+                  })
+                setAnexos(anteriores => [...anteriores, ...escolhidos])
+                e.target.value = ''
+              }}
+              style={{ display: 'none' }}
+            />
+
+            <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
+              PDF, documentos e imagens, até 10 MB
+            </span>
+          </div>
+
+          {anexos.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '14px' }}>
+              {anexos.map((arquivo, indice) => (
+                <div
+                  key={`${arquivo.name}-${indice}`}
+                  className="flex items-center rounded-lg"
+                  style={{
+                    padding: '7px 12px', gap: '10px',
+                    background: 'var(--bg-input)', border: '1px solid var(--border)',
+                  }}
+                >
+                  <span className="flex-1 truncate" style={{ fontSize: '12.5px', color: 'var(--text-primary)' }}>
+                    {arquivo.name}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setAnexos(a => a.filter((_, i) => i !== indice))}
+                    className="cursor-pointer"
+                    style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', fontSize: '12px' }}
+                  >
+                    Remover
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="flex justify-end">
             <button
               type="submit"

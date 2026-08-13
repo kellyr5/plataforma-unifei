@@ -24,6 +24,9 @@ interface Certificado {
   horas_realizadas: number
   codigo_validacao: string
   arquivo_pdf: string
+  /* URL absoluta montada pelo backend. O caminho cru do arquivo não serve:
+     a mídia é servida em /media/, e não sob /api/. */
+  arquivo_pdf_url: string | null
   emitido_em: string
 }
 
@@ -126,9 +129,10 @@ function CertCard({ cert }: { cert: Certificado }) {
             {cert.codigo_validacao}
           </div>
         </div>
-        {cert.arquivo_pdf && (
+        {cert.arquivo_pdf_url && (
           <a
-            href={"/api/" + cert.arquivo_pdf}
+            href={cert.arquivo_pdf_url}
+            download
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center rounded-lg font-medium transition-all duration-150 cursor-pointer text-white"

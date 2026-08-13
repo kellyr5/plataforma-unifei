@@ -39,6 +39,44 @@ function dataLegivel(valor: string): string {
   })
 }
 
+/**
+ * Atalhos de período, calculados a partir da data de hoje.
+ *
+ * O semestre letivo brasileiro vai de fevereiro a julho e de agosto a
+ * dezembro. Traduzir isso em botões evita que o aluno tenha de lembrar em que
+ * dia o semestre começou para responder "como fui neste semestre".
+ */
+function atalhosDePeriodo() {
+  const hoje = new Date()
+  const ano = hoje.getFullYear()
+  const primeiroSemestre = hoje.getMonth() + 1 <= 7
+
+  const iso = (data: Date) => data.toISOString().slice(0, 10)
+  const trintaDias = new Date(hoje)
+  trintaDias.setDate(trintaDias.getDate() - 30)
+
+  const inicioCorrente = primeiroSemestre ? `${ano}-02-01` : `${ano}-08-01`
+  const fimCorrente = primeiroSemestre ? `${ano}-07-31` : `${ano}-12-31`
+
+  const inicioAnterior = primeiroSemestre ? `${ano - 1}-08-01` : `${ano}-02-01`
+  const fimAnterior = primeiroSemestre ? `${ano - 1}-12-31` : `${ano}-07-31`
+
+  return [
+    { rotulo: 'Tudo', desde: '', ate: '' },
+    { rotulo: 'Últimos 30 dias', desde: iso(trintaDias), ate: iso(hoje) },
+    {
+      rotulo: `Semestre atual (${ano}.${primeiroSemestre ? 1 : 2})`,
+      desde: inicioCorrente,
+      ate: fimCorrente,
+    },
+    {
+      rotulo: `Semestre anterior (${primeiroSemestre ? ano - 1 : ano}.${primeiroSemestre ? 2 : 1})`,
+      desde: inicioAnterior,
+      ate: fimAnterior,
+    },
+  ]
+}
+
 function Metrica({ valor, rotulo, cor }: { valor: number; rotulo: string; cor: string }) {
   return (
     <div style={{ textAlign: 'center', minWidth: '76px' }}>
@@ -170,6 +208,7 @@ export default function AndamentoPage() {
   const [carregando, setCarregando] = useState(true)
   const [desde, setDesde] = useState('')
   const [ate, setAte] = useState('')
+  const [personalizado, setPersonalizado] = useState(false)
 
   const buscar = useCallback(async () => {
     setCarregando(true)
@@ -228,22 +267,65 @@ export default function AndamentoPage() {
         <Metrica valor={totais.melhores} rotulo="respostas que ajudaram" cor="#10B981" />
       </div>
 
-      {/* Recorte por período */}
-      <div className="flex items-center" style={{ gap: '10px', marginBottom: '20px' }}>
-        <label style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>De</label>
-        <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} style={campoData} />
+      {/* Recorte por período.
 
-        <label style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>até</label>
-        <input type="date" value={ate} onChange={(e) => setAte(e.target.value)} style={campoData} />
+          Atalhos primeiro, datas depois. Quem quer ver "este semestre" não
+          deveria precisar lembrar em que dia o semestre começou, e era isso
+          que dois campos de data soltos exigiam. */}
+      <div style={{ marginBottom: '20px' }}>
+        <div className="flex items-center flex-wrap" style={{ gap: '6px' }}>
+          {atalhosDePeriodo().map(atalho => {
+            const ativo = desde === atalho.desde && ate === atalho.ate
 
-        {(desde || ate) && (
+            return (
+              <button
+                key={atalho.rotulo}
+                onClick={() => { setDesde(atalho.desde); setAte(atalho.ate) }}
+                className="rounded-lg font-medium cursor-pointer"
+                style={{
+                  padding: '7px 13px', fontSize: '12.5px',
+                  background: ativo ? '#003087' : 'var(--bg-input)',
+                  color: ativo ? 'white' : 'var(--text-secondary)',
+                  border: `1px solid ${ativo ? '#003087' : 'var(--border)'}`,
+                }}
+              >
+                {atalho.rotulo}
+              </button>
+            )
+          })}
+
           <button
-            onClick={() => { setDesde(''); setAte('') }}
-            className="cursor-pointer"
-            style={{ fontSize: '12px', background: 'none', border: 'none', color: 'var(--text-tertiary)' }}
+            onClick={() => setPersonalizado(!personalizado)}
+            className="rounded-lg font-medium cursor-pointer"
+            style={{
+              padding: '7px 13px', fontSize: '12.5px',
+              background: personalizado ? '#003087' : 'var(--bg-input)',
+              color: personalizado ? 'white' : 'var(--text-secondary)',
+              border: `1px solid ${personalizado ? '#003087' : 'var(--border)'}`,
+            }}
           >
-            Limpar período
+            Escolher datas
           </button>
+        </div>
+
+        {personalizado && (
+          <div className="flex items-center" style={{ gap: '10px', marginTop: '10px' }}>
+            <label style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>De</label>
+            <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} style={campoData} />
+
+            <label style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>até</label>
+            <input type="date" value={ate} onChange={(e) => setAte(e.target.value)} style={campoData} />
+
+            {(desde || ate) && (
+              <button
+                onClick={() => { setDesde(''); setAte('') }}
+                className="cursor-pointer"
+                style={{ fontSize: '12px', background: 'none', border: 'none', color: 'var(--text-tertiary)' }}
+              >
+                Limpar
+              </button>
+            )}
+          </div>
         )}
       </div>
 

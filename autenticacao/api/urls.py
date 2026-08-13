@@ -11,6 +11,8 @@ from autenticacao.api.views import (
     ReenvioCodigoView,
     LogoutView,
     RefreshView,
+    BuscaUsuarioView,
+    PreCadastroView,
 )
 
 
@@ -26,4 +28,8 @@ urlpatterns = [
     path('verify/', TokenVerifyView.as_view(), name='token_verify'),
     path('logout/', LogoutView.as_view(), name='logout'),
     path('me/', MeView.as_view(), name='me'),
+
+    # Coordenacao
+    path('usuarios/', BuscaUsuarioView.as_view(), name='busca-usuario'),
+    path('pre-cadastro/', PreCadastroView.as_view(), name='pre-cadastro'),
 ]

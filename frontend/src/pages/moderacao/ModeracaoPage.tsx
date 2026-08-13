@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import toast, { Toaster } from 'react-hot-toast'
 
 import api from '../../services/api'
@@ -224,11 +225,39 @@ export default function ModeracaoPage() {
   const [alertas, setAlertas] = useState<Alerta[]>([])
   const [carregando, setCarregando] = useState(true)
   const [semAcesso, setSemAcesso] = useState(false)
-  const [filtro, setFiltro] = useState<Filtro>('pendente')
+  /* Começa em "todas" e não em "pendentes".
+     Abrir num filtro vazio faz a fila parecer que não existe, mesmo havendo
+     caso em análise — foi o que aconteceu com o professor, que via a aba
+     "Em análise 1" e a tela dizendo que não havia nada. */
+  const [filtro, setFiltro] = useState<Filtro>('todas')
+
+  /* O painel da coordenação e os cartões do professor chegam aqui já
+     apontando uma disciplina, então a fila respeita esse recorte. */
+  const [parametros] = useSearchParams()
+  const navigate = useNavigate()
+  const disciplinaFiltrada = parametros.get('disciplina')
+  const [nomeDisciplina, setNomeDisciplina] = useState('')
+
+  /* O nome vem da própria disciplina, e não da primeira denúncia da lista:
+     quando a fila está vazia não haveria de onde tirar, e é justamente aí que
+     saber qual disciplina se está vendo importa mais. */
+  useEffect(() => {
+    if (!disciplinaFiltrada) {
+      setNomeDisciplina('')
+      return
+    }
+
+    api.get(`/forum/disciplinas/${disciplinaFiltrada}/`)
+      .then(res => setNomeDisciplina(`${res.data.codigo} — ${res.data.nome}`))
+      .catch(() => setNomeDisciplina(''))
+  }, [disciplinaFiltrada])
 
   async function buscar() {
     try {
-      const res = await api.get('/forum/alertas/', { params: { ordering: '-created_at' } })
+      const params: Record<string, string> = { ordering: '-created_at' }
+      if (disciplinaFiltrada) params.disciplina = disciplinaFiltrada
+
+      const res = await api.get('/forum/alertas/', { params })
       const dados = Array.isArray(res.data) ? res.data : res.data.results || []
       setAlertas(dados)
       setSemAcesso(false)
@@ -240,7 +269,7 @@ export default function ModeracaoPage() {
     }
   }
 
-  useEffect(() => { buscar() }, [])
+  useEffect(() => { buscar() }, [disciplinaFiltrada])
 
   async function assumir(id: string) {
     try {
@@ -309,19 +338,38 @@ export default function ModeracaoPage() {
 
       <div style={{ marginBottom: '24px' }}>
         <h1 className="font-bold tracking-tight" style={{ fontSize: '24px', color: 'var(--text-primary)', marginBottom: '4px' }}>
-          Moderação
+          {disciplinaFiltrada && nomeDisciplina
+            ? `Moderação · ${nomeDisciplina}`
+            : 'Moderação'}
         </h1>
         <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-          Denúncias das disciplinas em que você atua.
+          {disciplinaFiltrada
+            ? 'Denúncias registradas nesta disciplina.'
+            : 'Denúncias das disciplinas em que você atua.'}
         </p>
+
+        {/* Quando se chega aqui pelo painel, o recorte precisa estar visível e
+            ter saída óbvia, senão a fila parece vazia sem motivo aparente. */}
+        {disciplinaFiltrada && (
+          <button
+            onClick={() => navigate('/moderacao')}
+            className="cursor-pointer"
+            style={{
+              marginTop: '8px', fontSize: '12.5px', fontWeight: 500,
+              background: 'none', border: 'none', color: '#003087',
+            }}
+          >
+            Ver todas as disciplinas
+          </button>
+        )}
       </div>
 
       <div className="flex items-center" style={{ gap: '6px', marginBottom: '20px' }}>
         {([
+          { valor: 'todas' as const, rotulo: 'Todas' },
           { valor: 'pendente' as const, rotulo: 'Pendentes' },
           { valor: 'em_analise' as const, rotulo: 'Em análise' },
           { valor: 'resolvidas' as const, rotulo: 'Resolvidas' },
-          { valor: 'todas' as const, rotulo: 'Todas' },
         ]).map(f => (
           <button
             key={f.valor}

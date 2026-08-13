@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema
 from django.db import transaction
 from django.utils import timezone
-from django.db.models import F
+from django.db.models import Count, F, Q
 
 from auditoria.services import registrar_acao
 from notificacoes.services import criar_notificacao
@@ -41,6 +41,45 @@ from config.permissions import (
     e_administrador,
     pode_moderar_disciplina,
 )
+
+
+def periodos_ofertados_em(semestre):
+    """
+    Periodos da matriz ofertados em um ano-periodo.
+
+    A matriz e cursada em oito periodos ao longo de quatro anos, entao quem
+    entra no primeiro semestre cursa o primeiro periodo, no seguinte o
+    segundo, e assim por diante. Disso decorre que periodos impares so
+    acontecem em semestres 1 e pares em semestres 2.
+
+    Fica no nivel do modulo porque a regra vale para o painel da coordenacao
+    e para o forum. Duplica-la seria pedir para as duas telas divergirem.
+    """
+    if not semestre or '.' not in semestre:
+        return None
+
+    try:
+        numero = int(semestre.split('.')[1])
+    except ValueError:
+        return None
+
+    if numero not in (1, 2):
+        return None
+
+    resto = 1 if numero == 1 else 0
+    return [p for p in range(1, 13) if p % 2 == resto]
+
+
+def semestre_corrente():
+    """
+    Ano-periodo corrente, deduzido da data.
+
+    No calendario brasileiro o primeiro semestre letivo vai ate julho. Fica
+    aqui, e nao em cada view, para que todas as telas concordem sobre qual e
+    o semestre em curso.
+    """
+    hoje = timezone.now().date()
+    return f'{hoje.year}.{1 if hoje.month <= 7 else 2}'
 
 
 def usuario_pode_marcar_melhor_resposta(usuario, topico):
@@ -77,6 +116,362 @@ class CursoViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return Curso.objects.all()
+
+
+class PainelCoordenacaoView(APIView):
+    """
+    GET /api/forum/painel-coordenacao/?curso={id}&semestre=2026.2
+
+    Visao do curso no semestre, repartida por disciplina.
+
+    A literatura de learning analytics chama isso de painel de nivel
+    intermediario: mostra o conjunto e permite descer ate a disciplina que
+    precisa de atencao. Por isso a ordenacao nao e alfabetica nem por codigo,
+    e sim por duvidas sem resposta: quem coordena precisa ver primeiro onde
+    esta faltando apoio, nao onde tudo corre bem.
+
+    O tempo ate a primeira resposta e o indicador mais revelador do conjunto.
+    Muitas duvidas com resposta rapida indicam turma ativa e bem acompanhada;
+    poucas duvidas com resposta lenta costumam indicar que os alunos pararam
+    de perguntar porque ninguem respondia.
+    """
+
+    permission_classes = [IsAdminOrSuperuser]
+
+    @extend_schema(
+        responses={200: dict},
+        tags=['Forum'],
+        summary='Painel da coordenacao por disciplina',
+    )
+    def get(self, request):
+        semestre = request.query_params.get('semestre')
+        periodo = request.query_params.get('periodo')
+
+        # O curso vem do vinculo de quem coordena, e nao da requisicao. Quem
+        # coordena responde por um curso, entao deixar isso a cargo do cliente
+        # permitiria consultar o curso alheio trocando um parametro na URL.
+        # O superusuario nao tem vinculo e continua enxergando tudo.
+        curso_id = (
+            str(request.user.curso_coordenado_id)
+            if request.user.curso_coordenado_id
+            else request.query_params.get('curso')
+        )
+
+        # Optativas ficam de fora: sao ofertadas por outros institutos e nao
+        # compoem o forum do curso.
+        disciplinas = Disciplina.objects.filter(
+            deleted_at__isnull=True, optativa=False,
+        ).select_related('curso')
+
+        if curso_id:
+            disciplinas = disciplinas.filter(curso_id=curso_id)
+
+        # A oferta segue a paridade do periodo na matriz: periodos impares no
+        # primeiro semestre, pares no segundo. Filtramos por essa regra em vez
+        # do campo semestre gravado na disciplina, porque a regra pertence a
+        # matriz e vale para qualquer ano, enquanto o campo guarda apenas a
+        # ultima importacao. Em 2026.2 aparecem 2o, 4o, 6o e 8o periodos.
+        periodos_do_semestre = self._periodos_do_semestre(semestre)
+        if periodos_do_semestre:
+            disciplinas = disciplinas.filter(periodo_sugerido__in=periodos_do_semestre)
+        if periodo:
+            disciplinas = disciplinas.filter(periodo_sugerido=periodo)
+
+        disciplinas = list(disciplinas)
+        ids = [d.id for d in disciplinas]
+
+        responsaveis = self._responsaveis(ids)
+        atividade = self._atividade(ids)
+        denuncias = self._denuncias_pendentes(ids)
+
+        linhas = []
+        for disciplina in disciplinas:
+            dados = atividade.get(disciplina.id, {})
+            papeis = responsaveis.get(disciplina.id, {})
+
+            linhas.append({
+                'disciplina_id': str(disciplina.id),
+                'codigo': disciplina.codigo,
+                'nome': disciplina.nome,
+                'periodo_sugerido': disciplina.periodo_sugerido,
+                'professor': papeis.get('professor'),
+                'monitor': papeis.get('monitor'),
+                'total_topicos': dados.get('topicos', 0),
+                'sem_resposta': dados.get('sem_resposta', 0),
+                'total_respostas': dados.get('respostas', 0),
+                'participantes': dados.get('participantes', 0),
+                'horas_ate_primeira_resposta': dados.get('horas_primeira_resposta'),
+                'denuncias_pendentes': denuncias.get(disciplina.id, 0),
+            })
+
+        # Sem responsavel definido pesa mais que duvida acumulada, porque uma
+        # disciplina sem professor nem monitor nao tem quem responda.
+        linhas.sort(
+            key=lambda item: (
+                item['professor'] is not None,
+                -item['sem_resposta'],
+                -item['denuncias_pendentes'],
+            )
+        )
+
+        return Response({
+            'semestre': semestre,
+            'semestres_disponiveis': self._semestres(),
+            'resumo': {
+                'disciplinas': len(linhas),
+                'sem_professor': sum(1 for i in linhas if not i['professor']),
+                'sem_monitor': sum(1 for i in linhas if not i['monitor']),
+                'duvidas_sem_resposta': sum(i['sem_resposta'] for i in linhas),
+                'denuncias_pendentes': sum(i['denuncias_pendentes'] for i in linhas),
+            },
+            'disciplinas': linhas,
+        })
+
+    # ===== Consultas auxiliares =====
+
+    @staticmethod
+    def _periodos_do_semestre(semestre):
+        return periodos_ofertados_em(semestre)
+
+    @staticmethod
+    def _semestres():
+        """
+        Ano-periodos disponiveis para consulta, de 2025.1 ate o corrente.
+
+        A lista e gerada pelo calendario, e nao a partir das disciplinas
+        cadastradas. Sao coisas diferentes: a coordenacao precisa poder abrir
+        um semestre ainda sem oferta montada, justamente para monta-la, e
+        tambem consultar um semestre passado que ja nao tem disciplina ativa.
+        """
+        hoje = timezone.now().date()
+        semestre_corrente = 1 if hoje.month <= 7 else 2
+
+        opcoes = []
+        for ano in range(2025, hoje.year + 1):
+            for numero in (1, 2):
+                if ano == hoje.year and numero > semestre_corrente:
+                    break
+                opcoes.append(f'{ano}.{numero}')
+
+        return list(reversed(opcoes))
+
+    def _responsaveis(self, ids):
+        """Professor e monitor de cada disciplina, quando houver."""
+        mapa = {}
+
+        vinculos = PermissaoDisciplina.objects.filter(
+            disciplina_id__in=ids,
+            papel__in=['professor', 'monitor'],
+            ativo=True,
+        ).select_related('usuario')
+
+        for vinculo in vinculos:
+            mapa.setdefault(vinculo.disciplina_id, {})[vinculo.papel] = (
+                vinculo.usuario.nome_completo
+            )
+
+        return mapa
+
+    def _atividade(self, ids):
+        """
+        Contagens do forum por disciplina.
+
+        A agregacao acontece em memoria porque o volume por semestre e pequeno
+        e assim evitamos meia duzia de consultas agregadas separadas, cada uma
+        percorrendo a mesma tabela.
+        """
+        posts = Post.objects.filter(
+            disciplina_id__in=ids, deleted_at__isnull=True,
+        ).values(
+            'id', 'disciplina_id', 'post_pai_id', 'autor_id', 'created_at',
+        )
+
+        topicos = {}
+        respostas_por_topico = {}
+        mapa = {}
+
+        for post in posts:
+            item = mapa.setdefault(post['disciplina_id'], {
+                'topicos': 0,
+                'respostas': 0,
+                'sem_resposta': 0,
+                'autores': set(),
+                'horas_primeira_resposta': None,
+            })
+            item['autores'].add(post['autor_id'])
+
+            if post['post_pai_id'] is None:
+                item['topicos'] += 1
+                topicos[post['id']] = post
+            else:
+                item['respostas'] += 1
+                anterior = respostas_por_topico.get(post['post_pai_id'])
+                if anterior is None or post['created_at'] < anterior:
+                    respostas_por_topico[post['post_pai_id']] = post['created_at']
+
+        # Segunda passada: agora sabemos quais topicos receberam resposta.
+        esperas = {}
+        for topico_id, topico in topicos.items():
+            primeira = respostas_por_topico.get(topico_id)
+
+            if primeira is None:
+                mapa[topico['disciplina_id']]['sem_resposta'] += 1
+                continue
+
+            horas = (primeira - topico['created_at']).total_seconds() / 3600
+            esperas.setdefault(topico['disciplina_id'], []).append(horas)
+
+        for disciplina_id, valores in esperas.items():
+            mapa[disciplina_id]['horas_primeira_resposta'] = round(
+                sum(valores) / len(valores), 1
+            )
+
+        for item in mapa.values():
+            item['participantes'] = len(item.pop('autores'))
+
+        return mapa
+
+    def _denuncias_pendentes(self, ids):
+        contagem = AlertaConteudo.objects.filter(
+            post__disciplina_id__in=ids,
+            status__in=['pendente', 'em_analise'],
+        ).values('post__disciplina_id').annotate(total=Count('id'))
+
+        return {linha['post__disciplina_id']: linha['total'] for linha in contagem}
+
+
+class MinhasDisciplinasView(APIView):
+    """
+    GET /api/forum/minhas-disciplinas/?papel=professor|monitor
+
+    Disciplinas em que a pessoa atua, com o que exige acao em cada uma.
+
+    E a pagina inicial de quem leciona ou monitora. A ordenacao segue o mesmo
+    princípio do painel da coordenacao: primeiro o que esta esperando por
+    alguem. Uma disciplina com tres duvidas sem resposta ha dias importa mais
+    do que outra com trinta duvidas ja respondidas.
+    """
+
+    @extend_schema(
+        responses={200: dict},
+        tags=['Forum'],
+        summary='Disciplinas em que atuo, com pendencias',
+    )
+    def get(self, request):
+        papeis = ['professor', 'monitor']
+        papel = request.query_params.get('papel')
+        if papel in papeis:
+            papeis = [papel]
+
+        vinculos = PermissaoDisciplina.objects.filter(
+            usuario=request.user, papel__in=papeis, ativo=True,
+        ).select_related('disciplina')
+
+        # Mesma regra de oferta do painel da coordenacao. Sem isso, o docente
+        # veria as disciplinas de todos os semestres somadas e as duas telas
+        # dariam numeros diferentes para a mesma pergunta.
+        semestre = request.query_params.get('semestre') or semestre_corrente()
+        periodos = periodos_ofertados_em(semestre)
+        if periodos:
+            vinculos = vinculos.filter(disciplina__periodo_sugerido__in=periodos)
+
+        disciplinas = {v.disciplina_id: v for v in vinculos}
+        if not disciplinas:
+            return Response({'disciplinas': [], 'resumo': self._resumo_vazio()})
+
+        ids = list(disciplinas.keys())
+        atividade = self._atividade(ids, request.user)
+        denuncias = self._denuncias(ids)
+        matriculados = self._matriculados(ids)
+
+        linhas = []
+        for disciplina_id, vinculo in disciplinas.items():
+            disciplina = vinculo.disciplina
+            dados = atividade.get(disciplina_id, {})
+
+            linhas.append({
+                'disciplina_id': str(disciplina_id),
+                'codigo': disciplina.codigo,
+                'nome': disciplina.nome,
+                'periodo_sugerido': disciplina.periodo_sugerido,
+                'semestre': semestre,
+                'meu_papel': vinculo.papel,
+                'matriculados': matriculados.get(disciplina_id, 0),
+                'total_topicos': dados.get('topicos', 0),
+                'sem_resposta': dados.get('sem_resposta', 0),
+                'respondi': dados.get('respondi', 0),
+                'ultima_atividade': dados.get('ultima_atividade'),
+                'denuncias_pendentes': denuncias.get(disciplina_id, 0),
+            })
+
+        linhas.sort(
+            key=lambda item: (-item['sem_resposta'], -item['denuncias_pendentes'])
+        )
+
+        return Response({
+            'resumo': {
+                'disciplinas': len(linhas),
+                'sem_resposta': sum(i['sem_resposta'] for i in linhas),
+                'denuncias_pendentes': sum(i['denuncias_pendentes'] for i in linhas),
+                'matriculados': sum(i['matriculados'] for i in linhas),
+            },
+            'disciplinas': linhas,
+        })
+
+    @staticmethod
+    def _resumo_vazio():
+        return {
+            'disciplinas': 0, 'sem_resposta': 0,
+            'denuncias_pendentes': 0, 'matriculados': 0,
+        }
+
+    def _atividade(self, ids, usuario):
+        posts = Post.objects.filter(
+            disciplina_id__in=ids, deleted_at__isnull=True,
+        ).values('id', 'disciplina_id', 'post_pai_id', 'autor_id', 'created_at')
+
+        mapa = {}
+        topicos = {}
+        com_resposta = set()
+
+        for post in posts:
+            item = mapa.setdefault(post['disciplina_id'], {
+                'topicos': 0, 'sem_resposta': 0, 'respondi': 0,
+                'ultima_atividade': None,
+            })
+
+            if post['post_pai_id'] is None:
+                item['topicos'] += 1
+                topicos[post['id']] = post
+            else:
+                com_resposta.add(post['post_pai_id'])
+                if post['autor_id'] == usuario.id:
+                    item['respondi'] += 1
+
+            momento = post['created_at'].isoformat()
+            if item['ultima_atividade'] is None or momento > item['ultima_atividade']:
+                item['ultima_atividade'] = momento
+
+        for topico_id, topico in topicos.items():
+            if topico_id not in com_resposta:
+                mapa[topico['disciplina_id']]['sem_resposta'] += 1
+
+        return mapa
+
+    def _denuncias(self, ids):
+        contagem = AlertaConteudo.objects.filter(
+            post__disciplina_id__in=ids,
+            status__in=['pendente', 'em_analise'],
+        ).values('post__disciplina_id').annotate(total=Count('id'))
+
+        return {linha['post__disciplina_id']: linha['total'] for linha in contagem}
+
+    def _matriculados(self, ids):
+        contagem = PermissaoDisciplina.objects.filter(
+            disciplina_id__in=ids, papel='aluno', ativo=True,
+        ).values('disciplina_id').annotate(total=Count('id'))
+
+        return {linha['disciplina_id']: linha['total'] for linha in contagem}
 
 
 class MeuAndamentoView(APIView):
@@ -204,9 +599,16 @@ class DisciplinaViewSet(viewsets.ModelViewSet):
         if periodo:
             queryset = queryset.filter(periodo_sugerido=periodo)
 
+        # Mesma regra de oferta do painel da coordenacao: quem pede um
+        # ano-periodo recebe apenas as disciplinas efetivamente ofertadas
+        # nele. Sem isso, o forum ofereceria as trinta e uma da matriz.
         semestre = self.request.query_params.get('semestre')
-        if semestre:
-            queryset = queryset.filter(semestre=semestre)
+        periodos = periodos_ofertados_em(semestre)
+        if periodos:
+            queryset = queryset.filter(periodo_sugerido__in=periodos)
+
+        if self.request.query_params.get('sem_optativas') == '1':
+            queryset = queryset.filter(optativa=False)
 
         return queryset
 
@@ -222,6 +624,43 @@ class PermissaoDisciplinaViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ['created_at', 'papel']
     ordering = ['-created_at']
+
+    def create(self, request, *args, **kwargs):
+        """
+        Cria ou atualiza o vinculo da pessoa com a disciplina.
+
+        Uma pessoa tem um unico papel por disciplina, garantido por constraint.
+        Quando a coordenacao promove alguem que ja e aluno a monitor, o certo
+        e trocar o papel, e nao recusar por duplicidade: era o que acontecia,
+        e a mensagem de erro do banco nao dizia nada a quem estava na tela.
+        """
+        usuario_id = request.data.get('usuario')
+        disciplina_id = request.data.get('disciplina')
+        papel = request.data.get('papel')
+
+        existente = PermissaoDisciplina.objects.filter(
+            usuario_id=usuario_id, disciplina_id=disciplina_id,
+        ).first()
+
+        if existente:
+            papel_anterior = existente.papel
+            existente.papel = papel
+            existente.ativo = True
+            existente.save(update_fields=['papel', 'ativo'])
+
+            registrar_acao(
+                acao='permissao_disciplina_alterada',
+                objeto_afetado=existente.disciplina,
+                descricao=(
+                    f'{existente.usuario.nome_completo} passou de {papel_anterior} '
+                    f'para {papel} em {existente.disciplina.codigo}.'
+                ),
+            )
+
+            serializer = self.get_serializer(existente)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        return super().create(request, *args, **kwargs)
 
     def get_queryset(self):
         queryset = PermissaoDisciplina.objects.select_related('usuario', 'disciplina')
@@ -261,8 +700,29 @@ class PostViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = Post.objects.filter(deleted_at__isnull=True).select_related(
-            'autor', 'disciplina', 'post_pai'
+            'autor', 'disciplina', 'post_pai', 'restrito_por'
         )
+
+        usuario = self.request.user
+
+        if not e_administrador(usuario):
+            # O forum e por disciplina: so ve as discussoes de uma materia
+            # quem tem vinculo com ela. Sem esse recorte, o aluno recebia as
+            # duvidas do curso inteiro, inclusive de periodos que nao cursa.
+            minhas = PermissaoDisciplina.objects.filter(
+                usuario=usuario, ativo=True,
+            ).values_list('disciplina_id', flat=True)
+
+            queryset = queryset.filter(disciplina_id__in=minhas)
+
+            # Post restrito e visivel ao autor e a quem modera a disciplina.
+            # Para os demais colegas ele simplesmente nao existe.
+            queryset = queryset.filter(
+                Q(restrito=False)
+                | Q(autor=usuario)
+                | Q(disciplina_id__in=disciplinas_que_modera(usuario))
+            )
+
         disciplina_id = self.request.query_params.get('disciplina')
         if disciplina_id:
             queryset = queryset.filter(disciplina_id=disciplina_id)
@@ -465,6 +925,99 @@ class PostViewSet(viewsets.ModelViewSet):
         )
         serializer = AlertaConteudoSerializer(alerta)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post', 'delete'])
+    def restringir(self, request, pk=None):
+        """
+        POST /posts/{id}/restringir/    restringe, exigindo motivo
+        DELETE /posts/{id}/restringir/  libera novamente
+
+        Recurso pedagogico do monitor e do professor, distinto da remocao por
+        denuncia. O post sai da vista dos colegas mas continua acessivel ao
+        autor, com o motivo, para que ele entenda o que precisa corrigir sem
+        ser exposto a turma.
+        """
+        post = self.get_object()
+
+        if not pode_moderar_disciplina(request.user, post.disciplina):
+            return Response(
+                {'detail': 'Apenas monitores e professores da disciplina podem restringir.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        if request.method == 'DELETE':
+            if not post.restrito:
+                return Response(
+                    {'detail': 'Esta publicacao nao esta restrita.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            post.restrito = False
+            post.motivo_restricao = ''
+            post.restrito_por = None
+            post.restrito_em = None
+            post.save(update_fields=[
+                'restrito', 'motivo_restricao', 'restrito_por', 'restrito_em',
+            ])
+
+            criar_notificacao(
+                destinatario=post.autor,
+                tipo='post_liberado',
+                titulo='Sua publicacao voltou a ficar visivel',
+                mensagem=(
+                    f'A restricao aplicada em {post.disciplina.codigo} foi removida '
+                    f'e sua publicacao esta visivel novamente.'
+                ),
+                remetente=request.user,
+                objeto_relacionado=post.disciplina,
+            )
+
+            return Response(self.get_serializer(post).data, status=status.HTTP_200_OK)
+
+        if post.restrito:
+            return Response(
+                {'detail': 'Esta publicacao ja esta restrita.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        motivo = request.data.get('motivo', '').strip()
+        if not motivo:
+            return Response(
+                {'detail': 'Informe o motivo da restricao. O autor recebe esse texto.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        with transaction.atomic():
+            post.restrito = True
+            post.motivo_restricao = motivo
+            post.restrito_por = request.user
+            post.restrito_em = timezone.now()
+            post.save(update_fields=[
+                'restrito', 'motivo_restricao', 'restrito_por', 'restrito_em',
+            ])
+
+            criar_notificacao(
+                destinatario=post.autor,
+                tipo='post_restrito',
+                titulo='Sua publicacao foi restrita',
+                mensagem=(
+                    f'Sua publicacao em {post.disciplina.codigo} deixou de aparecer '
+                    f'para os colegas. Motivo: {motivo}'
+                ),
+                remetente=request.user,
+                objeto_relacionado=post.disciplina,
+            )
+
+            registrar_acao(
+                acao='post_restrito',
+                objeto_afetado=post,
+                descricao=(
+                    f'Publicacao restrita por {request.user.nome_completo} '
+                    f'em {post.disciplina.codigo}. Motivo: {motivo}'
+                ),
+            )
+
+        return Response(self.get_serializer(post).data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post', 'delete'], url_path='marcar-melhor')
     def marcar_melhor(self, request, pk=None):

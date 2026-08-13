@@ -49,6 +49,22 @@ class Oportunidade(models.Model):
 
     titulo = models.CharField(max_length=255)
     descricao = models.TextField()
+    imagem = models.ImageField(
+        upload_to='oportunidades/%Y/%m/',
+        null=True,
+        blank=True,
+        help_text='Imagem de capa exibida no cartao da oportunidade',
+    )
+    o_que_fazer = models.TextField(
+        blank=True,
+        default='',
+        help_text='Atividades que o voluntario ira desempenhar',
+    )
+    requisitos = models.TextField(
+        blank=True,
+        default='',
+        help_text='O que se espera de quem se inscrever',
+    )
     area = models.CharField(max_length=30, choices=AREA_CHOICES, db_index=True)
     local = models.CharField(max_length=255, help_text='Cidade/local de realizacao')
     vagas = models.PositiveIntegerField(default=1)

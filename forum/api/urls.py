@@ -9,6 +9,8 @@ from forum.api.views import (
     PermissaoDisciplinaViewSet,
     ArquivoViewSet,
     MeuAndamentoView,
+    MinhasDisciplinasView,
+    PainelCoordenacaoView,
 )
 
 
@@ -22,6 +24,16 @@ router.register(r'arquivos', ArquivoViewSet, basename='arquivo')
 
 urlpatterns = [
     path('andamento/', MeuAndamentoView.as_view(), name='meu-andamento'),
+    path(
+        'minhas-disciplinas/',
+        MinhasDisciplinasView.as_view(),
+        name='minhas-disciplinas',
+    ),
+    path(
+        'painel-coordenacao/',
+        PainelCoordenacaoView.as_view(),
+        name='painel-coordenacao',
+    ),
 ]
 
 urlpatterns += router.urls

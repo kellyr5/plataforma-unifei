@@ -37,10 +37,26 @@ interface Inscricao {
   created_at: string
 }
 
-function StatMini({ label, value, color }: { label: string; value: string; color: string }) {
+/**
+ * Indicador do perfil.
+ *
+ * Sem cor por métrica: verde, âmbar e vermelho sugerem bom, atenção e ruim,
+ * e nenhuma dessas contagens é boa ou ruim em si. A leitura vem do número e
+ * do rótulo, e a cor fica reservada para o que de fato exige ação.
+ */
+function StatMini({ label, value }: { label: string; value: string }) {
   return (
     <div className="text-center">
-      <div className="font-bold" style={{ fontSize: '24px', color }}>{value}</div>
+      <div
+        className="font-semibold"
+        style={{
+          fontSize: '24px',
+          color: 'var(--text-primary)',
+          fontVariantNumeric: 'tabular-nums',
+        }}
+      >
+        {value}
+      </div>
       <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '2px' }}>{label}</div>
     </div>
   )
@@ -139,6 +155,17 @@ export default function PerfilPage() {
   const totalRespostas = reputacoes.reduce((s, r) => s + r.total_respostas, 0)
   const totalMelhores = reputacoes.reduce((s, r) => s + r.total_melhores_respostas, 0)
 
+  /**
+   * O vocabulário muda com o papel. "Ajudaram colegas" só faz sentido entre
+   * estudantes; quem leciona ou coordena não tem colegas na turma, e ler isso
+   * no próprio perfil soa como se o sistema não soubesse quem ele é.
+   */
+  const ensina = !!user && (user.e_professor || user.e_monitor || user.e_coordenacao)
+
+  const rotulos = ensina
+    ? { topicos: 'Tópicos abertos', melhores: 'Respostas de referência' }
+    : { topicos: 'Dúvidas levantadas', melhores: 'Ajudaram colegas' }
+
   const initials = user?.nome_completo
     ? user.nome_completo.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
     : 'U'
@@ -177,23 +204,65 @@ export default function PerfilPage() {
             <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
               {user?.email || ''}
             </p>
-            {user?.cpf && (
-              <p style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>
-                CPF: {user.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.***.***-$4')}
-              </p>
+            <div className="flex items-center" style={{ gap: '10px', marginTop: '6px' }}>
+              <span
+                className="rounded"
+                style={{
+                  padding: '3px 9px', fontSize: '11.5px', fontWeight: 600,
+                  background: 'rgba(0,48,135,0.07)', color: '#003087',
+                }}
+              >
+                {user?.rotulo_perfil || 'Estudante'}
+              </span>
+
+              {user?.matricula && (
+                <span style={{ fontSize: '12.5px', color: 'var(--text-tertiary)' }}>
+                  Matrícula {user.matricula}
+                </span>
+              )}
+
+              {user?.cpf && (
+                <span style={{ fontSize: '12.5px', color: 'var(--text-tertiary)' }}>
+                  CPF {user.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.***.***-$4')}
+                </span>
+              )}
+            </div>
+
+            {/* Vínculos por disciplina: é o que define o que a pessoa pode
+                fazer, e estava invisível para ela até agora. */}
+            {user?.papeis_disciplina && user.papeis_disciplina.length > 0 && (
+              <div className="flex flex-wrap" style={{ gap: '6px', marginTop: '10px' }}>
+                {user.papeis_disciplina.map(vinculo => (
+                  <span
+                    key={vinculo.disciplina_id}
+                    className="rounded"
+                    style={{
+                      padding: '3px 8px', fontSize: '11.5px',
+                      background: 'var(--bg-input)',
+                      border: '1px solid var(--border)',
+                      color: 'var(--text-secondary)',
+                    }}
+                  >
+                    {vinculo.disciplina_codigo}
+                    <span style={{ color: 'var(--text-tertiary)' }}>
+                      {' · '}{vinculo.papel}
+                    </span>
+                  </span>
+                ))}
+              </div>
             )}
           </div>
         </div>
 
         {/* Stats resumo */}
         <div className="flex items-center justify-around" style={{ marginTop: '24px', padding: '20px 0 0', borderTop: '1px solid var(--border)' }}>
-          <StatMini label="Dúvidas levantadas" value={totalTopicos.toString()} color="#003087" />
+          <StatMini label={rotulos.topicos} value={totalTopicos.toString()} />
           <div style={{ width: '1px', height: '40px', background: 'var(--border)' }} />
-          <StatMini label="Respostas" value={totalRespostas.toString()} color="#10B981" />
+          <StatMini label="Respostas" value={totalRespostas.toString()} />
           <div style={{ width: '1px', height: '40px', background: 'var(--border)' }} />
-          <StatMini label="Ajudaram colegas" value={totalMelhores.toString()} color="#F59E0B" />
+          <StatMini label={rotulos.melhores} value={totalMelhores.toString()} />
           <div style={{ width: '1px', height: '40px', background: 'var(--border)' }} />
-          <StatMini label="Certificados" value={certificados.length.toString()} color="#C8102E" />
+          <StatMini label="Certificados" value={certificados.length.toString()} />
         </div>
       </div>
 

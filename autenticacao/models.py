@@ -39,11 +39,57 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     nome_completo = models.CharField(max_length=255)
     cpf = models.CharField(max_length=11, unique=True, db_index=True)
+    matricula = models.CharField(
+        max_length=20,
+        blank=True,
+        default='',
+        db_index=True,
+        help_text='Matrícula institucional, usada no pré-cadastro pela coordenação',
+    )
     email = models.EmailField(max_length=150, unique=True)
+    GENERO_CHOICES = [
+        ('f', 'Feminino'),
+        ('m', 'Masculino'),
+        ('n', 'Prefiro não informar'),
+    ]
+
+    genero = models.CharField(
+        max_length=1,
+        choices=GENERO_CHOICES,
+        default='n',
+        help_text='Usado apenas para flexionar o nome do perfil na interface',
+    )
+
+    # Curso sob responsabilidade de quem coordena.
+    #
+    # Hoje a plataforma atende um curso e quem e admin enxerga tudo. Com dois
+    # cursos, cada coordenacao precisa ver apenas o seu, e quem cadastra
+    # cursos e nomeia coordenadores passa a ser o superusuario, que nao tem
+    # tela propria. Registrar o vinculo agora evita reescrever as consultas
+    # depois, e custa um campo.
+    curso_coordenado = models.ForeignKey(
+        'forum.Curso',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='coordenadores',
+        help_text='Preenchido apenas para quem coordena um curso',
+    )
+
     ativo = models.BooleanField(default=False)
     bio = models.TextField(blank=True, default='')
     data_nascimento = models.DateField(null=True, blank=True)
     avatar_url = models.CharField(max_length=255, blank=True, default='')
+
+    # Dados usados na assinatura do certificado emitido pela organizacao.
+    nome_responsavel = models.CharField(max_length=255, blank=True, default='')
+    cargo_responsavel = models.CharField(max_length=120, blank=True, default='')
+    assinatura = models.ImageField(
+        upload_to='assinaturas/',
+        null=True,
+        blank=True,
+        help_text='Imagem da assinatura do responsavel, usada no certificado',
+    )
     reputacao = models.IntegerField(default=0)
     ultimo_acesso = models.DateTimeField(null=True, blank=True)
     is_admin = models.BooleanField(default=False)

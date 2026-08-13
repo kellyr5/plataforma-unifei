@@ -52,6 +52,9 @@ class PostSerializer(serializers.ModelSerializer):
     autor_nome = serializers.CharField(source='autor.nome_completo', read_only=True)
     disciplina_codigo = serializers.CharField(source='disciplina.codigo', read_only=True)
     total_respostas = serializers.SerializerMethodField()
+    restrito_por_nome = serializers.CharField(
+        source='restrito_por.nome_completo', read_only=True, default=None,
+    )
     e_topico = serializers.BooleanField(read_only=True)
 
     class Meta:
@@ -60,12 +63,22 @@ class PostSerializer(serializers.ModelSerializer):
             'id', 'disciplina', 'disciplina_codigo', 'autor', 'autor_nome',
             'post_pai', 'titulo', 'conteudo', 'e_melhor', 'e_topico',
             'visualizacoes', 'pontuacao', 'total_reacoes_persiste',
-            'total_respostas', 'created_at', 'updated_at',
+            'total_respostas',
+            'restrito', 'motivo_restricao', 'restrito_por_nome',
+            'created_at', 'updated_at',
         ]
+        # A restricao muda apenas pela acao propria, que exige motivo e
+        # notifica o autor. Deixa-la editavel aqui abriria um caminho paralelo
+        # que ignoraria as duas regras.
+        #
+        # Os campos declarados explicitamente na classe, como autor_nome e
+        # restrito_por_nome, ja sao read_only por definicao e nao podem
+        # constar aqui: o DRF trata isso como erro de configuracao.
         read_only_fields = [
-            'id', 'autor', 'autor_nome', 'disciplina_codigo', 'visualizacoes',
-            'pontuacao', 'total_reacoes_persiste', 'total_respostas',
-            'e_melhor', 'e_topico', 'created_at', 'updated_at',
+            'id', 'autor', 'visualizacoes', 'pontuacao',
+            'total_reacoes_persiste', 'e_melhor',
+            'restrito', 'motivo_restricao',
+            'created_at', 'updated_at',
         ]
 
     def get_total_respostas(self, obj) -> int:

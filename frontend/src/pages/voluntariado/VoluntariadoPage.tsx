@@ -29,6 +29,20 @@ interface Oportunidade {
   organizacao_nome: string
   requer_aprovacao: boolean
   created_at: string
+  imagem_url: string | null
+  /* Situação da inscrição de quem está vendo, quando existir. É uma por
+     pessoa em cada vaga, então a tela precisa saber antes de oferecer o
+     botão. */
+  minha_inscricao: string | null
+}
+
+const SITUACAO_ROTULO: Record<string, string> = {
+  pendente: 'Inscrição enviada',
+  aprovada: 'Você participa desta ação',
+  concluida: 'Participação concluída',
+  rejeitada: 'Inscrição não aceita',
+  removida: 'Você foi removido desta ação',
+  desistente: 'Você desistiu desta ação',
 }
 
 const areas = [
@@ -61,32 +75,70 @@ function OpCard({ op, onClick }: { op: Oportunidade; onClick: () => void }) {
 
   return (
     <div
-      className="rounded-xl cursor-pointer transition-all duration-200"
+      className="rounded-xl cursor-pointer"
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        padding: '22px', background: 'var(--bg-card)',
-        border: `1px solid ${hovered ? cor + '40' : 'var(--border)'}`,
-        boxShadow: hovered ? `0 4px 12px ${cor}10` : 'none',
+        background: 'var(--bg-card)',
+        border: `1px solid ${hovered ? cor + '55' : 'var(--border)'}`,
+        boxShadow: hovered
+          ? '0 10px 24px rgba(15,23,42,0.10)'
+          : '0 1px 2px rgba(15,23,42,0.04)',
+        transform: hovered ? 'translateY(-3px)' : 'translateY(0)',
+        transition: 'transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
-      {/* Header: area + status */}
-      <div className="flex items-center justify-between" style={{ marginBottom: '12px' }}>
-        <span className="rounded-md" style={{ padding: '3px 10px', fontSize: '11px', fontWeight: 500, background: `${cor}12`, color: cor }}>
+      {/* Capa. Quando a organização não enviou imagem, um bloco na cor da
+          área mantém o ritmo visual da grade em vez de deixar um buraco. */}
+      <div style={{ position: 'relative', height: '128px', overflow: 'hidden' }}>
+        {op.imagem_url ? (
+          <img
+            src={op.imagem_url}
+            alt=""
+            style={{
+              width: '100%', height: '100%', objectFit: 'cover', display: 'block',
+              transform: hovered ? 'scale(1.05)' : 'scale(1)',
+              transition: 'transform 0.4s ease',
+            }}
+          />
+        ) : (
+          <div style={{
+            width: '100%', height: '100%',
+            background: `linear-gradient(135deg, ${cor}22 0%, ${cor}0d 60%, var(--bg-input) 100%)`,
+          }} />
+        )}
+
+        <span
+          className="rounded-md"
+          style={{
+            position: 'absolute', top: '10px', left: '12px',
+            padding: '3px 10px', fontSize: '11px', fontWeight: 600,
+            background: 'rgba(255,255,255,0.92)', color: cor,
+            backdropFilter: 'blur(4px)',
+          }}
+        >
           {op.area_display}
         </span>
-        {op.esta_aberta_inscricao ? (
-          <span className="rounded-md" style={{ padding: '3px 10px', fontSize: '11px', fontWeight: 500, background: 'rgba(16,185,129,0.06)', color: '#10B981' }}>
-            Inscrições abertas
-          </span>
-        ) : (
-          <span className="rounded-md" style={{ padding: '3px 10px', fontSize: '11px', fontWeight: 500, background: 'rgba(239,68,68,0.06)', color: '#EF4444' }}>
-            Encerrada
+
+        {op.minha_inscricao && (
+          <span
+            className="rounded-md"
+            style={{
+              position: 'absolute', top: '10px', right: '12px',
+              padding: '3px 10px', fontSize: '11px', fontWeight: 600,
+              background: 'rgba(0,48,135,0.92)', color: 'white',
+            }}
+          >
+            {SITUACAO_ROTULO[op.minha_inscricao] || 'Inscrito'}
           </span>
         )}
       </div>
 
+      <div style={{ padding: '18px 20px 20px', display: 'flex', flexDirection: 'column', flex: 1 }}>
       {/* Titulo */}
       <div className="font-semibold" style={{ fontSize: '16px', color: 'var(--text-primary)', marginBottom: '6px', lineHeight: 1.4 }}>
         {op.titulo}
@@ -134,6 +186,7 @@ function OpCard({ op, onClick }: { op: Oportunidade; onClick: () => void }) {
           Requer aprovação da organização
         </div>
       )}
+      </div>
     </div>
   )
 }
@@ -142,7 +195,6 @@ export default function VoluntariadoPage() {
   const navigate = useNavigate()
   const [oportunidades, setOportunidades] = useState<Oportunidade[]>([])
   const [loading, setLoading] = useState(true)
-  const [filtroArea, setFiltroArea] = useState('')
   const [busca, setBusca] = useState('')
   const [buscaInput, setBuscaInput] = useState('')
 
@@ -153,15 +205,19 @@ export default function VoluntariadoPage() {
 
   useEffect(() => {
     setLoading(true)
-    const params: Record<string, string> = { ordering: '-created_at' }
-    if (filtroArea) params.area = filtroArea
+    /* Só as que ainda aceitam inscrição. Listar oportunidade encerrada é
+       oferecer ao aluno algo em que ele não pode entrar. */
+    const params: Record<string, string> = {
+      ordering: '-created_at',
+      status: 'ativa',
+    }
     if (busca) params.search = busca
 
     api.get('/voluntariado/oportunidades/', { params }).then(res => {
       const data = Array.isArray(res.data) ? res.data : res.data.results || []
-      setOportunidades(data)
+      setOportunidades(data.filter((op: Oportunidade) => op.esta_aberta_inscricao))
     }).catch(console.error).finally(() => setLoading(false))
-  }, [filtroArea, busca])
+  }, [busca])
 
   return (
     <div style={{ maxWidth: '1000px' }}>
@@ -171,7 +227,7 @@ export default function VoluntariadoPage() {
           Voluntariado
         </h1>
         <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-          {oportunidades.length} oportunidade(s) disponível(is)
+          {oportunidades.length} oportunidade(s) com inscrições abertas
         </p>
       </div>
 
@@ -191,20 +247,9 @@ export default function VoluntariadoPage() {
             style={{ fontSize: '13px', color: 'var(--text-primary)' }} />
         </div>
 
-        <div className="flex items-center" style={{ gap: '6px', overflowX: 'auto' }}>
-          {areas.map(a => (
-            <button key={a.value} onClick={() => setFiltroArea(filtroArea === a.value ? '' : a.value)}
-              className="flex-shrink-0 rounded-lg font-medium cursor-pointer transition-all duration-150"
-              style={{
-                padding: '8px 14px', fontSize: '12px',
-                background: filtroArea === a.value ? '#003087' : 'var(--bg-input)',
-                color: filtroArea === a.value ? 'white' : 'var(--text-secondary)',
-                border: `1px solid ${filtroArea === a.value ? '#003087' : 'var(--border)'}`,
-              }}>
-              {a.label}
-            </button>
-          ))}
-        </div>
+        {/* Sem filtro por área: são poucas oportunidades por vez, e recortar
+            por tema esconde vagas que o aluno aceitaria se tivesse visto.
+            A busca por texto cobre quem já sabe o que procura. */}
       </div>
 
       {/* Lista */}

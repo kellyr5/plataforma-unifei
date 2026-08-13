@@ -33,11 +33,20 @@ def gerar_pdf_certificado(certificado: Certificado) -> ContentFile:
         f'/api/voluntariado/certificados/validar/{certificado.codigo_validacao}/'
     )
 
+    # O responsavel vem do perfil da organizacao que publicou a oportunidade.
+    # E ela quem atesta o servico prestado, entao e o nome dela que assina.
+    organizacao = certificado.inscricao.oportunidade.organizacao
+
     html_string = render_to_string(
         'voluntariado/certificado.html',
         {
             'certificado': certificado,
             'url_validacao': url_validacao,
+            'responsavel_nome': organizacao.nome_responsavel,
+            'responsavel_cargo': organizacao.cargo_responsavel,
+            'assinatura_url': (
+                organizacao.assinatura.path if organizacao.assinatura else None
+            ),
         },
     )
 

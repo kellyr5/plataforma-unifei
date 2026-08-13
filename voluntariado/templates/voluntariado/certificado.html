@@ -23,6 +23,27 @@
             background:
                 linear-gradient(135deg, #f8fafc 0%, #ffffff 60%, #eef2f7 100%);
         }
+        .assinatura {
+            margin-top: 14mm;
+            text-align: center;
+        }
+        .assinatura-imagem {
+            max-height: 16mm;
+            margin-bottom: -4mm;
+        }
+        .assinatura-linha {
+            width: 70mm;
+            margin: 0 auto 2mm;
+            border-top: 1px solid #1a2238;
+        }
+        .assinatura-nome {
+            font-size: 11pt;
+            font-weight: bold;
+        }
+        .assinatura-cargo {
+            font-size: 9pt;
+            color: #5a6478;
+        }
         .borda {
             position: absolute;
             top: 12mm;
@@ -142,6 +163,23 @@
             <div class="detalhes">
                 Emitido em <strong>{{ certificado.emitido_em|date:"d \d\e F \d\e Y" }}</strong>
             </div>
+
+            {# Assinatura de quem atesta o servico. Sem o nome do responsavel,
+               o documento nao identifica quem se responsabiliza pelo que
+               afirma, e perde valor como comprovante. #}
+            {% if responsavel_nome %}
+            <div class="assinatura">
+                {% if assinatura_url %}
+                    <img src="{{ assinatura_url }}" alt="" class="assinatura-imagem">
+                {% endif %}
+                <div class="assinatura-linha"></div>
+                <div class="assinatura-nome">{{ responsavel_nome }}</div>
+                {% if responsavel_cargo %}
+                    <div class="assinatura-cargo">{{ responsavel_cargo }}</div>
+                {% endif %}
+                <div class="assinatura-cargo">{{ certificado.nome_organizacao }}</div>
+            </div>
+            {% endif %}
         </div>
 
         <div class="rodape">

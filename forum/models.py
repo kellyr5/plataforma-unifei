@@ -76,6 +76,11 @@ class Disciplina(models.Model):
         help_text='Carga horaria total em horas',
     )
     optativa = models.BooleanField(default=False)
+    ementa = models.TextField(
+        blank=True,
+        default='',
+        help_text='Descricao da disciplina, conforme o PPC',
+    )
 
     pre_requisitos = models.ManyToManyField(
         'self',
@@ -172,6 +177,21 @@ class Post(models.Model):
     titulo = models.CharField(max_length=255, blank=True, help_text='Vazio em respostas')
     conteudo = models.TextField()
     e_melhor = models.BooleanField(default=False)
+
+    # Restricao pedagogica, aplicada por monitor ou professor da disciplina.
+    # Diferente da remocao por denuncia: o post continua existindo e o autor
+    # continua enxergando, com o motivo, para que entenda o que houve. Some
+    # apenas para os demais alunos, o que corrige sem expor a pessoa a turma.
+    restrito = models.BooleanField(default=False, db_index=True)
+    motivo_restricao = models.TextField(blank=True)
+    restrito_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='posts_restringidos',
+    )
+    restrito_em = models.DateTimeField(null=True, blank=True)
     visualizacoes = models.IntegerField(default=0)
     pontuacao = models.IntegerField(default=0, help_text='Cache de votos')
     total_reacoes_persiste = models.IntegerField(

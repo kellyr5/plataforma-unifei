@@ -13,16 +13,19 @@ class OportunidadeSerializer(serializers.ModelSerializer):
     vagas_disponiveis = serializers.IntegerField(read_only=True)
     esta_aberta_inscricao = serializers.BooleanField(read_only=True)
     total_inscritos = serializers.SerializerMethodField()
+    imagem_url = serializers.SerializerMethodField()
+    minha_inscricao = serializers.SerializerMethodField()
 
     class Meta:
         model = Oportunidade
         fields = [
             'id',
             'organizacao', 'organizacao_nome',
-            'titulo', 'descricao',
+            'titulo', 'descricao', 'o_que_fazer', 'requisitos',
+            'imagem', 'imagem_url',
             'area', 'area_display',
             'local',
-            'vagas', 'vagas_disponiveis', 'total_inscritos',
+            'vagas', 'vagas_disponiveis', 'total_inscritos', 'minha_inscricao',
             'carga_horaria_total',
             'data_inicio', 'data_fim', 'prazo_inscricao',
             'requer_aprovacao',
@@ -31,12 +34,30 @@ class OportunidadeSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at',
         ]
         read_only_fields = [
-            'id', 'organizacao', 'organizacao_nome',
-            'area_display', 'status_display',
-            'vagas_disponiveis', 'total_inscritos',
-            'esta_aberta_inscricao',
+            'id', 'organizacao',
             'created_at', 'updated_at',
         ]
+
+    def get_imagem_url(self, obj) -> str | None:
+        request = self.context.get('request')
+        if obj.imagem and request:
+            return request.build_absolute_uri(obj.imagem.url)
+        return None
+
+    def get_minha_inscricao(self, obj) -> str | None:
+        """
+        Situacao da inscricao de quem esta consultando, quando existir.
+
+        E uma inscricao por pessoa em cada oportunidade, garantido por
+        constraint no banco. A tela precisa saber disso antes de oferecer o
+        botao, para nao convidar alguem a repetir algo que sera recusado.
+        """
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return None
+
+        inscricao = obj.inscricoes.filter(estudante=request.user).first()
+        return inscricao.status if inscricao else None
 
     def get_total_inscritos(self, obj) -> int:
         return obj.inscricoes.count()

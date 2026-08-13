@@ -1,6 +1,8 @@
 from rest_framework import viewsets, filters, status, permissions
 from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
+from django.db.models import Count
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
@@ -33,6 +35,8 @@ class OportunidadeViewSet(viewsets.ModelViewSet):
 
     queryset = Oportunidade.objects.none()  # define o tipo da PK para o schema OpenAPI
     serializer_class = OportunidadeSerializer
+    # A criacao aceita imagem de capa, entao precisa de multipart.
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['titulo', 'descricao', 'local']
     ordering_fields = ['created_at', 'data_inicio', 'prazo_inscricao']
@@ -87,6 +91,56 @@ class OportunidadeViewSet(viewsets.ModelViewSet):
         instance.deleted_at = timezone.now()
         instance.status = 'cancelada'
         instance.save()
+
+    @action(detail=False, methods=['get'])
+    def minhas(self, request):
+        """
+        GET /api/voluntariado/oportunidades/minhas/
+
+        Painel da organizacao: o que ela publicou e como cada vaga esta.
+
+        Traz as contagens por situacao porque e disso que a organizacao
+        precisa para agir. Inscricao pendente exige decisao dela; aprovada
+        aguardando conclusao exige acompanhamento; e a vaga sem ninguem
+        inscrito perto do prazo indica anuncio que nao alcancou ninguem.
+        """
+        oportunidades = Oportunidade.objects.filter(
+            organizacao=request.user, deleted_at__isnull=True,
+        ).order_by('-created_at')
+
+        contagens = InscricaoVoluntariado.objects.filter(
+            oportunidade__in=oportunidades,
+        ).values('oportunidade_id', 'status').annotate(total=Count('id'))
+
+        por_oportunidade = {}
+        for linha in contagens:
+            por_oportunidade.setdefault(linha['oportunidade_id'], {})[
+                linha['status']
+            ] = linha['total']
+
+        dados = []
+        for oportunidade in oportunidades:
+            situacao = por_oportunidade.get(oportunidade.id, {})
+            item = OportunidadeSerializer(
+                oportunidade, context={'request': request},
+            ).data
+            item['inscricoes'] = {
+                'pendentes': situacao.get('pendente', 0),
+                'aprovadas': situacao.get('aprovada', 0),
+                'concluidas': situacao.get('concluida', 0),
+                'rejeitadas': situacao.get('rejeitada', 0),
+            }
+            dados.append(item)
+
+        return Response({
+            'resumo': {
+                'oportunidades': len(dados),
+                'pendentes': sum(d['inscricoes']['pendentes'] for d in dados),
+                'aprovadas': sum(d['inscricoes']['aprovadas'] for d in dados),
+                'concluidas': sum(d['inscricoes']['concluidas'] for d in dados),
+            },
+            'oportunidades': dados,
+        })
 
     @action(detail=True, methods=['post'])
     def inscrever(self, request, pk=None):

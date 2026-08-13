@@ -15,6 +15,12 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
+      // Arquivos enviados e certificados gerados sao servidos pelo Django em
+      // /media/. Sem este proxy, o link de download cairia no Vite.
+      '/media': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
       // Encaminha o WebSocket das notificacoes para o Daphne.
       '/ws': {
         target: 'ws://localhost:8000',

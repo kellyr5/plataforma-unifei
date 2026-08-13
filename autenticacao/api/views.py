@@ -17,12 +17,21 @@ from autenticacao.models import Usuario
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.views import TokenRefreshView
 
+from django.db import transaction
+from django.db.models import Q
+from django.shortcuts import get_object_or_404
+
+from auditoria.services import registrar_acao
+from config.permissions import IsAdminOrSuperuser
+
 from autenticacao.api.serializers import (
     RegistroSerializer,
     AtivacaoSerializer,
     ReenvioCodigoSerializer,
     LogoutSerializer,
+    PreCadastroSerializer,
     RefreshComListaRedisSerializer,
+    UsuarioResumoSerializer,
 )
 from autenticacao.tokens import invalidar
 from autenticacao.utils import (
@@ -190,6 +199,125 @@ class ReenvioCodigoView(APIView):
         return resposta_padrao
 
 
+class BuscaUsuarioView(APIView):
+    """
+    GET /api/auth/usuarios/?busca=texto
+
+    Consulta de pessoas para as telas de atribuicao da coordenacao.
+
+    Exige ao menos tres caracteres e devolve poucos resultados de proposito:
+    e um campo de busca para encontrar alguem conhecido, nao uma listagem
+    navegavel de toda a base de usuarios.
+    """
+
+    permission_classes = [IsAdminOrSuperuser]
+
+    @extend_schema(
+        responses={200: UsuarioResumoSerializer(many=True)},
+        tags=['Autenticacao'],
+        summary='Buscar pessoas para atribuicao',
+    )
+    def get(self, request):
+        busca = request.query_params.get('busca', '').strip()
+
+        if len(busca) < 3:
+            return Response([])
+
+        digitos = ''.join(filtro for filtro in busca if filtro.isdigit())
+
+        consulta = Q(nome_completo__icontains=busca) | Q(email__icontains=busca)
+        if digitos:
+            consulta |= Q(cpf__startswith=digitos) | Q(matricula__startswith=digitos)
+
+        usuarios = Usuario.objects.filter(
+            consulta, deleted_at__isnull=True,
+        ).order_by('nome_completo')[:15]
+
+        return Response(UsuarioResumoSerializer(usuarios, many=True).data)
+
+
+class PreCadastroView(APIView):
+    """
+    POST /api/auth/pre-cadastro/
+
+    Cadastro institucional feito pela coordenacao.
+
+    Se o CPF ja existir, a pessoa nao e recriada: apenas atualizamos matricula
+    e nome, e seguimos para o vinculo. E o caso comum do monitor, que ja e
+    aluno da plataforma.
+    """
+
+    permission_classes = [IsAdminOrSuperuser]
+
+    @extend_schema(
+        request=PreCadastroSerializer,
+        responses={201: dict},
+        tags=['Autenticacao'],
+        summary='Pre-cadastrar pessoa e vincular a disciplina',
+    )
+    def post(self, request):
+        from forum.models import Disciplina, PermissaoDisciplina
+
+        serializer = PreCadastroSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        dados = serializer.validated_data
+
+        with transaction.atomic():
+            usuario = Usuario.objects.filter(cpf=dados['cpf']).first()
+            criado = usuario is None
+
+            if criado:
+                usuario = Usuario(
+                    cpf=dados['cpf'],
+                    email=dados['email'].lower().strip(),
+                    nome_completo=dados['nome_completo'],
+                    matricula=dados.get('matricula', ''),
+                    ativo=False,
+                )
+                # Sem senha utilizavel: a pessoa define a dela ao ativar.
+                usuario.set_unusable_password()
+                usuario.save()
+            else:
+                usuario.nome_completo = dados['nome_completo']
+                if dados.get('matricula'):
+                    usuario.matricula = dados['matricula']
+                usuario.save(update_fields=['nome_completo', 'matricula'])
+
+            vinculo = None
+            if dados.get('disciplina'):
+                disciplina = get_object_or_404(Disciplina, id=dados['disciplina'])
+                vinculo, _ = PermissaoDisciplina.objects.update_or_create(
+                    usuario=usuario,
+                    disciplina=disciplina,
+                    defaults={'papel': dados['papel'], 'ativo': True},
+                )
+
+            registrar_acao(
+                acao='permissao_disciplina_alterada' if vinculo else 'registro',
+                objeto_afetado=usuario,
+                descricao=(
+                    f'{"Pre-cadastro" if criado else "Atualizacao"} de '
+                    f'{usuario.nome_completo} pela coordenacao'
+                    + (f', como {dados["papel"]} em {vinculo.disciplina.codigo}.'
+                       if vinculo else '.')
+                ),
+            )
+
+        return Response(
+            {
+                'detail': (
+                    'Pessoa cadastrada. Ela ativa a conta no primeiro acesso, '
+                    'pelo mesmo codigo enviado por email aos demais usuarios.'
+                    if criado else
+                    'Pessoa ja cadastrada na plataforma. Vinculo atualizado.'
+                ),
+                'criado': criado,
+                'usuario': UsuarioResumoSerializer(usuario).data,
+            },
+            status=status.HTTP_201_CREATED if criado else status.HTTP_200_OK,
+        )
+
+
 class RefreshView(TokenRefreshView):
     """
     POST /api/auth/refresh/
@@ -288,16 +416,21 @@ class MeView(APIView):
         e_coordenacao = bool(u.is_admin or u.is_superuser)
         e_monitor = any(v.papel == 'monitor' for v in vinculos)
         e_professor = any(v.papel == 'professor' for v in vinculos)
+        e_organizacao = 'ong' in papeis_globais
 
         return Response({
             'id': str(u.id),
             'nome_completo': u.nome_completo,
             'cpf': u.cpf,
+            'matricula': u.matricula,
             'email': u.email,
             'is_admin': u.is_admin,
             'bio': u.bio or '',
             'avatar_url': u.avatar_url or '',
 
+            'genero': u.genero,
+            'nome_responsavel': u.nome_responsavel,
+            'cargo_responsavel': u.cargo_responsavel,
             'papeis_globais': papeis_globais,
             'papeis_disciplina': papeis_disciplina,
 
@@ -305,6 +438,38 @@ class MeView(APIView):
             'e_coordenacao': e_coordenacao,
             'e_monitor': e_monitor,
             'e_professor': e_professor,
-            'e_organizacao': 'ong' in papeis_globais,
+            'e_organizacao': e_organizacao,
             'pode_moderar': e_coordenacao or e_monitor or e_professor,
+
+            'rotulo_perfil': self._rotular(
+                u.genero, e_coordenacao, e_professor, e_monitor, e_organizacao
+            ),
         })
+
+    @staticmethod
+    def _rotular(genero, coordenacao, professor, monitor, organizacao):
+        """
+        Nome do perfil, flexionado quando a pessoa informou o genero.
+
+        A ordem importa: quem coordena tambem pode lecionar, e o rotulo deve
+        mostrar a atribuicao de maior alcance. Quem nao informou o genero
+        recebe a forma masculina, que e a nao marcada em portugues, ou uma
+        palavra neutra quando existe, como no caso da organizacao.
+        """
+        def flexionar(masculino, feminino):
+            return feminino if genero == 'f' else masculino
+
+        if organizacao:
+            return 'Organização parceira'
+        if coordenacao:
+            return flexionar('Coordenador', 'Coordenadora')
+        if professor:
+            return flexionar('Professor', 'Professora')
+
+        # O monitor nao deixa de ser estudante: ele cursa suas proprias
+        # materias e exerce monitoria em uma ou outra. O rotulo duplo evita
+        # que ele se veja como algo que nao e.
+        if monitor:
+            return flexionar('Aluno/Monitor', 'Aluna/Monitora')
+
+        return flexionar('Estudante', 'Estudante')

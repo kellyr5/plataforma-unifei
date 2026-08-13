@@ -130,8 +130,27 @@ def vincular(usuario, disciplina, papel='aluno'):
     )
 
 
+def matricular(usuario, disciplina, papel='aluno'):
+    """
+    Garante o vínculo do usuário com a disciplina, sem duplicar.
+
+    Existe porque o fórum só mostra as discussões das disciplinas em que a
+    pessoa participa. Quem escreve numa turma faz parte dela, então a fábrica
+    de post cuida disso sozinha e os testes não precisam repetir a matrícula
+    a cada cenário.
+    """
+    vinculo, _ = PermissaoDisciplina.objects.get_or_create(
+        usuario=usuario,
+        disciplina=disciplina,
+        defaults={'papel': papel, 'ativo': True},
+    )
+    return vinculo
+
+
 def criar_topico(autor, disciplina, titulo='Dúvida sobre complexidade'):
     """Cria um tópico, ou seja, um post sem post_pai."""
+    matricular(autor, disciplina)
+
     return Post.objects.create(
         disciplina=disciplina,
         autor=autor,
@@ -142,6 +161,8 @@ def criar_topico(autor, disciplina, titulo='Dúvida sobre complexidade'):
 
 def criar_resposta(autor, topico, conteudo='O pior caso é O(n^2).'):
     """Cria uma resposta encadeada a um tópico. Respostas não têm título."""
+    matricular(autor, topico.disciplina)
+
     return Post.objects.create(
         disciplina=topico.disciplina,
         autor=autor,

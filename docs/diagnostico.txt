@@ -1,0 +1,65 @@
+22 objects imported automatically (use -v 2 for details).
+
+
+============================================================
+PROFESSOR: Bruno Professor (10000000002)
+============================================================
+
+Vinculos ativos: 8
+  professor  XDES01   periodo=1 semestre=2026.2
+  professor  CRSC03   periodo=1 semestre=2026.2
+  professor  MAT00A   periodo=1 semestre=2026.2
+  professor  XMAC01   periodo=1 semestre=2026.2
+  professor  CAHC04   periodo=1 semestre=2026.2
+  professor  CRSC04   periodo=2 semestre=2026.2
+  professor  CTCO01   periodo=2 semestre=2026.2
+  professor  CMAC04   periodo=2 semestre=2026.2
+
+--- GET /api/forum/minhas-disciplinas/ ---
+status: 200
+resumo: {'disciplinas': 8, 'sem_resposta': 3, 'denuncias_pendentes': 1, 'matriculados': 15}
+  CAHC04   papel=professor  duvidas=3 sem_resposta=1 matriculados=1
+  MAT00A   papel=professor  duvidas=1 sem_resposta=1 matriculados=2
+  XMAC01   papel=professor  duvidas=1 sem_resposta=1 matriculados=2
+  XDES01   papel=professor  duvidas=0 sem_resposta=0 matriculados=2
+  CRSC03   papel=professor  duvidas=1 sem_resposta=0 matriculados=2
+  CRSC04   papel=professor  duvidas=1 sem_resposta=0 matriculados=2
+  CTCO01   papel=professor  duvidas=0 sem_resposta=0 matriculados=2
+  CMAC04   papel=professor  duvidas=1 sem_resposta=0 matriculados=2
+
+--- GET /api/forum/minhas-disciplinas/?papel=monitor ---
+status: 200
+resumo: {'disciplinas': 0, 'sem_resposta': 0, 'denuncias_pendentes': 0, 'matriculados': 0}
+
+--- GET /api/auth/me/ ---
+status: 200
+e_professor=True e_monitor=False e_coordenacao=False rotulo=Professor
+
+============================================================
+MONITORA: Carla Monitora (10000000003)
+============================================================
+
+Vinculos ativos: 9
+  aluno      XDES01   periodo=1 semestre=2026.2
+  aluno      CRSC03   periodo=1 semestre=2026.2
+  aluno      MAT00A   periodo=1 semestre=2026.2
+  aluno      XMAC01   periodo=1 semestre=2026.2
+  monitor    CAHC04   periodo=1 semestre=2026.2
+  aluno      CRSC04   periodo=2 semestre=2026.2
+  aluno      CTCO01   periodo=2 semestre=2026.2
+  aluno      MAT00B   periodo=2 semestre=2026.2
+  aluno      CMAC04   periodo=2 semestre=2026.2
+
+--- GET /api/forum/minhas-disciplinas/ ---
+status: 200
+resumo: {'disciplinas': 1, 'sem_resposta': 1, 'denuncias_pendentes': 1, 'matriculados': 1}
+  CAHC04   papel=monitor    duvidas=3 sem_resposta=1 matriculados=1
+
+--- GET /api/forum/minhas-disciplinas/?papel=monitor ---
+status: 200
+resumo: {'disciplinas': 1, 'sem_resposta': 1, 'denuncias_pendentes': 1, 'matriculados': 1}
+  CAHC04   papel=monitor    duvidas=3 sem_resposta=1 matriculados=1
+
+--- GET /api/auth/me/ ---
+status: 200
+e_professor=False e_monitor=True e_coordenacao=False rotulo=Monitora

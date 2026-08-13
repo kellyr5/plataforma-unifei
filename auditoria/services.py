@@ -9,7 +9,7 @@ usuario autenticado) via thread local.
 import logging
 from typing import Optional, Any
 from django.contrib.contenttypes.models import ContentType
-from django.db import models
+from django.db import models, transaction
 from django.forms.models import model_to_dict
 
 from auditoria.models import AuditLog
@@ -60,12 +60,18 @@ def _para_texto(valor):
     """
     Converte para texto o que o JSON nao aceita.
 
-    Campos ManyToMany chegam como lista de chaves, entao a conversao precisa
-    descer um nivel. Sem isso, auditar uma disciplina com pre-requisitos
-    quebraria na gravacao, e o erro so apareceria em producao.
+    Tres casos aparecem na pratica: campos ManyToMany chegam como lista de
+    chaves, UUID e data precisam virar texto, e campos de arquivo e imagem
+    chegam como objeto do Django, nao como caminho. Este ultimo derrubava o
+    cadastro de usuario inteiro, porque a excecao acontecia dentro do bloco
+    atomico e invalidava a transacao.
     """
     if isinstance(valor, (list, tuple)):
         return [_para_texto(item) for item in valor]
+
+    # FieldFile e ImageFieldFile: guardamos o caminho, nao o objeto.
+    if hasattr(valor, 'name') and hasattr(valor, 'storage'):
+        return valor.name or None
 
     if hasattr(valor, 'hex') or hasattr(valor, 'isoformat'):
         return str(valor)
@@ -111,7 +117,12 @@ def registrar_acao(
         log_data['objeto_id'] = objeto_afetado.id
 
     try:
-        return AuditLog.objects.create(**log_data)
+        # O ponto de salvamento isola a gravacao do log da transacao de quem
+        # chamou. Sem ele, um erro aqui invalida a transacao inteira e derruba
+        # a operacao principal, que e exatamente o que a auditoria nao pode
+        # fazer: registrar o que aconteceu jamais deve impedir que aconteca.
+        with transaction.atomic():
+            return AuditLog.objects.create(**log_data)
     except Exception as exc:
         logger.error(f'Falha ao registrar AuditLog (acao={acao}): {exc}')
         return None

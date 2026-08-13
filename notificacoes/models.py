@@ -31,6 +31,8 @@ class Notificacao(models.Model):
         ('reacao_persiste', 'Reacao "duvida persiste" na sua resposta'),
         ('denuncia_resolvida', 'Sua denuncia foi resolvida'),
         ('post_removido', 'Seu post foi removido por moderacao'),
+        ('post_restrito', 'Sua publicacao foi restrita pela disciplina'),
+        ('post_liberado', 'A restricao da sua publicacao foi removida'),
         ('papel_disciplina', 'Voce foi adicionado a uma disciplina'),
         # Voluntariado
         ('inscricao_aprovada', 'Sua inscricao em voluntariado foi aprovada'),

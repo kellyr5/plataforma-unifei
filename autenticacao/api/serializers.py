@@ -106,6 +106,53 @@ class RefreshComListaRedisSerializer(TokenRefreshSerializer):
         return dados
 
 
+class UsuarioResumoSerializer(serializers.ModelSerializer):
+    """Dados minimos para escolher uma pessoa numa lista de atribuicao."""
+
+    class Meta:
+        model = Usuario
+        fields = ['id', 'nome_completo', 'cpf', 'matricula', 'email', 'ativo']
+
+
+class PreCadastroSerializer(serializers.Serializer):
+    """
+    Pre-cadastro feito pela coordenacao, no modelo do SIGAA.
+
+    A conta nasce inativa e sem senha utilizavel. Quem verificou o vinculo
+    institucional foi a coordenacao, mas a pessoa ainda precisa provar que
+    controla o email informado, e isso acontece no primeiro acesso, pelo mesmo
+    fluxo de ativacao por codigo que os demais usuarios ja usam. Assim nao
+    existe senha provisoria circulando por terceiros.
+    """
+
+    nome_completo = serializers.CharField(max_length=255)
+    cpf = serializers.CharField(max_length=14)
+    email = serializers.EmailField()
+    matricula = serializers.CharField(max_length=20, allow_blank=True, required=False)
+
+    disciplina = serializers.UUIDField(required=False, allow_null=True)
+    papel = serializers.ChoiceField(
+        choices=['aluno', 'monitor', 'professor'],
+        required=False,
+    )
+
+    def validate_cpf(self, value):
+        cpf = cpf_apenas_numeros(value)
+
+        if len(cpf) != 11:
+            raise serializers.ValidationError('CPF deve ter 11 digitos.')
+
+        return cpf
+
+    def validate(self, data):
+        if data.get('disciplina') and not data.get('papel'):
+            raise serializers.ValidationError({
+                'papel': 'Informe o papel ao vincular a pessoa a uma disciplina.'
+            })
+
+        return data
+
+
 class LogoutSerializer(serializers.Serializer):
     """Recebe o refresh token que sera invalidado no encerramento da sessao."""
 

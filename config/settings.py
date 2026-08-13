@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'notificacoes',
     'auditoria',
     'voluntariado',
+    'colaboracao',
 ]
 
 MIDDLEWARE = [

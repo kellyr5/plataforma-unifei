@@ -1,430 +1,460 @@
 /**
- * ForumPage — Listagem de topicos do forum academico.
+ * ForumPage — Fórum acadêmico, organizado por disciplina.
  *
- * Funcionalidades:
- * - Filtro por disciplina (tabs horizontais)
- * - Busca por titulo
- * - Listagem de topicos com votos, respostas, disciplina, autor
- * - Botao de criar novo topico
- * - Dados reais da API
+ * A tela tem dois estados. Sem disciplina escolhida, mostra as matérias da
+ * pessoa em cartões, com o que está acontecendo em cada uma; escolhida uma
+ * disciplina, mostra as discussões dela.
+ *
+ * A razão é o próprio desenho do fórum: a discussão pertence à turma. Uma
+ * lista única misturando dúvidas de matérias diferentes obrigava o leitor a
+ * filtrar mentalmente o que não era dele, e escondia o dado que importa, que
+ * é onde há pergunta esperando resposta.
+ *
+ * Acima dos cartões fica a faixa de pendências, com as dúvidas mais antigas
+ * ainda sem resposta. Antigo vem antes de recente de propósito: uma pergunta
+ * de ontem sem resposta é normal, uma de duas semanas é abandono.
  */
 
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import api from '../../services/api'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
-interface Disciplina {
-  id: string
-  codigo: string
-  nome: string
-  curso: string
-}
+import api from '../../services/api'
+import { useAuth } from '../../contexts/AuthContext'
 
 interface Post {
   id: string
   titulo: string
   conteudo: string
-  pontuacao: number
-  total_respostas: number
-  total_reacoes_persiste: number
-  e_melhor: boolean
   disciplina: string
   disciplina_codigo: string
-  disciplina_nome: string
   autor_nome: string
-  created_at: string
+  pontuacao: number
+  total_respostas: number
+  e_melhor: boolean
+  restrito: boolean
   post_pai: string | null
+  created_at: string
 }
 
-function tempoRelativo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const min = Math.floor(diff / 60000)
-  if (min < 1) return 'agora'
-  if (min < 60) return `ha ${min}min`
-  const h = Math.floor(min / 60)
-  if (h < 24) return `ha ${h}h`
-  const d = Math.floor(h / 24)
-  return d < 30 ? `ha ${d}d` : `ha ${Math.floor(d / 30)} mes(es)`
+interface Disciplina {
+  id: string
+  codigo: string
+  nome: string
+  papel: string
+}
+
+const AZUL = '#003087'
+
+function tempoRelativo(valor: string): string {
+  const minutos = Math.floor((Date.now() - new Date(valor).getTime()) / 60000)
+  if (minutos < 1) return 'agora'
+  if (minutos < 60) return `há ${minutos}min`
+
+  const horas = Math.floor(minutos / 60)
+  if (horas < 24) return `há ${horas}h`
+
+  const dias = Math.floor(horas / 24)
+  if (dias < 30) return `há ${dias}d`
+  return `há ${Math.floor(dias / 30)} mês(es)`
+}
+
+function diasDesde(valor: string): number {
+  return Math.floor((Date.now() - new Date(valor).getTime()) / 86400000)
 }
 
 /* ============================================================
-   COMPONENTES INTERNOS
+   Cartão de disciplina
    ============================================================ */
-
-function TopicCard({ post, onClick }: { post: Post; onClick?: () => void }) {
+function CartaoDisciplina({ disciplina, topicos, aoAbrir }: {
+  disciplina: Disciplina
+  topicos: Post[]
+  aoAbrir: () => void
+}) {
   const [hovered, setHovered] = useState(false)
-  const hasAnswers = (post.total_respostas || 0) > 0
 
-  return (
-    <div
-      className="flex rounded-xl cursor-pointer transition-all duration-200"
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        padding: '18px 20px', gap: '18px',
-        background: 'var(--bg-card)',
-        border: `1px solid ${hovered ? '#00308740' : 'var(--border)'}`,
-        boxShadow: hovered ? '0 2px 8px rgba(0,48,135,0.06)' : 'none',
-      }}
-    >
-      {/* Votos */}
-      <div className="flex flex-col items-center flex-shrink-0" style={{ minWidth: '52px', gap: '2px' }}>
-        <div className="font-bold" style={{ fontSize: '22px', color: '#003087' }}>{post.pontuacao || 0}</div>
-        <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>votos</div>
-      </div>
+  const semResposta = topicos.filter(t => t.total_respostas === 0).length
+  const ultima = topicos[0]
 
-      {/* Respostas */}
-      <div className="flex flex-col items-center flex-shrink-0" style={{
-        minWidth: '52px', gap: '2px', padding: '4px 8px', borderRadius: '8px',
-        background: hasAnswers ? 'rgba(16,185,129,0.06)' : 'transparent',
-      }}>
-        <div className="font-bold" style={{ fontSize: '18px', color: hasAnswers ? '#10B981' : 'var(--text-tertiary)' }}>
-          {post.total_respostas || 0}
-        </div>
-        <div style={{ fontSize: '11px', color: hasAnswers ? '#10B981' : 'var(--text-tertiary)' }}>respostas</div>
-      </div>
-
-      {/* Conteudo */}
-      <div className="flex-1 min-w-0">
-        <div className="font-medium" style={{ fontSize: '15px', color: 'var(--text-primary)', marginBottom: '8px', lineHeight: 1.4 }}>
-          {post.titulo || post.conteudo?.substring(0, 100)}
-        </div>
-
-        <div className="flex items-center flex-wrap" style={{ gap: '8px' }}>
-          {/* Tag da disciplina */}
-          <span className="rounded-md" style={{
-            padding: '3px 10px', fontSize: '11px', fontWeight: 500,
-            background: 'rgba(0,48,135,0.06)', color: '#003087',
-          }}>
-            {post.disciplina_codigo}{post.disciplina_nome ? ` - ${post.disciplina_nome}` : ''}
-          </span>
-
-          {/* Badge resolvido */}
-          {post.e_melhor && (
-            <span className="rounded-md flex items-center" style={{
-              padding: '3px 10px', fontSize: '11px', fontWeight: 500, gap: '4px',
-              background: 'rgba(16,185,129,0.06)', color: '#10B981',
-            }}>
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-              </svg>
-              Resolvido
-            </span>
-          )}
-
-          {/* Duvida persiste */}
-          {(post.total_reacoes_persiste || 0) > 0 && (
-            <span className="rounded-md" style={{
-              padding: '3px 10px', fontSize: '11px', fontWeight: 500,
-              background: 'rgba(245,158,11,0.06)', color: '#F59E0B',
-            }}>
-              {post.total_reacoes_persiste} dúvida(s) persiste(m)
-            </span>
-          )}
-        </div>
-
-        {/* Meta info */}
-        <div className="flex items-center" style={{ gap: '12px', marginTop: '8px', fontSize: '12px', color: 'var(--text-tertiary)' }}>
-          <span>por <strong style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>{post.autor_nome}</strong></span>
-          <span>{tempoRelativo(post.created_at)}</span>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function DisciplinaTab({ disc, active, onClick }: { disc: { id: string; codigo: string; nome: string }; active: boolean; onClick: () => void }) {
   return (
     <button
-      onClick={onClick}
-      className="flex-shrink-0 rounded-lg font-medium cursor-pointer transition-all duration-150"
+      onClick={aoAbrir}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="rounded-xl text-left cursor-pointer"
       style={{
-        padding: '8px 16px', fontSize: '13px',
-        background: active ? '#003087' : 'var(--bg-input)',
-        color: active ? 'white' : 'var(--text-secondary)',
-        border: `1px solid ${active ? '#003087' : 'var(--border)'}`,
+        padding: '18px 20px',
+        background: 'var(--bg-card)',
+        border: `1px solid ${hovered ? 'rgba(0,48,135,0.45)' : 'var(--border)'}`,
+        boxShadow: hovered ? '0 8px 20px rgba(15,23,42,0.08)' : 'none',
+        transform: hovered ? 'translateY(-2px)' : 'translateY(0)',
+        transition: 'all 0.2s ease',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px',
+        width: '100%',
       }}
     >
-      {disc.codigo}
+      <div className="flex items-start justify-between" style={{ gap: '12px' }}>
+        <div className="min-w-0">
+          <div className="font-semibold" style={{ fontSize: '14px', color: AZUL }}>
+            {disciplina.codigo}
+          </div>
+          <div style={{ fontSize: '13px', color: 'var(--text-primary)', marginTop: '2px' }}>
+            {disciplina.nome}
+          </div>
+        </div>
+
+        {disciplina.papel !== 'aluno' && (
+          <span className="rounded flex-shrink-0" style={{
+            padding: '2px 7px', fontSize: '10.5px', fontWeight: 600,
+            background: 'rgba(0,48,135,0.07)', color: AZUL,
+          }}>
+            {disciplina.papel}
+          </span>
+        )}
+      </div>
+
+      <div className="flex items-center" style={{ gap: '18px' }}>
+        <span style={{ fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+          <strong style={{ color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+            {topicos.length}
+          </strong>{' '}
+          dúvida(s)
+        </span>
+
+        {semResposta > 0 && (
+          <span style={{ fontSize: '12.5px', color: AZUL, fontWeight: 500 }}>
+            {semResposta} sem resposta
+          </span>
+        )}
+      </div>
+
+      <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
+        {ultima
+          ? `Última: "${ultima.titulo.slice(0, 46)}${ultima.titulo.length > 46 ? '…' : ''}" ${tempoRelativo(ultima.created_at)}`
+          : 'Nenhuma dúvida ainda'}
+      </div>
     </button>
   )
 }
 
 /* ============================================================
-   PAGINA PRINCIPAL DO FORUM
+   Linha de tópico
+   ============================================================ */
+function LinhaTopico({ post, mostrarDisciplina, aoAbrir }: {
+  post: Post
+  mostrarDisciplina?: boolean
+  aoAbrir: () => void
+}) {
+  const [hovered, setHovered] = useState(false)
+  const semResposta = post.total_respostas === 0
+  const dias = diasDesde(post.created_at)
+
+  return (
+    <button
+      onClick={aoAbrir}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="flex items-center text-left cursor-pointer rounded-xl w-full"
+      style={{
+        padding: '15px 18px', gap: '16px',
+        background: hovered ? 'var(--bg-hover)' : 'var(--bg-card)',
+        border: '1px solid var(--border)',
+        transition: 'background 0.15s ease',
+      }}
+    >
+      <div style={{ textAlign: 'center', minWidth: '46px' }}>
+        <div
+          className="font-semibold"
+          style={{
+            fontSize: '16px',
+            fontVariantNumeric: 'tabular-nums',
+            color: post.total_respostas > 0 ? 'var(--text-primary)' : 'var(--text-tertiary)',
+          }}
+        >
+          {post.total_respostas}
+        </div>
+        <div style={{ fontSize: '10.5px', color: 'var(--text-tertiary)' }}>
+          resposta{post.total_respostas === 1 ? '' : 's'}
+        </div>
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center" style={{ gap: '8px' }}>
+          {mostrarDisciplina && (
+            <span className="font-medium" style={{ fontSize: '11.5px', color: AZUL }}>
+              {post.disciplina_codigo}
+            </span>
+          )}
+          {post.e_melhor && (
+            <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>resolvida</span>
+          )}
+          {post.restrito && (
+            <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>restrita</span>
+          )}
+        </div>
+
+        <div className="font-medium truncate" style={{ fontSize: '14px', color: 'var(--text-primary)', marginTop: '2px' }}>
+          {post.titulo}
+        </div>
+
+        <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '3px' }}>
+          {post.autor_nome} · {tempoRelativo(post.created_at)}
+          {semResposta && dias >= 3 ? ` · aguardando há ${dias} dias` : ''}
+        </div>
+      </div>
+    </button>
+  )
+}
+
+/* ============================================================
+   Página
    ============================================================ */
 export default function ForumPage() {
   const navigate = useNavigate()
-  const [disciplinas, setDisciplinas] = useState<Disciplina[]>([])
+  const { user } = useAuth()
+
+  /* O filtro mora na URL: o painel da coordenação e os cartões do professor
+     chegam aqui já apontando uma disciplina. */
+  const [parametros, setParametros] = useSearchParams()
+  const disciplinaAtual = parametros.get('disciplina')
+  const somenteSemResposta = parametros.get('sem_resposta') === '1'
+
   const [posts, setPosts] = useState<Post[]>([])
-  const [loading, setLoading] = useState(true)
-  const [filtroDisc, setFiltroDisc] = useState<string | null>(null)
+  const [carregando, setCarregando] = useState(true)
   const [busca, setBusca] = useState('')
-  const [showNovoTopico, setShowNovoTopico] = useState(false)
+  const [buscaInput, setBuscaInput] = useState('')
 
-  /* Campos do novo topico */
-  const [novoTitulo, setNovoTitulo] = useState('')
-  const [novoConteudo, setNovoConteudo] = useState('')
-  const [novoDisciplina, setNovoDisciplina] = useState('')
-  const [criando, setCriando] = useState(false)
+  const disciplinas: Disciplina[] = useMemo(
+    () => (user?.papeis_disciplina || []).map(vinculo => ({
+      id: vinculo.disciplina_id,
+      codigo: vinculo.disciplina_codigo,
+      nome: vinculo.disciplina_nome,
+      papel: vinculo.papel,
+    })),
+    [user]
+  )
 
-  /* Carregar disciplinas */
-  useEffect(() => {
-    api.get('/forum/disciplinas/').then(res => {
-      const data = Array.isArray(res.data) ? res.data : res.data.results || []
-      setDisciplinas(data)
-    }).catch(console.error)
-  }, [])
-
-  /* Carregar posts (recarrega quando muda filtro) */
-  useEffect(() => {
-    setLoading(true)
-    const params: Record<string, string> = { ordering: '-created_at' }
-    if (filtroDisc) params.disciplina = filtroDisc
-    if (busca) params.search = busca
-
-    api.get('/forum/posts/', { params }).then(res => {
-      const data = Array.isArray(res.data) ? res.data : res.data.results || []
-      setPosts(data.filter((p: Post) => !p.post_pai))
-    }).catch(console.error).finally(() => setLoading(false))
-  }, [filtroDisc, busca])
-
-  /* Criar novo tópico */
-  async function handleCriarTopico(e: React.FormEvent) {
-    e.preventDefault()
-    if (!novoTitulo.trim() || !novoConteudo.trim() || !novoDisciplina) return
-
-    setCriando(true)
-    try {
-      await api.post('/forum/posts/', {
-        titulo: novoTitulo,
-        conteudo: novoConteudo,
-        disciplina: novoDisciplina,
-      })
-      setNovoTitulo('')
-      setNovoConteudo('')
-      setNovoDisciplina('')
-      setShowNovoTopico(false)
-      /* Recarrega os posts */
-      const params: Record<string, string> = { ordering: '-created_at' }
-      if (filtroDisc) params.disciplina = filtroDisc
-      const res = await api.get('/forum/posts/', { params })
-      const data = Array.isArray(res.data) ? res.data : res.data.results || []
-      setPosts(data.filter((p: Post) => !p.post_pai))
-    } catch (err) {
-      console.error('Erro ao criar topico:', err)
-    } finally {
-      setCriando(false)
-    }
+  function abrirDisciplina(id: string | null) {
+    const novos = new URLSearchParams()
+    if (id) novos.set('disciplina', id)
+    setParametros(novos)
   }
 
-  /* Debounce na busca */
-  const [buscaInput, setBuscaInput] = useState('')
   useEffect(() => {
-    const timer = setTimeout(() => setBusca(buscaInput), 400)
-    return () => clearTimeout(timer)
+    const temporizador = setTimeout(() => setBusca(buscaInput), 400)
+    return () => clearTimeout(temporizador)
   }, [buscaInput])
+
+  useEffect(() => {
+    setCarregando(true)
+    const params: Record<string, string> = { ordering: '-created_at', page_size: '100' }
+    if (busca) params.search = busca
+
+    api.get('/forum/posts/', { params })
+      .then(res => {
+        const dados = Array.isArray(res.data) ? res.data : res.data.results || []
+        setPosts(dados.filter((p: Post) => !p.post_pai))
+      })
+      .catch(() => setPosts([]))
+      .finally(() => setCarregando(false))
+  }, [busca])
+
+  const porDisciplina = useMemo(() => {
+    const mapa: Record<string, Post[]> = {}
+    posts.forEach(post => {
+      (mapa[post.disciplina] ||= []).push(post)
+    })
+    return mapa
+  }, [posts])
+
+  /* Pendências: sem resposta, das mais antigas para as mais recentes.
+     Uma pergunta de ontem sem resposta é normal; uma de duas semanas não. */
+  const pendentes = useMemo(
+    () => posts
+      .filter(p => p.total_respostas === 0)
+      .sort((a, b) => a.created_at.localeCompare(b.created_at))
+      .slice(0, 4),
+    [posts]
+  )
+
+  const disciplinaEscolhida = disciplinas.find(d => d.id === disciplinaAtual)
+  const ensina = !!user && (user.e_professor || user.e_coordenacao)
+
+  const topicosVisiveis = disciplinaAtual
+    ? (porDisciplina[disciplinaAtual] || []).filter(
+        p => !somenteSemResposta || p.total_respostas === 0
+      )
+    : []
+
+  const campoBusca = {
+    minWidth: '220px', maxWidth: '340px', gap: '8px',
+    padding: '9px 14px', borderRadius: '10px',
+    background: 'var(--bg-input)', border: '1px solid var(--border)',
+  }
 
   return (
     <div style={{ maxWidth: '900px' }}>
-
-      {/* Header */}
-      <div className="flex items-center justify-between" style={{ marginBottom: '24px' }}>
+      {/* Cabeçalho */}
+      <div className="flex items-end justify-between" style={{ gap: '16px', marginBottom: '20px' }}>
         <div>
-          <h1 className="font-bold tracking-tight" style={{ fontSize: '24px', color: 'var(--text-primary)', marginBottom: '4px' }}>
-            Fórum Acadêmico
-          </h1>
-          <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-            {posts.length} tópico(s) {filtroDisc ? 'nesta disciplina' : 'no total'}
+          <div className="flex items-center" style={{ gap: '10px' }}>
+            {disciplinaAtual && (
+              <button
+                onClick={() => abrirDisciplina(null)}
+                className="flex items-center justify-center rounded-lg cursor-pointer"
+                style={{
+                  width: '32px', height: '32px', background: 'var(--bg-card)',
+                  border: '1px solid var(--border)', color: 'var(--text-secondary)',
+                }}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                </svg>
+              </button>
+            )}
+
+            <h1 className="font-bold tracking-tight" style={{ fontSize: '23px', color: 'var(--text-primary)' }}>
+              {disciplinaEscolhida ? disciplinaEscolhida.codigo : 'Fórum acadêmico'}
+            </h1>
+          </div>
+
+          <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+            {disciplinaEscolhida
+              ? `${disciplinaEscolhida.nome} · ${topicosVisiveis.length} dúvida(s)${somenteSemResposta ? ' sem resposta' : ''}`
+              : 'Suas disciplinas e o que está sendo discutido em cada uma.'}
           </p>
         </div>
 
         <button
-          onClick={() => setShowNovoTopico(!showNovoTopico)}
-          className="flex items-center rounded-xl font-medium cursor-pointer transition-all duration-200 text-white"
-          style={{
-            padding: '10px 20px', gap: '8px', fontSize: '14px',
-            background: 'linear-gradient(135deg, #003087 0%, #001845 100%)',
-            boxShadow: '0 2px 8px rgba(0,48,135,0.25)',
-          }}
+          onClick={() => navigate(
+            disciplinaAtual ? `/forum/novo?disciplina=${disciplinaAtual}` : '/forum/novo'
+          )}
+          className="flex items-center rounded-xl font-medium cursor-pointer text-white flex-shrink-0"
+          style={{ padding: '10px 18px', gap: '8px', fontSize: '13.5px', border: 'none', background: AZUL }}
         >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
-          Novo tópico
+          {/* Quem leciona não tira dúvida com a própria turma: publica aviso,
+              material ou orientação. O rótulo acompanha o papel. */}
+          {ensina ? 'Nova publicação' : 'Nova dúvida'}
         </button>
       </div>
 
-      {/* Formulario de novo topico (colapsavel) */}
-      {showNovoTopico && (
-        <form onSubmit={handleCriarTopico} className="rounded-xl" style={{
-          padding: '24px', marginBottom: '24px',
-          background: 'var(--bg-card)', border: '1px solid var(--border)',
-        }}>
-          <h3 className="font-semibold" style={{ fontSize: '16px', color: 'var(--text-primary)', marginBottom: '16px' }}>
-            Criar novo tópico
-          </h3>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {/* Disciplina */}
-            <div>
-              <label className="block font-medium" style={{ fontSize: '13px', color: 'var(--text-primary)', marginBottom: '6px' }}>Disciplina</label>
-              <select
-                value={novoDisciplina}
-                onChange={e => setNovoDisciplina(e.target.value)}
-                className="w-full rounded-xl outline-none cursor-pointer"
-                style={{
-                  padding: '10px 14px', fontSize: '14px',
-                  background: 'var(--bg-input)', border: '1.5px solid var(--border)',
-                  color: 'var(--text-primary)',
-                }}
-              >
-                <option value="">Selecione a disciplina</option>
-                {disciplinas.map(d => (
-                  <option key={d.id} value={d.id}>{d.codigo} - {d.nome}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Titulo */}
-            <div>
-              <label className="block font-medium" style={{ fontSize: '13px', color: 'var(--text-primary)', marginBottom: '6px' }}>Titulo</label>
-              <input
-                type="text"
-                value={novoTitulo}
-                onChange={e => setNovoTitulo(e.target.value)}
-                placeholder="Resuma sua dúvida em uma frase"
-                className="w-full rounded-xl outline-none"
-                style={{
-                  padding: '10px 14px', fontSize: '14px',
-                  background: 'var(--bg-input)', border: '1.5px solid var(--border)',
-                  color: 'var(--text-primary)',
-                }}
-              />
-            </div>
-
-            {/* Conteudo */}
-            <div>
-              <label className="block font-medium" style={{ fontSize: '13px', color: 'var(--text-primary)', marginBottom: '6px' }}>Descricao</label>
-              <textarea
-                value={novoConteudo}
-                onChange={e => setNovoConteudo(e.target.value)}
-                placeholder="Descreva sua dúvida com detalhes..."
-                rows={4}
-                className="w-full rounded-xl outline-none resize-none"
-                style={{
-                  padding: '10px 14px', fontSize: '14px',
-                  background: 'var(--bg-input)', border: '1.5px solid var(--border)',
-                  color: 'var(--text-primary)',
-                }}
-              />
-            </div>
-
-            <div className="flex items-center" style={{ gap: '12px', justifyContent: 'flex-end' }}>
-              <button
-                type="button"
-                onClick={() => setShowNovoTopico(false)}
-                className="rounded-xl font-medium cursor-pointer transition-all duration-200"
-                style={{
-                  padding: '10px 20px', fontSize: '14px',
-                  background: 'var(--bg-input)', color: 'var(--text-secondary)',
-                  border: '1px solid var(--border)',
-                }}
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={criando || !novoTitulo.trim() || !novoConteudo.trim() || !novoDisciplina}
-                className="rounded-xl font-medium cursor-pointer transition-all duration-200 text-white"
-                style={{
-                  padding: '10px 20px', fontSize: '14px',
-                  background: '#003087', opacity: criando ? 0.7 : 1,
-                }}
-              >
-                {criando ? 'Publicando...' : 'Publicar'}
-              </button>
-            </div>
-          </div>
-        </form>
-      )}
-
-      {/* Filtros */}
-      <div className="flex items-center" style={{ gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
-
-        {/* Busca */}
-        <div className="flex items-center flex-1"
-          style={{
-            minWidth: '200px', maxWidth: '320px', gap: '8px',
-            padding: '8px 14px', borderRadius: '10px',
-            background: 'var(--bg-input)', border: '1px solid var(--border)',
-          }}>
-          <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} style={{ color: 'var(--text-tertiary)' }}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Buscar tópicos..."
-            value={buscaInput}
-            onChange={e => setBuscaInput(e.target.value)}
-            className="flex-1 bg-transparent outline-none"
-            style={{ fontSize: '13px', color: 'var(--text-primary)' }}
-          />
-        </div>
-
-        {/* Tabs de disciplinas */}
-        <div className="flex items-center" style={{ gap: '6px', overflowX: 'auto' }}>
-          <button
-            onClick={() => setFiltroDisc(null)}
-            className="flex-shrink-0 rounded-lg font-medium cursor-pointer transition-all duration-150"
-            style={{
-              padding: '8px 16px', fontSize: '13px',
-              background: !filtroDisc ? '#003087' : 'var(--bg-input)',
-              color: !filtroDisc ? 'white' : 'var(--text-secondary)',
-              border: `1px solid ${!filtroDisc ? '#003087' : 'var(--border)'}`,
-            }}
-          >
-            Todas
-          </button>
-          {disciplinas.map(d => (
-            <DisciplinaTab
-              key={d.id}
-              disc={d}
-              active={filtroDisc === d.id}
-              onClick={() => setFiltroDisc(filtroDisc === d.id ? null : d.id)}
-            />
-          ))}
-        </div>
+      {/* Busca */}
+      <div className="flex items-center" style={{ ...campoBusca, marginBottom: '20px' }}>
+        <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} style={{ color: 'var(--text-tertiary)' }}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+        </svg>
+        <input
+          type="text"
+          placeholder="Buscar em todas as suas disciplinas..."
+          value={buscaInput}
+          onChange={e => setBuscaInput(e.target.value)}
+          className="flex-1 bg-transparent outline-none"
+          style={{ fontSize: '13px', color: 'var(--text-primary)' }}
+        />
       </div>
 
-      {/* Lista de topicos */}
-      {loading ? (
-        <div className="flex items-center justify-center" style={{ height: '200px' }}>
-          <div className="flex items-center" style={{ gap: '12px', color: 'var(--text-secondary)', fontSize: '14px' }}>
-            <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
-            Carregando tópicos...
+      {carregando ? (
+        <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)' }}>Carregando fórum...</p>
+      ) : disciplinaAtual ? (
+        /* ---------- Dentro de uma disciplina ---------- */
+        topicosVisiveis.length === 0 ? (
+          <div className="rounded-xl text-center" style={{
+            padding: '48px 24px', background: 'var(--bg-card)', border: '1px solid var(--border)',
+          }}>
+            <p className="font-medium" style={{ fontSize: '15px', color: 'var(--text-primary)', marginBottom: '5px' }}>
+              Nenhuma dúvida por aqui
+            </p>
+            <p style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>
+              Seja a primeira pessoa a perguntar nesta disciplina.
+            </p>
           </div>
-        </div>
-      ) : posts.length === 0 ? (
-        <div className="rounded-xl text-center" style={{ padding: '48px', background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-          <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1} style={{ color: 'var(--text-tertiary)', margin: '0 auto 12px' }}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 01-.825-.242m9.345-8.334a2.126 2.126 0 00-.476-.095 48.64 48.64 0 00-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 1.136.845 2.1 1.976 2.193 1.234.1 2.4.163 3.548.163" />
-          </svg>
-          <p className="font-medium" style={{ fontSize: '15px', color: 'var(--text-primary)', marginBottom: '4px' }}>
-            {busca ? 'Nenhum tópico encontrado' : 'Nenhum tópico ainda'}
-          </p>
-          <p style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>
-            {busca ? 'Tente outra busca.' : 'Seja o primeiro a criar um tópico nesta disciplina!'}
-          </p>
-        </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {topicosVisiveis.map(post => (
+              <LinhaTopico key={post.id} post={post} aoAbrir={() => navigate(`/forum/${post.id}`)} />
+            ))}
+          </div>
+        )
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {posts.map(post => <TopicCard key={post.id} post={post} onClick={() => navigate(`/forum/${post.id}`)} />)}
-        </div>
+        /* ---------- Visão geral ---------- */
+        <>
+          {pendentes.length > 0 && !busca && (
+            <section style={{ marginBottom: '24px' }}>
+              <h2 className="font-semibold" style={{ fontSize: '14px', color: 'var(--text-primary)', marginBottom: '4px' }}>
+                Esperando resposta
+              </h2>
+              <p style={{ fontSize: '12.5px', color: 'var(--text-tertiary)', marginBottom: '10px' }}>
+                Dúvidas que ainda não receberam nenhuma resposta, das mais antigas primeiro.
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {pendentes.map(post => (
+                  <LinhaTopico
+                    key={post.id}
+                    post={post}
+                    mostrarDisciplina
+                    aoAbrir={() => navigate(`/forum/${post.id}`)}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {busca ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {posts.length === 0 ? (
+                <p style={{ fontSize: '13.5px', color: 'var(--text-tertiary)' }}>
+                  Nada encontrado para "{busca}".
+                </p>
+              ) : posts.map(post => (
+                <LinhaTopico
+                  key={post.id}
+                  post={post}
+                  mostrarDisciplina
+                  aoAbrir={() => navigate(`/forum/${post.id}`)}
+                />
+              ))}
+            </div>
+          ) : (
+            <section>
+              <h2 className="font-semibold" style={{ fontSize: '14px', color: 'var(--text-primary)', marginBottom: '10px' }}>
+                Suas disciplinas
+              </h2>
+
+              {disciplinas.length === 0 ? (
+                <div className="rounded-xl text-center" style={{
+                  padding: '48px 24px', background: 'var(--bg-card)', border: '1px solid var(--border)',
+                }}>
+                  <p className="font-medium" style={{ fontSize: '15px', color: 'var(--text-primary)', marginBottom: '5px' }}>
+                    Você ainda não está em nenhuma disciplina
+                  </p>
+                  <p style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>
+                    A coordenação do curso faz essa vinculação a cada semestre.
+                  </p>
+                </div>
+              ) : (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))',
+                  gap: '12px',
+                }}>
+                  {disciplinas.map(disciplina => (
+                    <CartaoDisciplina
+                      key={disciplina.id}
+                      disciplina={disciplina}
+                      topicos={porDisciplina[disciplina.id] || []}
+                      aoAbrir={() => abrirDisciplina(disciplina.id)}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+        </>
       )}
     </div>
   )
