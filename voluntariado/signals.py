@@ -46,9 +46,9 @@ def notificar_mudancas_de_status(sender, instance, created, **kwargs):
             destinatario=estudante,
             remetente=instance.avaliado_por or organizacao,
             tipo='inscricao_aprovada',
-            titulo=f'Inscricao aprovada: {op.titulo}',
+            titulo=f'Inscrição aprovada: {op.titulo}',
             mensagem=(
-                f'Sua inscricao em "{op.titulo}" foi aprovada por '
+                f'Sua inscrição em "{op.titulo}" foi aprovada por '
                 f'{organizacao.nome_completo}.'
             ),
             objeto_relacionado=op,
@@ -59,10 +59,10 @@ def notificar_mudancas_de_status(sender, instance, created, **kwargs):
             destinatario=estudante,
             remetente=instance.avaliado_por or organizacao,
             tipo='inscricao_rejeitada',
-            titulo=f'Inscricao nao aprovada: {op.titulo}',
+            titulo=f'Inscrição não aprovada: {op.titulo}',
             mensagem=(
-                f'Sua inscricao em "{op.titulo}" nao foi aprovada. '
-                f'Motivo: {instance.motivo_decisao or "Nao informado"}.'
+                f'Sua inscrição em "{op.titulo}" não foi aprovada. '
+                f'Motivo: {instance.motivo_decisao or "não informado"}.'
             ),
             objeto_relacionado=op,
         )
@@ -72,10 +72,10 @@ def notificar_mudancas_de_status(sender, instance, created, **kwargs):
             destinatario=estudante,
             remetente=instance.avaliado_por or organizacao,
             tipo='inscricao_removida',
-            titulo=f'Voce foi removido da oportunidade: {op.titulo}',
+            titulo=f'Você foi removido da oportunidade: {op.titulo}',
             mensagem=(
-                f'Voce foi removido da oportunidade "{op.titulo}". '
-                f'Motivo: {instance.motivo_decisao or "Nao informado"}.'
+                f'Você foi removido da oportunidade "{op.titulo}". '
+                f'Motivo: {instance.motivo_decisao or "não informado"}.'
             ),
             objeto_relacionado=op,
         )
@@ -85,11 +85,11 @@ def notificar_mudancas_de_status(sender, instance, created, **kwargs):
             destinatario=estudante,
             remetente=instance.avaliado_por or organizacao,
             tipo='voluntariado_concluido',
-            titulo=f'Voluntariado concluido: {op.titulo}',
+            titulo=f'Voluntariado concluído: {op.titulo}',
             mensagem=(
-                f'Sua participacao em "{op.titulo}" foi concluida com '
+                f'Sua participação em "{op.titulo}" foi concluída com '
                 f'{instance.horas_realizadas} hora(s). '
-                f'Seu certificado ja esta disponivel.'
+                f'Seu certificado já está disponível.'
             ),
             objeto_relacionado=op,
         )

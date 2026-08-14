@@ -620,7 +620,6 @@ class DisciplinaViewSet(viewsets.ModelViewSet):
 
 class PermissaoDisciplinaViewSet(viewsets.ModelViewSet):
     serializer_class = PermissaoDisciplinaSerializer
-    permission_classes = [IsAdminOrSuperuser]
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ['created_at', 'papel']
     ordering = ['-created_at']
@@ -662,8 +661,26 @@ class PermissaoDisciplinaViewSet(viewsets.ModelViewSet):
 
         return super().create(request, *args, **kwargs)
 
+    def get_permissions(self):
+        """
+        Consulta liberada a quem leciona ou monitora; escrita só a coordenacao.
+
+        O professor precisa saber quantos alunos tem na turma para dimensionar
+        os grupos, e essa informacao nao justifica dar a ele o poder de alterar
+        vinculos.
+        """
+        if self.action in ['list', 'retrieve']:
+            return [PodeModerar()]
+        return [IsAdminOrSuperuser()]
+
     def get_queryset(self):
         queryset = PermissaoDisciplina.objects.select_related('usuario', 'disciplina')
+
+        # Quem nao coordena so consulta as disciplinas em que atua.
+        if not e_administrador(self.request.user):
+            queryset = queryset.filter(
+                disciplina_id__in=disciplinas_que_modera(self.request.user)
+            )
         disciplina_id = self.request.query_params.get('disciplina')
         usuario_id = self.request.query_params.get('usuario')
         papel = self.request.query_params.get('papel')
@@ -963,10 +980,10 @@ class PostViewSet(viewsets.ModelViewSet):
             criar_notificacao(
                 destinatario=post.autor,
                 tipo='post_liberado',
-                titulo='Sua publicacao voltou a ficar visivel',
+                titulo='Sua publicação voltou a ficar visível',
                 mensagem=(
-                    f'A restricao aplicada em {post.disciplina.codigo} foi removida '
-                    f'e sua publicacao esta visivel novamente.'
+                    f'A restrição aplicada em {post.disciplina.codigo} foi removida '
+                    f'e sua publicação está visível novamente.'
                 ),
                 remetente=request.user,
                 objeto_relacionado=post.disciplina,
@@ -999,9 +1016,9 @@ class PostViewSet(viewsets.ModelViewSet):
             criar_notificacao(
                 destinatario=post.autor,
                 tipo='post_restrito',
-                titulo='Sua publicacao foi restrita',
+                titulo='Sua publicação foi restrita',
                 mensagem=(
-                    f'Sua publicacao em {post.disciplina.codigo} deixou de aparecer '
+                    f'Sua publicação em {post.disciplina.codigo} deixou de aparecer '
                     f'para os colegas. Motivo: {motivo}'
                 ),
                 remetente=request.user,
@@ -1320,10 +1337,10 @@ class AlertaConteudoViewSet(viewsets.ReadOnlyModelViewSet):
                 criar_notificacao(
                     destinatario=alerta.post.autor,
                     tipo='post_removido',
-                    titulo='Seu post foi removido pela moderacao',
+                    titulo='Sua publicação foi removida pela moderação',
                     mensagem=(
-                        f'Um conteudo seu em {alerta.post.disciplina.codigo} foi '
-                        f'removido apos analise de denuncia. Motivo: {resolucao}'
+                        f'Um conteúdo seu em {alerta.post.disciplina.codigo} foi '
+                        f'removido após análise de denúncia. Motivo: {resolucao}'
                     ),
                     remetente=request.user,
                     objeto_relacionado=alerta.post.disciplina,
@@ -1332,10 +1349,10 @@ class AlertaConteudoViewSet(viewsets.ReadOnlyModelViewSet):
             criar_notificacao(
                 destinatario=alerta.denunciante,
                 tipo='denuncia_resolvida',
-                titulo='Sua denuncia foi analisada',
+                titulo='Sua denúncia foi analisada',
                 mensagem=(
-                    f'A denuncia que voce registrou foi julgada {alerta.get_status_display().lower()}. '
-                    f'{resolucao}'
+                    f'A denúncia que você registrou foi julgada '
+                    f'{alerta.get_status_display().lower()}. {resolucao}'
                 ),
                 remetente=request.user,
                 objeto_relacionado=alerta.post.disciplina,

@@ -228,7 +228,7 @@ export default function NovoTopicoPage() {
             className="inline-flex items-center rounded-lg font-medium cursor-pointer"
             style={{
               padding: '9px 15px', gap: '7px', fontSize: '13px',
-              color: '#003087',
+              color: 'var(--accent-blue)',
               background: 'rgba(0,48,135,0.06)',
               border: '1px solid rgba(0,48,135,0.25)',
             }}
@@ -289,7 +289,7 @@ export default function NovoTopicoPage() {
             className="rounded-xl font-medium text-white cursor-pointer"
             style={{
               padding: '11px 22px', fontSize: '14px', border: 'none',
-              background: '#003087', opacity: enviando ? 0.6 : 1,
+              background: 'var(--accent-blue)', opacity: enviando ? 0.6 : 1,
             }}
           >
             {enviando ? 'Publicando...' : (ensina ? 'Publicar' : 'Publicar dúvida')}

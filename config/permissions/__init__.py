@@ -33,10 +33,32 @@ def disciplinas_que_modera(usuario):
 
 
 def pode_moderar_disciplina(usuario, disciplina) -> bool:
-    """Informa se o usuario pode moderar conteudo de uma disciplina especifica."""
+    """
+    Informa se o usuario pode moderar conteudo de uma disciplina especifica.
+
+    O administrador passa por aqui: moderacao e supervisao, e a coordenacao
+    responde pelo curso inteiro.
+    """
     if e_administrador(usuario):
         return True
 
+    return disciplina.id in set(disciplinas_que_modera(usuario))
+
+
+def leciona_disciplina(usuario, disciplina) -> bool:
+    """
+    Informa se o usuario conduz a turma: professor ou monitor com vinculo.
+
+    Diferente de pode_moderar_disciplina em um ponto decisivo: aqui o
+    administrador nao passa. A distincao e entre supervisionar e participar.
+
+    A coordenacao acompanha o curso e modera conteudo de qualquer disciplina,
+    mas nao esta matriculada em nenhuma turma e nao leciona. Organizar
+    trabalho em grupo, sortear equipes e responder duvida de grupo sao atos de
+    quem conduz a materia naquele semestre — quem conhece a turma, o enunciado
+    e o momento do conteudo. Deixar isso a cargo de um administrador global
+    seria decidir sobre uma sala em que ele nao entra.
+    """
     return disciplina.id in set(disciplinas_que_modera(usuario))
 
 

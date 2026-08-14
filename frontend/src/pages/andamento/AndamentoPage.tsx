@@ -112,7 +112,7 @@ function LinhaInteracao({ interacao, onAbrir }: {
         style={{
           padding: '2px 8px', borderRadius: '6px', fontSize: '11px',
           background: eDuvida ? 'rgba(0,48,135,0.08)' : 'var(--bg-input)',
-          color: eDuvida ? '#003087' : 'var(--text-secondary)',
+          color: eDuvida ? 'var(--accent-blue)' : 'var(--text-secondary)',
         }}
       >
         {eDuvida ? 'Dúvida' : 'Resposta'}
@@ -123,7 +123,7 @@ function LinhaInteracao({ interacao, onAbrir }: {
       </span>
 
       {interacao.e_melhor && (
-        <span className="flex-shrink-0" style={{ fontSize: '11px', color: '#10B981' }}>
+        <span className="flex-shrink-0" style={{ fontSize: '11px', color: 'var(--accent-oliva-texto)' }}>
           ajudou
         </span>
       )}
@@ -160,9 +160,9 @@ function CardDisciplina({ item, onAbrir }: {
         </div>
 
         <div className="flex items-center flex-shrink-0" style={{ gap: '8px' }}>
-          <Metrica valor={item.total_posts} rotulo="dúvidas" cor="#003087" />
+          <Metrica valor={item.total_posts} rotulo="dúvidas" cor="var(--accent-blue)" />
           <Metrica valor={item.total_respostas} rotulo="respostas" cor="var(--text-secondary)" />
-          <Metrica valor={item.total_melhores_respostas} rotulo="ajudaram" cor="#10B981" />
+          <Metrica valor={item.total_melhores_respostas} rotulo="ajudaram" cor="var(--accent-oliva)" />
         </div>
       </div>
 
@@ -173,7 +173,7 @@ function CardDisciplina({ item, onAbrir }: {
             className="cursor-pointer"
             style={{
               marginTop: '10px', fontSize: '12px', fontWeight: 500,
-              background: 'none', border: 'none', color: '#003087',
+              background: 'none', border: 'none', color: 'var(--accent-blue)',
             }}
           >
             {aberto
@@ -262,9 +262,9 @@ export default function AndamentoPage() {
           background: 'var(--bg-card)', border: '1px solid var(--border)',
         }}
       >
-        <Metrica valor={totais.posts} rotulo="dúvidas levantadas" cor="#003087" />
+        <Metrica valor={totais.posts} rotulo="dúvidas levantadas" cor="var(--accent-blue)" />
         <Metrica valor={totais.respostas} rotulo="respostas dadas" cor="var(--text-secondary)" />
-        <Metrica valor={totais.melhores} rotulo="respostas que ajudaram" cor="#10B981" />
+        <Metrica valor={totais.melhores} rotulo="respostas que ajudaram" cor="var(--accent-oliva)" />
       </div>
 
       {/* Recorte por período.
@@ -284,9 +284,9 @@ export default function AndamentoPage() {
                 className="rounded-lg font-medium cursor-pointer"
                 style={{
                   padding: '7px 13px', fontSize: '12.5px',
-                  background: ativo ? '#003087' : 'var(--bg-input)',
+                  background: ativo ? 'var(--accent-blue)' : 'var(--bg-input)',
                   color: ativo ? 'white' : 'var(--text-secondary)',
-                  border: `1px solid ${ativo ? '#003087' : 'var(--border)'}`,
+                  border: `1px solid ${ativo ? 'var(--accent-blue)' : 'var(--border)'}`,
                 }}
               >
                 {atalho.rotulo}
@@ -299,9 +299,9 @@ export default function AndamentoPage() {
             className="rounded-lg font-medium cursor-pointer"
             style={{
               padding: '7px 13px', fontSize: '12.5px',
-              background: personalizado ? '#003087' : 'var(--bg-input)',
+              background: personalizado ? 'var(--accent-blue)' : 'var(--bg-input)',
               color: personalizado ? 'white' : 'var(--text-secondary)',
-              border: `1px solid ${personalizado ? '#003087' : 'var(--border)'}`,
+              border: `1px solid ${personalizado ? 'var(--accent-blue)' : 'var(--border)'}`,
             }}
           >
             Escolher datas

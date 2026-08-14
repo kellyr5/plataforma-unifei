@@ -94,6 +94,52 @@ class Trabalho(models.Model):
         return self.total_grupos * self.tamanho_maximo
 
 
+class ArquivoTrabalho(models.Model):
+    """
+    Material de apoio anexado ao enunciado do trabalho.
+
+    O enunciado raramente cabe em texto puro: vem com a especificacao em PDF,
+    a base de dados a processar, o esqueleto de codigo, a rubrica de correcao.
+    Sem lugar para isso na plataforma, o professor acabaria distribuindo o
+    material por outro canal, e o trabalho ficaria com o enunciado aqui e os
+    arquivos em outro lugar — que e exatamente a dispersao que a plataforma
+    existe para resolver.
+
+    Fica no trabalho, e nao no grupo: e material da turma inteira. O que cada
+    grupo produz e assunto da conversa dele.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    trabalho = models.ForeignKey(
+        Trabalho,
+        on_delete=models.CASCADE,
+        related_name='arquivos',
+    )
+
+    enviado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='arquivos_de_trabalho',
+    )
+
+    arquivo = models.FileField(upload_to='trabalhos/%Y/%m/')
+    nome_original = models.CharField(max_length=255)
+    tamanho_bytes = models.BigIntegerField()
+    tipo_mime = models.CharField(max_length=100, blank=True, default='')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'arquivo_trabalho'
+        verbose_name = 'Arquivo de trabalho'
+        verbose_name_plural = 'Arquivos de trabalho'
+        ordering = ['created_at']
+
+    def __str__(self):
+        return self.nome_original
+
+
 class GrupoTrabalho(models.Model):
     """
     Um grupo dentro de um trabalho.

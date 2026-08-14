@@ -19,6 +19,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import api from '../../services/api'
+import { contar, plural } from '../../utils/plural'
 import { useAuth } from '../../contexts/AuthContext'
 
 interface Post {
@@ -43,7 +44,7 @@ interface Disciplina {
   papel: string
 }
 
-const AZUL = '#003087'
+const AZUL = 'var(--accent-blue)'
 
 function tempoRelativo(valor: string): string {
   const minutos = Math.floor((Date.now() - new Date(valor).getTime()) / 60000)
@@ -55,7 +56,8 @@ function tempoRelativo(valor: string): string {
 
   const dias = Math.floor(horas / 24)
   if (dias < 30) return `há ${dias}d`
-  return `há ${Math.floor(dias / 30)} mês(es)`
+  const meses = Math.floor(dias / 30)
+  return `há ${meses} ${plural(meses, 'mês', 'meses')}`
 }
 
 function diasDesde(valor: string): number {
@@ -119,7 +121,7 @@ function CartaoDisciplina({ disciplina, topicos, aoAbrir }: {
           <strong style={{ color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
             {topicos.length}
           </strong>{' '}
-          dúvida(s)
+          {plural(topicos.length, 'dúvida', 'dúvidas')}
         </span>
 
         {semResposta > 0 && (
@@ -321,25 +323,30 @@ export default function ForumPage() {
 
           <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', marginTop: '4px' }}>
             {disciplinaEscolhida
-              ? `${disciplinaEscolhida.nome} · ${topicosVisiveis.length} dúvida(s)${somenteSemResposta ? ' sem resposta' : ''}`
+              ? `${disciplinaEscolhida.nome} · ${contar(topicosVisiveis.length, 'dúvida', 'dúvidas')}${somenteSemResposta ? ' sem resposta' : ''}`
               : 'Suas disciplinas e o que está sendo discutido em cada uma.'}
           </p>
         </div>
 
-        <button
-          onClick={() => navigate(
-            disciplinaAtual ? `/forum/novo?disciplina=${disciplinaAtual}` : '/forum/novo'
-          )}
-          className="flex items-center rounded-xl font-medium cursor-pointer text-white flex-shrink-0"
-          style={{ padding: '10px 18px', gap: '8px', fontSize: '13.5px', border: 'none', background: AZUL }}
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-          </svg>
-          {/* Quem leciona não tira dúvida com a própria turma: publica aviso,
-              material ou orientação. O rótulo acompanha o papel. */}
-          {ensina ? 'Nova publicação' : 'Nova dúvida'}
-        </button>
+        {/* Publicar exige ter onde publicar. Sem vínculo com disciplina não há
+            destino possível, e o botão levaria a um formulário com a lista de
+            disciplinas vazia. */}
+        {disciplinas.length > 0 && (
+          <button
+            onClick={() => navigate(
+              disciplinaAtual ? `/forum/novo?disciplina=${disciplinaAtual}` : '/forum/novo'
+            )}
+            className="flex items-center rounded-xl font-medium cursor-pointer text-white flex-shrink-0"
+            style={{ padding: '10px 18px', gap: '8px', fontSize: '13.5px', border: 'none', background: AZUL }}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            {/* Quem leciona não tira dúvida com a própria turma: publica aviso,
+                material ou orientação. O rótulo acompanha o papel. */}
+            {ensina ? 'Nova publicação' : 'Nova dúvida'}
+          </button>
+        )}
       </div>
 
       {/* Busca */}
@@ -382,7 +389,11 @@ export default function ForumPage() {
       ) : (
         /* ---------- Visão geral ---------- */
         <>
-          {pendentes.length > 0 && !busca && (
+          {/* A faixa de espera é sobre as turmas de quem está olhando. Para
+              quem não tem vínculo, ela trazia dúvidas de disciplinas alheias —
+              o servidor devolve tudo a quem administra, e a tela mostrava sem
+              perguntar de quem era. */}
+          {pendentes.length > 0 && !busca && disciplinas.length > 0 && (
             <section style={{ marginBottom: '24px' }}>
               <h2 className="font-semibold" style={{ fontSize: '14px', color: 'var(--text-primary)', marginBottom: '4px' }}>
                 Esperando resposta

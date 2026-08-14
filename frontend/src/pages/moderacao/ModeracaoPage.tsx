@@ -5,9 +5,14 @@
  * fila por disciplina, então cada moderador recebe apenas o que lhe cabe
  * julgar; aqui não há filtro de permissão duplicado, só a apresentação.
  *
- * O fluxo é assumir, analisar e decidir. Assumir existe para evitar que dois
- * moderadores trabalhem no mesmo caso: quando alguém assume, os demais veem o
- * nome do responsável e o botão de decidir sai do alcance deles.
+ * Esta tela é a triagem: o que chegou, de qual disciplina, e se alguém já
+ * está cuidando. A decisão acontece em /moderacao/:id, onde o conteúdo
+ * denunciado aparece por inteiro. Separar as duas coisas evita o que havia
+ * antes — decidir a partir do título e do motivo, sem ler o que foi escrito.
+ *
+ * Assumir existe para evitar que dois moderadores trabalhem no mesmo caso:
+ * quando alguém assume, os demais veem o nome do responsável e a análise
+ * abre em leitura.
  */
 
 import { useEffect, useState } from 'react'
@@ -35,11 +40,42 @@ interface Alerta {
 
 type Filtro = 'pendente' | 'em_analise' | 'resolvidas' | 'todas'
 
-const statusConfig: Record<Alerta['status'], { rotulo: string; cor: string }> = {
-  pendente: { rotulo: 'Pendente', cor: '#F59E0B' },
-  em_analise: { rotulo: 'Em análise', cor: '#003087' },
-  procedente: { rotulo: 'Procedente', cor: '#EF4444' },
-  improcedente: { rotulo: 'Improcedente', cor: '#10B981' },
+/**
+ * Situação do caso.
+ *
+ * Azul para o que ainda exige trabalho, cinza para o que já foi decidido. Não
+ * há verde nem vermelho: procedente e improcedente são desfechos igualmente
+ * corretos da análise, e colori-los como acerto e erro sugere que o moderador
+ * deveria preferir um deles.
+ */
+const statusConfig: Record<
+  Alerta['status'],
+  { rotulo: string; fundo: string; texto: string; borda: string }
+> = {
+  pendente: {
+    rotulo: 'Pendente',
+    fundo: 'var(--accent-blue-soft)',
+    texto: 'var(--accent-blue-text)',
+    borda: 'var(--accent-blue-border)',
+  },
+  em_analise: {
+    rotulo: 'Em análise',
+    fundo: 'var(--accent-blue-soft)',
+    texto: 'var(--accent-blue-text)',
+    borda: 'var(--accent-blue-border)',
+  },
+  procedente: {
+    rotulo: 'Procedente',
+    fundo: 'var(--bg-input)',
+    texto: 'var(--text-secondary)',
+    borda: 'var(--border)',
+  },
+  improcedente: {
+    rotulo: 'Improcedente',
+    fundo: 'var(--bg-input)',
+    texto: 'var(--text-secondary)',
+    borda: 'var(--border)',
+  },
 }
 
 function dataLegivel(valor: string): string {
@@ -57,7 +93,8 @@ function Etiqueta({ status }: { status: Alerta['status'] }) {
       style={{
         padding: '3px 10px', borderRadius: '10px',
         fontSize: '11px', fontWeight: 600,
-        background: `${config.cor}15`, color: config.cor,
+        background: config.fundo, color: config.texto,
+        border: `1px solid ${config.borda}`,
       }}
     >
       {config.rotulo}
@@ -65,31 +102,22 @@ function Etiqueta({ status }: { status: Alerta['status'] }) {
   )
 }
 
-function CardDenuncia({
-  alerta, usuarioId, onAssumir, onLiberar, onResolver,
-}: {
+/**
+ * Um caso na fila.
+ *
+ * O cartão serve à triagem: o que foi denunciado, por quem, e se alguém já
+ * está cuidando. A decisão em si acontece na página de análise, porque julgar
+ * exige ler o conteúdo inteiro — e conteúdo inteiro não cabe numa lista sem
+ * transformar a triagem em rolagem.
+ */
+function CardDenuncia({ alerta, usuarioId, aoAbrir }: {
   alerta: Alerta
   usuarioId: string
-  onAssumir: (id: string) => void
-  onLiberar: (id: string) => void
-  onResolver: (id: string, decisao: string, resolucao: string) => void
+  aoAbrir: () => void
 }) {
-  const [resolucao, setResolucao] = useState('')
-  const [enviando, setEnviando] = useState(false)
-
   const resolvida = alerta.status === 'procedente' || alerta.status === 'improcedente'
   const minha = alerta.assumido_por === usuarioId
   const deOutro = !!alerta.assumido_por && !minha
-
-  async function decidir(decisao: 'procedente' | 'improcedente') {
-    if (!resolucao.trim()) {
-      toast.error('Descreva a justificativa da decisão.')
-      return
-    }
-    setEnviando(true)
-    await onResolver(alerta.id, decisao, resolucao.trim())
-    setEnviando(false)
-  }
 
   return (
     <div
@@ -145,76 +173,21 @@ function CardDenuncia({
         </div>
       )}
 
-      {/* Ação de assumir */}
-      {!resolvida && !alerta.assumido_por && (
+      {/* Entrada para a análise. Quem já assumiu volta para onde parou; quem
+          ainda não assumiu abre o caso para ler antes de decidir. */}
+      {!resolvida && (
         <button
-          onClick={() => onAssumir(alerta.id)}
+          onClick={aoAbrir}
           className="rounded-lg font-medium cursor-pointer"
           style={{
-            padding: '8px 16px', fontSize: '13px',
-            background: '#003087', color: 'white', border: 'none',
+            padding: '8px 16px', fontSize: '13px', border: 'none',
+            background: deOutro ? 'transparent' : 'var(--accent-blue)',
+            color: deOutro ? 'var(--text-secondary)' : '#FFFFFF',
+            boxShadow: deOutro ? 'inset 0 0 0 1px var(--border)' : 'none',
           }}
         >
-          Assumir análise
+          {minha ? 'Continuar análise' : deOutro ? 'Abrir somente leitura' : 'Analisar denúncia'}
         </button>
-      )}
-
-      {/* Decisão, para quem assumiu */}
-      {!resolvida && minha && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <textarea
-            value={resolucao}
-            onChange={(e) => setResolucao(e.target.value)}
-            placeholder="Justificativa da decisão. O autor do post e o denunciante recebem este texto."
-            rows={3}
-            className="w-full rounded-lg outline-none"
-            style={{
-              padding: '10px 12px', fontSize: '13px', resize: 'vertical',
-              background: 'var(--bg-input)', color: 'var(--text-primary)',
-              border: '1px solid var(--border)',
-            }}
-          />
-
-          <div className="flex items-center" style={{ gap: '8px' }}>
-            <button
-              onClick={() => decidir('procedente')}
-              disabled={enviando}
-              className="rounded-lg font-medium cursor-pointer"
-              style={{
-                padding: '8px 16px', fontSize: '13px',
-                background: '#EF4444', color: 'white', border: 'none',
-                opacity: enviando ? 0.6 : 1,
-              }}
-            >
-              Procedente e remover post
-            </button>
-
-            <button
-              onClick={() => decidir('improcedente')}
-              disabled={enviando}
-              className="rounded-lg font-medium cursor-pointer"
-              style={{
-                padding: '8px 16px', fontSize: '13px',
-                background: 'var(--bg-input)', color: 'var(--text-secondary)',
-                border: '1px solid var(--border)',
-                opacity: enviando ? 0.6 : 1,
-              }}
-            >
-              Improcedente
-            </button>
-
-            <button
-              onClick={() => onLiberar(alerta.id)}
-              className="cursor-pointer"
-              style={{
-                marginLeft: 'auto', fontSize: '12px',
-                background: 'none', border: 'none', color: 'var(--text-tertiary)',
-              }}
-            >
-              Devolver à fila
-            </button>
-          </div>
-        </div>
       )}
     </div>
   )
@@ -270,35 +243,6 @@ export default function ModeracaoPage() {
   }
 
   useEffect(() => { buscar() }, [disciplinaFiltrada])
-
-  async function assumir(id: string) {
-    try {
-      await api.post(`/forum/alertas/${id}/assumir/`)
-      await buscar()
-    } catch (err: any) {
-      toast.error(err.response?.data?.detail || 'Não foi possível assumir a denúncia.')
-      buscar()
-    }
-  }
-
-  async function liberar(id: string) {
-    try {
-      await api.post(`/forum/alertas/${id}/liberar/`)
-      await buscar()
-    } catch (err: any) {
-      toast.error(err.response?.data?.detail || 'Não foi possível liberar a denúncia.')
-    }
-  }
-
-  async function resolver(id: string, decisao: string, resolucao: string) {
-    try {
-      await api.post(`/forum/alertas/${id}/resolver/`, { decisao, resolucao })
-      toast.success('Denúncia resolvida. As partes foram notificadas.')
-      await buscar()
-    } catch (err: any) {
-      toast.error(err.response?.data?.detail || 'Não foi possível registrar a decisão.')
-    }
-  }
 
   const contagem = {
     pendente: alertas.filter(a => a.status === 'pendente').length,
@@ -356,7 +300,7 @@ export default function ModeracaoPage() {
             className="cursor-pointer"
             style={{
               marginTop: '8px', fontSize: '12.5px', fontWeight: 500,
-              background: 'none', border: 'none', color: '#003087',
+              background: 'none', border: 'none', color: 'var(--accent-blue)',
             }}
           >
             Ver todas as disciplinas
@@ -377,9 +321,9 @@ export default function ModeracaoPage() {
             className="flex items-center rounded-lg font-medium cursor-pointer"
             style={{
               padding: '8px 14px', gap: '6px', fontSize: '13px',
-              background: filtro === f.valor ? '#003087' : 'var(--bg-input)',
+              background: filtro === f.valor ? 'var(--accent-blue)' : 'var(--bg-input)',
               color: filtro === f.valor ? 'white' : 'var(--text-secondary)',
-              border: `1px solid ${filtro === f.valor ? '#003087' : 'var(--border)'}`,
+              border: `1px solid ${filtro === f.valor ? 'var(--accent-blue)' : 'var(--border)'}`,
             }}
           >
             {f.rotulo}
@@ -413,9 +357,7 @@ export default function ModeracaoPage() {
               key={alerta.id}
               alerta={alerta}
               usuarioId={user?.id || ''}
-              onAssumir={assumir}
-              onLiberar={liberar}
-              onResolver={resolver}
+              aoAbrir={() => navigate(`/moderacao/${alerta.id}`)}
             />
           ))}
         </div>

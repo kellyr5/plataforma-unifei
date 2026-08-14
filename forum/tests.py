@@ -45,6 +45,25 @@ class PermissaoDisciplinaTests(APITestCase):
 
         self.assertEqual(resposta.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_professor_consulta_a_propria_turma(self):
+        """
+        Precisa saber quantos alunos tem para dimensionar os grupos de um
+        trabalho, mas não pode alterar vínculo.
+        """
+        professor = criar_usuario(nome='Professor')
+        vincular(professor, self.disciplina, papel='professor')
+        self.client.force_authenticate(user=professor)
+
+        consulta = self.client.get(self.url, {'disciplina': str(self.disciplina.id)})
+        escrita = self.client.post(self.url, {
+            'usuario': str(self.aluno.id),
+            'disciplina': str(self.disciplina.id),
+            'papel': 'monitor',
+        })
+
+        self.assertEqual(consulta.status_code, status.HTTP_200_OK)
+        self.assertEqual(escrita.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_admin_pode_criar_vinculo(self):
         self.client.force_authenticate(user=self.admin)
 

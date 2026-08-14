@@ -8,16 +8,22 @@ import DashboardPage from './pages/dashboard/DashboardPage'
 import PainelCoordenacao from './pages/coordenacao/PainelCoordenacao'
 import DisciplinaCoordenacao from './pages/coordenacao/DisciplinaCoordenacao'
 import PainelDocente from './pages/docente/PainelDocente'
+import TrabalhosPage from './pages/grupos/TrabalhosPage'
+import NovoTrabalhoPage from './pages/grupos/NovoTrabalhoPage'
+import ConversaPage from './pages/grupos/ConversaPage'
+import AjudaPage from './pages/grupos/AjudaPage'
 import PainelOrganizacao from './pages/organizacao/PainelOrganizacao'
 import NovaOportunidade from './pages/organizacao/NovaOportunidade'
 import ParticipantesOportunidade from './pages/organizacao/ParticipantesOportunidade'
 import ForumPage from './pages/forum/ForumPage'
+import BuscaPage from './pages/busca/BuscaPage'
 import TopicPage from './pages/forum/TopicPage'
 import NovoTopicoPage from './pages/forum/NovoTopicoPage'
 import VoluntariadoPage from './pages/voluntariado/VoluntariadoPage'
 import OportunidadePage from './pages/voluntariado/OportunidadePage'
 import NotificacoesPage from './pages/notificacoes/NotificacoesPage'
 import ModeracaoPage from './pages/moderacao/ModeracaoPage'
+import AnaliseDenunciaPage from './pages/moderacao/AnaliseDenunciaPage'
 import PerfilPage from './pages/perfil/PerfilPage'
 import AndamentoPage from './pages/andamento/AndamentoPage'
 import CertificadosPage from './pages/certificados/CertificadosPage'
@@ -72,6 +78,7 @@ function App() {
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
               <Route path="/dashboard" element={<PaginaInicial />} />
               <Route path="/forum" element={<ForumPage />} />
+              <Route path="/busca" element={<BuscaPage />} />
               {/* A rota de criação vem antes da rota com parâmetro, senão
                   "novo" seria interpretado como identificador de tópico. */}
               <Route path="/forum/novo" element={<NovoTopicoPage />} />
@@ -80,6 +87,7 @@ function App() {
               <Route path="/voluntariado/:id" element={<OportunidadePage />} />
               <Route path="/notificacoes" element={<NotificacoesPage />} />
               <Route path="/moderacao" element={<ModeracaoPage />} />
+              <Route path="/moderacao/:id" element={<AnaliseDenunciaPage />} />
               <Route
                 path="/coordenacao/disciplina/:id"
                 element={<DisciplinaCoordenacao />}
@@ -93,6 +101,12 @@ function App() {
               <Route path="/perfil" element={<PerfilPage />} />
               <Route path="/andamento" element={<AndamentoPage />} />
               <Route path="/monitoria" element={<PainelDocente papel="monitor" />} />
+              {/* A rota de criação vem antes da genérica, senão "novo" seria
+                  lido como identificador de trabalho. */}
+              <Route path="/trabalhos/novo" element={<NovoTrabalhoPage />} />
+              <Route path="/trabalhos" element={<TrabalhosPage />} />
+              <Route path="/conversas/:id" element={<ConversaPage />} />
+              <Route path="/ajuda" element={<AjudaPage />} />
               <Route path="/certificados" element={<CertificadosPage />} />
               {/* Proximas telas virao aqui */}
             </Route>

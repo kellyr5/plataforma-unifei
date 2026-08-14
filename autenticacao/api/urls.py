@@ -13,10 +13,14 @@ from autenticacao.api.views import (
     RefreshView,
     BuscaUsuarioView,
     PreCadastroView,
+    EstatisticasPublicasView,
 )
 
 
 urlpatterns = [
+    # Publico, usado pela tela de entrada
+    path('estatisticas/', EstatisticasPublicasView.as_view(), name='estatisticas'),
+
     # Registro e ativacao
     path('register/', RegistroView.as_view(), name='register'),
     path('ativar/', AtivacaoView.as_view(), name='ativar'),

@@ -36,6 +36,13 @@ interface User {
   genero: 'f' | 'm' | 'n'
   matricula: string
 
+  /* Curso e período são derivados das disciplinas em que a pessoa está
+     matriculada, e não de campos do cadastro: matrícula muda a cada semestre,
+     e um dado copiado fica velho no dia seguinte. */
+  curso_nome: string
+  curso_codigo: string
+  periodo_atual: number | null
+
   /* Preenchidos apenas para a organização parceira, e usados na assinatura
      do certificado que ela emite. */
   nome_responsavel?: string

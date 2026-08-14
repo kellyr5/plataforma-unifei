@@ -10,6 +10,7 @@ import { InputField } from '../../components/ui/InputField'
 import { GearShadow } from '../../components/ui/GearShadow'
 import { Stat } from '../../components/ui/Stat'
 import { BackgroundCarousel } from '../../components/layout/BackgroundCarousel'
+import api from '../../services/api'
 
 import {
   LockIcon, CpfIcon, EmailIcon, ShieldCheckIcon,
@@ -18,8 +19,6 @@ import {
 } from '../../components/ui/Icons'
 
 import logoSymbolDark from '../../assets/logo-unifei-symbol-dark.png'
-import logoFullDark from '../../assets/logo-unifei-full-dark.png'
-import logoFullLight from '../../assets/logo-unifei-full-light.png'
 import campusBg1 from '../../assets/campus-unifei.jpeg'
 import campusBg2 from '../../assets/campus-unifei-entrada.jpg'
 
@@ -33,6 +32,7 @@ export default function LoginPage() {
   const { isAuthenticated, fetchMe } = useAuth()
   const navigate = useNavigate()
   const [mounted, setMounted] = useState(false)
+  const [numeros, setNumeros] = useState({ estudantes: 0, topicos: 0, certificados: 0 })
   const parallaxRef = useRef<HTMLDivElement>(null)
   const t = useMouseParallax(parallaxRef, 7)
 
@@ -51,6 +51,14 @@ export default function LoginPage() {
   useEffect(() => {
     const timer = setTimeout(() => setMounted(true), 150)
     return () => clearTimeout(timer)
+  }, [])
+
+  /* Contagens da tela de entrada. Ficam em zero se a consulta falhar: a tela
+     de login não pode deixar de abrir porque um número não chegou. */
+  useEffect(() => {
+    api.get('/auth/estatisticas/')
+      .then(({ data }) => setNumeros(data))
+      .catch(() => undefined)
   }, [])
 
   /* Formata CPF enquanto digita: 000.000.000-00 */
@@ -209,9 +217,26 @@ export default function LoginPage() {
         <BackgroundCarousel images={[campusBg1, campusBg2]} interval={8000} />
 
         <div className="relative z-10 flex flex-col h-full" style={{ padding: '40px' }}>
-          <div style={{ animation: mounted ? 'fade-up 0.6s ease-out' : 'none', opacity: mounted ? 1 : 0 }}>
-            <img src={logoFullDark} alt="UNIFEI" className="object-contain drop-shadow-lg login-hero__logo-top"
-              style={{ height: '40px' }} draggable={false} />
+          {/* O arquivo do letreiro tem as letras cortadas nas bordas da própria
+              imagem, e a marca aparecia como "UNIFE!". Até a assinatura oficial
+              da SECOM entrar no projeto, o nome vai em texto. */}
+          <div
+            className="login-hero__logo-top"
+            style={{
+              animation: mounted ? 'fade-up 0.6s ease-out' : 'none',
+              opacity: mounted ? 1 : 0,
+              lineHeight: 1.2,
+            }}
+          >
+            <div className="text-white font-bold" style={{ fontSize: '19px', letterSpacing: '0.09em' }}>
+              UNIFEI
+            </div>
+            <div style={{
+              fontSize: '9.5px', letterSpacing: '0.13em', textTransform: 'uppercase',
+              color: 'rgba(255,255,255,0.5)', marginTop: '2px',
+            }}>
+              Fórum acadêmico
+            </div>
           </div>
 
           <div className="flex-1 flex flex-col items-center justify-center">
@@ -230,7 +255,7 @@ export default function LoginPage() {
                 transform: `translateX(-50%) translateX(${t.x}px)`, transition: 'transform 0.3s ease-out',
               }} />
               <div style={{ animation: 'logo-float 5s ease-in-out infinite' }}>
-                <img src={logoSymbolDark} alt="Simbolo UNIFEI"
+                <img src={logoSymbolDark} alt="Símbolo da UNIFEI"
                   className="relative z-10 object-contain login-hero__logo-img"
                   style={{ width: '192px', height: '192px', transform: `translateZ(30px) translateX(${t.x}px) translateY(${t.y}px)` }}
                   draggable={false} />
@@ -241,26 +266,31 @@ export default function LoginPage() {
               <h1 className="text-white font-bold tracking-tight login-hero__title" style={{ lineHeight: '1.1', marginBottom: '16px' }}>
                 Revelemo-nos, mais por atos do que por palavras,
                 <br />
-                <span className="bg-clip-text text-transparent login-hero__gradient-text">D
-                ignos de possuir este grande país</span>
+                {/* Sem quebra de linha dentro do span: o JSX transforma a
+                    quebra em espaço, e a palavra aparecia partida como
+                    "D ignos" na tela. */}
+                <span className="bg-clip-text text-transparent login-hero__gradient-text">dignos de possuir este grande país</span>
               </h1>
               <p className="text-white/35 leading-relaxed" style={{ fontSize: '15px', maxWidth: '28rem', margin: '0 auto' }}>
-                Forum academico por disciplina integrado com voluntariado universitario.
+                Fórum acadêmico por disciplina, integrado ao voluntariado universitário.
               </p>
             </div>
 
             <div className="flex items-center" style={{ gap: '48px', marginTop: '40px', animation: mounted ? 'fade-up 0.7s ease-out 0.7s both' : 'none' }}>
-              <Stat target={1200} suffix="+" label="Estudantes" delay={1000} />
+              {/* Contagens reais, vindas da API. Eram valores fixos escritos
+                  no código — número inventado numa tela institucional não
+                  sobrevive à primeira pergunta sobre de onde ele vem. */}
+              <Stat target={numeros.estudantes} suffix="" label="Estudantes" delay={1000} />
               <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.1)' }} />
-              <Stat target={350} suffix="+" label="Topicos" delay={1200} />
+              <Stat target={numeros.topicos} suffix="" label="Tópicos" delay={1200} />
               <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.1)' }} />
-              <Stat target={89} suffix="" label="Certificados" delay={1400} />
+              <Stat target={numeros.certificados} suffix="" label="Certificados" delay={1400} />
             </div>
           </div>
 
           <div className="text-center" style={{ animation: mounted ? 'fade-in 0.5s ease-out 1.2s both' : 'none' }}>
             <p className="text-white/15 tracking-wide" style={{ fontSize: '12px' }}>
-              Universidade Federal de Itajuba — Ciencia da Computacao 2026
+              Universidade Federal de Itajubá — Ciência da Computação, 2026
             </p>
           </div>
         </div>
@@ -276,9 +306,18 @@ export default function LoginPage() {
           {theme === 'light' ? MoonIcon : SunIcon}
         </button>
 
-        <div className="lg:hidden absolute" style={{ top: '24px', left: '24px' }}>
-          <img src={theme === 'dark' ? logoFullDark : logoFullLight} alt="UNIFEI"
-            className="object-contain" style={{ height: '32px' }} draggable={false} />
+        <div className="lg:hidden absolute" style={{ top: '24px', left: '24px', lineHeight: 1.2 }}>
+          <div className="font-bold" style={{
+            fontSize: '17px', letterSpacing: '0.09em', color: 'var(--text-primary)',
+          }}>
+            UNIFEI
+          </div>
+          <div style={{
+            fontSize: '9px', letterSpacing: '0.13em', textTransform: 'uppercase',
+            color: 'var(--text-tertiary)', marginTop: '2px',
+          }}>
+            Fórum acadêmico
+          </div>
         </div>
 
         <div style={{ width: '100%', maxWidth: '440px' }}>
@@ -297,14 +336,20 @@ export default function LoginPage() {
 
               <div className="flex items-center rounded-xl login-form__badge" style={{ gap: '1px', padding: '2px 5px', marginBottom: '6px' }}>
                 {ShieldCheckIcon}
-                <span className="login-form__badge-text" style={{ fontSize: '13px' }}>Use suas credenciais do SIGAA</span>
+                {/* O selo descrevia o login como se ele usasse a senha do
+                    SIGAA. Não usa: o SIGAA entra uma única vez, no primeiro
+                    acesso, para confirmar que a pessoa é da universidade. A
+                    senha daqui é própria e fica só aqui. */}
+                <span className="login-form__badge-text" style={{ fontSize: '13px' }}>
+                  Acesso restrito à comunidade da UNIFEI
+                </span>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <InputField label="CPF" placeholder="000.000.000-00" icon={CpfIcon}
                   value={cpf} onChange={(v) => setCpf(formatCpf(v))} />
 
-                <InputField label="Senha do SIGAA" type={showPassword ? 'text' : 'password'} placeholder="Senha"
+                <InputField label="Senha" type={showPassword ? 'text' : 'password'} placeholder="Senha"
                   icon={LockIcon} rightElement={EyeToggle}
                   value={senha} onChange={setSenha}
                   labelRight={<button type="button" className="cursor-pointer font-medium login-form__link" style={{ fontSize: '13px' }}>Esqueceu a senha?</button>} />
@@ -325,7 +370,9 @@ export default function LoginPage() {
               <div className="flex items-center justify-between" style={{ marginBottom: '10px' }}>
                 <div>
                   <h2 className="text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>Primeiro Acesso</h2>
-                  <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '4px' }}>Vincule sua conta do SIGAA à plataforma</p>
+                  <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                    Confirmamos seu vínculo pelo SIGAA e você cria sua senha
+                  </p>
                 </div>
                 <button type="button" onClick={() => setMode('login')}
                   className="font-medium rounded-2xl transition-all duration-200 cursor-pointer login-form__btn-secondary"
@@ -338,7 +385,7 @@ export default function LoginPage() {
                 <div className="flex items-center" style={{ gap: '8px' }}>
                   <div className="rounded-full flex items-center justify-center font-bold text-white login-steps__active"
                     style={{ width: '24px', height: '24px', fontSize: '11px' }}>1</div>
-                  <span className="font-medium login-steps__label-active" style={{ fontSize: '13px' }}>Dados do SIGAA</span>
+                  <span className="font-medium login-steps__label-active" style={{ fontSize: '13px' }}>Validação do vínculo</span>
                 </div>
                 <div className="flex-1" style={{ height: '1px', background: 'var(--border)' }} />
                 <div className="flex items-center" style={{ gap: '2px', opacity: 0.4 }}>
@@ -353,7 +400,10 @@ export default function LoginPage() {
                   icon={EmailIcon} value={email} onChange={setEmail} />
                 <InputField label="CPF" placeholder="000.000.000-00" icon={CpfIcon}
                   value={cpf} onChange={(v) => setCpf(formatCpf(v))} />
-                <InputField label="Senha do SIGAA" type={showPassword ? 'text' : 'password'} placeholder="Sua senha do SIGAA"
+                {/* Esta é a senha que a pessoa passa a usar na plataforma. A
+                    do SIGAA nunca é pedida nem armazenada aqui: o vínculo é
+                    conferido pelo CPF e pelo email institucional. */}
+                <InputField label="Crie uma senha para esta plataforma" type={showPassword ? 'text' : 'password'} placeholder="Mínimo de 8 caracteres"
                   icon={LockIcon} rightElement={EyeToggle}
                   value={senha} onChange={setSenha} />
 

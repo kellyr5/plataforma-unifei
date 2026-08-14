@@ -1,71 +1,110 @@
 """
-Diagnostico da pagina inicial do professor e do monitor.
+Conferencia da matriz curricular importada do PPC.
 
 Uso:
-    python manage.py shell < docs/diagnostico.py
+    python manage.py shell < docs/diagnostico.py > docs/diagnostico.txt
 
-Confere o vinculo no banco e exercita o endpoint, para separar tres cenarios:
-falta de vinculo, erro na consulta, ou erro na serializacao.
+O PPC de Ciencia da Computacao preve 31 disciplinas obrigatorias. O banco tem
+uma a mais, e este script existe para descobrir qual: pode ser duplicata de
+codigo, sobra de uma importacao anterior ou disciplina criada a mao durante os
+testes. Nao remove nada; apenas descreve o que encontrou.
 """
 
-import traceback
+from collections import Counter
 
-from rest_framework.test import APIClient
+from forum.models import Curso, Disciplina, PermissaoDisciplina, Post
 
-from autenticacao.models import Usuario
-from forum.models import PermissaoDisciplina
 
-for cpf, quem in [('10000000002', 'PROFESSOR'), ('10000000003', 'MONITORA')]:
-    pessoa = Usuario.objects.filter(cpf=cpf).first()
+print('=' * 72)
+print('CURSOS')
+print('=' * 72)
 
-    print(f'\n{"=" * 60}')
-    print(f'{quem}: {pessoa}')
-    print('=' * 60)
+for curso in Curso.objects.all():
+    total = Disciplina.objects.filter(curso=curso, deleted_at__isnull=True).count()
+    obrigatorias = Disciplina.objects.filter(
+        curso=curso, deleted_at__isnull=True, optativa=False,
+    ).count()
+    print(f'{curso.codigo:<8} {curso.nome:<34} '
+          f'{total} disciplina(s), {obrigatorias} obrigatoria(s)')
 
-    if pessoa is None:
-        print('NAO EXISTE. Rode: python manage.py criar_perfis_demo')
-        continue
+print()
+print('=' * 72)
+print('OBRIGATORIAS POR PERIODO')
+print('=' * 72)
 
-    vinculos = PermissaoDisciplina.objects.filter(
-        usuario=pessoa, ativo=True,
-    ).select_related('disciplina')
+obrigatorias = Disciplina.objects.filter(
+    optativa=False, deleted_at__isnull=True,
+).order_by('periodo_sugerido', 'codigo')
 
-    print(f'\nVinculos ativos: {vinculos.count()}')
-    for vinculo in vinculos:
-        print(
-            f'  {vinculo.papel:<10} {vinculo.disciplina.codigo:<8} '
-            f'periodo={vinculo.disciplina.periodo_sugerido} '
-            f'semestre={vinculo.disciplina.semestre}'
-        )
+por_periodo = Counter(d.periodo_sugerido for d in obrigatorias)
 
-    cliente = APIClient()
-    cliente.force_authenticate(user=pessoa)
+for periodo in sorted(por_periodo):
+    print(f'  {periodo}o periodo: {por_periodo[periodo]} disciplina(s)')
 
-    for rota in ['/api/forum/minhas-disciplinas/',
-                 '/api/forum/minhas-disciplinas/?papel=monitor',
-                 '/api/auth/me/']:
-        print(f'\n--- GET {rota} ---')
-        try:
-            resposta = cliente.get(rota)
-            print(f'status: {resposta.status_code}')
+print(f'\n  Total: {obrigatorias.count()} (o PPC preve 31)')
 
-            dados = resposta.data
-            if 'me' in rota:
-                print(
-                    f"e_professor={dados.get('e_professor')} "
-                    f"e_monitor={dados.get('e_monitor')} "
-                    f"e_coordenacao={dados.get('e_coordenacao')} "
-                    f"rotulo={dados.get('rotulo_perfil')}"
-                )
-            else:
-                print(f"resumo: {dados.get('resumo')}")
-                for item in dados.get('disciplinas', []):
-                    print(
-                        f"  {item['codigo']:<8} papel={item['meu_papel']:<10} "
-                        f"duvidas={item['total_topicos']} "
-                        f"sem_resposta={item['sem_resposta']} "
-                        f"matriculados={item['matriculados']}"
-                    )
-        except Exception:
-            print('EXCECAO:')
-            traceback.print_exc()
+print()
+print('=' * 72)
+print('CODIGOS REPETIDOS')
+print('=' * 72)
+
+codigos = Counter(
+    Disciplina.objects.filter(deleted_at__isnull=True).values_list('codigo', flat=True)
+)
+repetidos = {codigo: n for codigo, n in codigos.items() if n > 1}
+
+if repetidos:
+    for codigo, n in repetidos.items():
+        print(f'  {codigo}: {n} registros')
+        for disciplina in Disciplina.objects.filter(codigo=codigo, deleted_at__isnull=True):
+            print(f'      id={disciplina.id} periodo={disciplina.periodo_sugerido} '
+                  f'nome="{disciplina.nome}" curso={disciplina.curso_id}')
+else:
+    print('  Nenhum codigo repetido.')
+
+print()
+print('=' * 72)
+print('SEM CURSO OU SEM PERIODO')
+print('=' * 72)
+
+soltas = Disciplina.objects.filter(deleted_at__isnull=True).filter(
+    curso__isnull=True,
+) | Disciplina.objects.filter(deleted_at__isnull=True, periodo_sugerido__isnull=True)
+
+for disciplina in soltas.distinct():
+    print(f'  {disciplina.codigo:<10} periodo={disciplina.periodo_sugerido} '
+          f'curso={disciplina.curso_id} nome="{disciplina.nome}" id={disciplina.id}')
+
+if not soltas.exists():
+    print('  Nenhuma.')
+
+print()
+print('=' * 72)
+print('LISTA COMPLETA DAS OBRIGATORIAS')
+print('=' * 72)
+print('  Confira contra o PPC: a que sobrar e a que deve sair.\n')
+
+for disciplina in obrigatorias:
+    vinculos = PermissaoDisciplina.objects.filter(disciplina=disciplina).count()
+    posts = Post.objects.filter(disciplina=disciplina, deleted_at__isnull=True).count()
+    print(f'  {disciplina.periodo_sugerido}o  {disciplina.codigo:<10} '
+          f'{disciplina.nome[:44]:<46} {vinculos} vinculo(s), {posts} post(s)')
+
+print()
+print('=' * 72)
+print('COMO REMOVER, DEPOIS DE IDENTIFICAR')
+print('=' * 72)
+print("""
+Soft delete preserva o historico e e o caminho seguro:
+
+    from django.utils import timezone
+    from forum.models import Disciplina
+
+    d = Disciplina.objects.get(codigo='CODIGO_AQUI')
+    d.deleted_at = timezone.now()
+    d.save(update_fields=['deleted_at'])
+
+Se a disciplina nao tiver vinculo nem post, apagar de vez tambem e seguro:
+
+    Disciplina.objects.filter(codigo='CODIGO_AQUI').delete()
+""")

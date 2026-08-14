@@ -10,10 +10,13 @@
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import toast, { Toaster } from 'react-hot-toast'
+
 import { useAuth } from '../../contexts/AuthContext'
 import api from '../../services/api'
 
 interface Andamento {
+  disciplina_id: string
   disciplina_codigo: string
   disciplina_nome: string
   total_posts: number
@@ -31,6 +34,7 @@ interface Certificado {
 
 interface Inscricao {
   id: string
+  oportunidade: string
   oportunidade_titulo: string
   status: string
   status_display: string
@@ -62,22 +66,72 @@ function StatMini({ label, value }: { label: string; value: string }) {
   )
 }
 
-function RepCard({ rep }: { rep: Andamento }) {
+/**
+ * Item de lista que leva a algum lugar.
+ *
+ * O perfil listava disciplinas, inscrições e certificados como blocos inertes:
+ * a informação estava ali, mas clicar não fazia nada, e nada na tela avisava
+ * disso. Quem chega ao perfil vindo de uma notificação quer justamente abrir o
+ * item — e a única saída era voltar ao menu e procurar de novo.
+ *
+ * O realce ao passar o mouse e a seta à direita existem para dizer, antes do
+ * clique, que ali há um destino.
+ */
+function ItemClicavel({ children, aoClicar }: {
+  children: React.ReactNode
+  aoClicar: () => void
+}) {
+  const [sobre, setSobre] = useState(false)
+
+  return (
+    <div
+      onClick={aoClicar}
+      onMouseEnter={() => setSobre(true)}
+      onMouseLeave={() => setSobre(false)}
+      className="flex items-center rounded-xl cursor-pointer"
+      style={{
+        padding: '14px 18px', gap: '14px',
+        background: sobre ? 'var(--bg-hover)' : 'var(--bg-card)',
+        border: `1px solid ${sobre ? 'var(--accent-blue-border)' : 'var(--border)'}`,
+        transition: 'background 0.15s ease, border-color 0.15s ease',
+      }}
+    >
+      {children}
+
+      <svg
+        className="w-4 h-4 flex-shrink-0"
+        fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}
+        style={{
+          color: 'var(--text-tertiary)',
+          opacity: sobre ? 1 : 0.35,
+          transform: sobre ? 'translateX(2px)' : 'none',
+          transition: 'all 0.15s ease',
+        }}
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+      </svg>
+    </div>
+  )
+}
+
+function RepCard({ rep, aoClicar }: { rep: Andamento; aoClicar: () => void }) {
   const [hovered, setHovered] = useState(false)
   return (
-    <div className="rounded-xl transition-all duration-200"
+    <div className="rounded-xl cursor-pointer"
+      onClick={aoClicar}
       onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
       style={{
-        padding: '20px', background: 'var(--bg-card)',
-        border: `1px solid ${hovered ? '#00308740' : 'var(--border)'}`,
-        boxShadow: hovered ? '0 2px 8px rgba(0,48,135,0.06)' : 'none',
+        padding: '18px 20px',
+        background: hovered ? 'var(--bg-hover)' : 'var(--bg-card)',
+        border: `1px solid ${hovered ? 'var(--accent-blue-border)' : 'var(--border)'}`,
+        transition: 'background 0.15s ease, border-color 0.15s ease',
       }}>
       <div className="flex items-center justify-between" style={{ marginBottom: '12px' }}>
-        <span className="rounded-md font-medium" style={{ padding: '3px 10px', fontSize: '12px', background: 'rgba(0,48,135,0.06)', color: '#003087' }}>
+        <span className="rounded-md font-medium" style={{ padding: '3px 10px', fontSize: '12px', background: 'var(--accent-blue-soft)', color: 'var(--accent-blue-text)' }}>
           {rep.disciplina_codigo}
         </span>
-        <span className="font-bold" style={{ fontSize: '20px', color: '#003087' }}>
-          {rep.total_posts} dúvida(s)
+        <span className="font-bold" style={{ fontSize: '19px', color: 'var(--text-primary)' }}>
+          {rep.total_posts} dúvida{rep.total_posts === 1 ? '' : 's'}
         </span>
       </div>
       <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px' }}>
@@ -107,17 +161,30 @@ function RepCard({ rep }: { rep: Andamento }) {
   )
 }
 
+/**
+ * Situação da inscrição.
+ *
+ * O estado é dito por escrito, não por cor. A escala anterior — âmbar,
+ * verde, vermelho — classificava a inscrição em atenção, sucesso e fracasso,
+ * e uma inscrição pendente não é um problema: é uma inscrição que a
+ * organização ainda vai avaliar.
+ *
+ * O vermelho permanece só na recusa, que é a única situação em que a pessoa
+ * precisa perceber de imediato que algo não seguiu adiante.
+ */
 const statusCores: Record<string, { bg: string; text: string }> = {
-  pendente: { bg: 'rgba(245,158,11,0.06)', text: '#F59E0B' },
-  aprovada: { bg: 'rgba(16,185,129,0.06)', text: '#10B981' },
-  concluida: { bg: 'rgba(0,48,135,0.06)', text: '#003087' },
-  rejeitada: { bg: 'rgba(239,68,68,0.06)', text: '#EF4444' },
-  desistente: { bg: 'rgba(107,114,128,0.06)', text: '#6B7280' },
-  removida: { bg: 'rgba(107,114,128,0.06)', text: '#6B7280' },
+  pendente: { bg: 'var(--bg-input)', text: 'var(--text-secondary)' },
+  aprovada: { bg: 'var(--accent-blue-soft)', text: 'var(--accent-blue-text)' },
+  concluida: { bg: 'rgba(174,189,9,0.10)', text: 'var(--accent-oliva-texto)' },
+  rejeitada: { bg: 'rgba(200,16,46,0.07)', text: 'var(--accent-red)' },
+  desistente: { bg: 'var(--bg-input)', text: 'var(--text-tertiary)' },
+  removida: { bg: 'var(--bg-input)', text: 'var(--text-tertiary)' },
 }
 
 export default function PerfilPage() {
-  const { user } = useAuth()
+  const { user, fetchMe } = useAuth()
+  const [enviandoFoto, setEnviandoFoto] = useState(false)
+  const [sobreFoto, setSobreFoto] = useState(false)
   const navigate = useNavigate()
   const [reputacoes, setReputacoes] = useState<Andamento[]>([])
   const [certificados, setCertificados] = useState<Certificado[]>([])
@@ -170,6 +237,37 @@ export default function PerfilPage() {
     ? user.nome_completo.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
     : 'U'
 
+  /**
+   * Envia a nova imagem de perfil.
+   *
+   * O contexto de autenticação é recarregado depois do envio porque a imagem
+   * aparece na barra superior e na lateral, não só nesta tela: atualizar
+   * apenas o estado local deixaria as três versões divergentes até o próximo
+   * recarregamento da página.
+   */
+  async function enviarFoto(arquivo: File) {
+    if (arquivo.size > 4 * 1024 * 1024) {
+      toast.error('A imagem passa de 4 MB.')
+      return
+    }
+
+    const corpo = new FormData()
+    corpo.append('foto', arquivo)
+
+    setEnviandoFoto(true)
+    try {
+      await api.patch('/auth/me/', corpo, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      await fetchMe()
+      toast.success('Imagem atualizada.')
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || 'Não foi possível enviar a imagem.')
+    } finally {
+      setEnviandoFoto(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center" style={{ height: '60vh' }}>
@@ -186,15 +284,67 @@ export default function PerfilPage() {
 
   return (
     <div style={{ maxWidth: '900px' }}>
+      <Toaster position="top-right" toastOptions={{
+        duration: 3000,
+        style: { background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border)' },
+      }} />
 
       {/* Card do perfil */}
       <div className="rounded-xl" style={{ padding: '28px', background: 'var(--bg-card)', border: '1px solid var(--border)', marginBottom: '24px' }}>
         <div className="flex items-start" style={{ gap: '20px' }}>
-          {/* Avatar */}
-          <div className="flex items-center justify-center rounded-2xl flex-shrink-0"
-            style={{ width: '72px', height: '72px', background: '#003087', color: 'white', fontSize: '24px', fontWeight: 600 }}>
-            {initials}
-          </div>
+          {/* Foto do perfil.
+              Para a organização parceira este é o logotipo que aparece em
+              cada oportunidade publicada, e por isso a troca acontece aqui, no
+              mesmo lugar em que ela vê como ficou. */}
+          <label
+            htmlFor="foto-perfil"
+            onMouseEnter={() => setSobreFoto(true)}
+            onMouseLeave={() => setSobreFoto(false)}
+            className="relative flex items-center justify-center rounded-2xl flex-shrink-0 cursor-pointer"
+            style={{
+              width: '72px', height: '72px', overflow: 'hidden',
+              background: user?.avatar_url ? 'var(--bg-input)' : 'var(--accent-blue)',
+              border: '1px solid var(--border)',
+              color: 'white', fontSize: '24px', fontWeight: 600,
+            }}
+            title="Trocar imagem"
+          >
+            {user?.avatar_url ? (
+              <img
+                src={user.avatar_url}
+                alt=""
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              />
+            ) : (
+              initials
+            )}
+
+            {/* A faixa só aparece ao passar o mouse. Fixa, ela cobria a parte
+                de baixo das iniciais e virava parte do desenho do avatar. */}
+            <span
+              className="absolute flex items-center justify-center"
+              style={{
+                left: 0, right: 0, bottom: 0, height: '20px',
+                background: 'rgba(0,0,0,0.6)', color: '#FFFFFF', fontSize: '9.5px',
+                letterSpacing: '0.04em', textTransform: 'uppercase',
+                opacity: enviandoFoto || sobreFoto ? 1 : 0,
+                transition: 'opacity 0.15s ease',
+              }}
+            >
+              {enviandoFoto ? 'enviando' : 'trocar'}
+            </span>
+          </label>
+          <input
+            id="foto-perfil"
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const arquivo = e.target.files?.[0]
+              if (arquivo) enviarFoto(arquivo)
+              e.target.value = ''
+            }}
+          />
 
           {/* Info */}
           <div className="flex-1">
@@ -204,12 +354,22 @@ export default function PerfilPage() {
             <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
               {user?.email || ''}
             </p>
+
+            {/* Curso e período. É o que qualquer sistema acadêmico mostra logo
+                abaixo do nome, e o que a pessoa procura ao abrir o próprio
+                perfil para conferir se está tudo certo. */}
+            {user?.curso_nome && (
+              <p style={{ fontSize: '13.5px', color: 'var(--text-primary)', marginTop: '2px' }}>
+                {user.curso_nome}
+                {user.periodo_atual ? ` · ${user.periodo_atual}º período` : ''}
+              </p>
+            )}
             <div className="flex items-center" style={{ gap: '10px', marginTop: '6px' }}>
               <span
                 className="rounded"
                 style={{
                   padding: '3px 9px', fontSize: '11.5px', fontWeight: 600,
-                  background: 'rgba(0,48,135,0.07)', color: '#003087',
+                  background: 'rgba(0,48,135,0.07)', color: 'var(--accent-blue)',
                 }}
               >
                 {user?.rotulo_perfil || 'Estudante'}
@@ -272,10 +432,16 @@ export default function PerfilPage() {
           <div className="flex items-center justify-between" style={{ marginBottom: '14px' }}>
             <h2 className="font-semibold" style={{ fontSize: '16px', color: 'var(--text-primary)' }}>Andamento por disciplina</h2>
             <button onClick={() => navigate('/andamento')} className="cursor-pointer font-medium"
-              style={{ fontSize: '13px', color: '#003087' }}>Ver painel completo</button>
+              style={{ fontSize: '13px', color: 'var(--accent-blue)' }}>Ver painel completo</button>
           </div>
           <div className="grid grid-cols-2" style={{ gap: '12px' }}>
-            {reputacoes.map((r, i) => <RepCard key={i} rep={r} />)}
+            {reputacoes.map(r => (
+              <RepCard
+                key={r.disciplina_codigo}
+                rep={r}
+                aoClicar={() => navigate(`/forum?disciplina=${r.disciplina_id}`)}
+              />
+            ))}
           </div>
         </div>
       )}
@@ -290,10 +456,10 @@ export default function PerfilPage() {
             {inscricoes.map(insc => {
               const cores = statusCores[insc.status] || { bg: 'var(--bg-input)', text: 'var(--text-secondary)' }
               return (
-                <div key={insc.id} className="flex items-center rounded-xl" style={{
-                  padding: '14px 18px', gap: '14px',
-                  background: 'var(--bg-card)', border: '1px solid var(--border)',
-                }}>
+                <ItemClicavel
+                  key={insc.id}
+                  aoClicar={() => navigate(`/voluntariado/${insc.oportunidade}`)}
+                >
                   <div className="flex-1 min-w-0">
                     <div className="font-medium" style={{ fontSize: '14px', color: 'var(--text-primary)' }}>
                       {insc.oportunidade_titulo}
@@ -305,7 +471,7 @@ export default function PerfilPage() {
                   }}>
                     {insc.status_display}
                   </span>
-                </div>
+                </ItemClicavel>
               )
             })}
           </div>
@@ -320,12 +486,9 @@ export default function PerfilPage() {
           </h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {certificados.map(cert => (
-              <div key={cert.id} className="flex items-center rounded-xl" style={{
-                padding: '14px 18px', gap: '14px',
-                background: 'var(--bg-card)', border: '1px solid var(--border)',
-              }}>
+              <ItemClicavel key={cert.id} aoClicar={() => navigate('/certificados')}>
                 <div className="flex items-center justify-center rounded-lg flex-shrink-0"
-                  style={{ width: '36px', height: '36px', background: 'rgba(0,48,135,0.06)', color: '#003087' }}>
+                  style={{ width: '36px', height: '36px', background: 'var(--accent-blue-soft)', color: 'var(--accent-blue-text)' }}>
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                   </svg>
@@ -333,10 +496,10 @@ export default function PerfilPage() {
                 <div className="flex-1 min-w-0">
                   <div className="font-medium" style={{ fontSize: '14px', color: 'var(--text-primary)' }}>{cert.nome_oportunidade}</div>
                   <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
-                    {cert.horas_realizadas}h | Emitido em {new Date(cert.emitido_em).toLocaleDateString('pt-BR')} | Codigo: {cert.codigo_validacao}
+                    {cert.horas_realizadas} h · emitido em {new Date(cert.emitido_em).toLocaleDateString('pt-BR')} · código {cert.codigo_validacao}
                   </div>
                 </div>
-              </div>
+              </ItemClicavel>
             ))}
           </div>
         </div>

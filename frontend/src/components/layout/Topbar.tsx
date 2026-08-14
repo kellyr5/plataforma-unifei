@@ -2,6 +2,7 @@
  * Topbar — Barra superior com busca, notificacoes e avatar.
  */
 
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../../contexts/AuthContext'
@@ -14,6 +15,7 @@ export function Topbar() {
   const { theme, toggleTheme } = useTheme()
   const { naoLidas } = useNotificacoes()
   const navigate = useNavigate()
+  const [consulta, setConsulta] = useState('')
 
   const initials = user?.nome_completo
     ? user.nome_completo.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
@@ -30,8 +32,15 @@ export function Topbar() {
         gap: '16px',
       }}
     >
-      {/* Busca */}
-      <div
+      {/* Busca no fórum. A consulta vai para /busca, que decide entre
+          comparação por significado e correspondência de termos conforme o
+          que o servidor tem disponível. */}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          const termo = consulta.trim()
+          if (termo) navigate(`/busca?q=${encodeURIComponent(termo)}`)
+        }}
         className="flex items-center flex-1"
         style={{
           maxWidth: '400px', gap: '8px',
@@ -40,22 +49,29 @@ export function Topbar() {
           fontSize: '13px', color: 'var(--text-tertiary)',
         }}
       >
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
         </svg>
         <input
           type="text"
-          placeholder="Buscar disciplinas, tópicos, oportunidades..."
+          value={consulta}
+          onChange={(e) => setConsulta(e.target.value)}
+          placeholder="Descreva a dúvida e procure no fórum..."
+          aria-label="Buscar no fórum"
           className="flex-1 bg-transparent outline-none"
           style={{ fontSize: '13px', color: 'var(--text-primary)' }}
         />
-      </div>
+      </form>
 
       {/* Acoes a direita */}
       <div className="flex items-center" style={{ marginLeft: 'auto', gap: '12px' }}>
-        {/* Toggle tema */}
+        {/* Botão só com ícone precisa de nome acessível: sem ele, o leitor de
+            tela anuncia apenas "botão" e a pessoa não sabe o que aciona. */}
         <button
           onClick={toggleTheme}
+          aria-label={
+            theme === 'light' ? 'Ativar tema escuro' : 'Ativar tema claro'
+          }
           className="flex items-center justify-center rounded-lg cursor-pointer transition-all duration-200"
           style={{ width: '36px', height: '36px', color: 'var(--text-secondary)' }}
         >
@@ -89,22 +105,28 @@ export function Topbar() {
                 border: '2px solid var(--bg-card)',
               }}
             >
-              {naoLidas > 99 ? '99+' : naoLidas}
+              {/* O número já é anunciado pelo aria-label do botão; repeti-lo
+                  aqui faria o leitor dizer a contagem duas vezes. */}
+              <span aria-hidden="true">{naoLidas > 99 ? '99+' : naoLidas}</span>
             </span>
           )}
         </button>
 
-        {/* Avatar */}
-        <div
+        {/* Era uma <div> com cursor de mão e nenhum comportamento: parecia
+            clicável, não respondia ao clique e o teclado não a alcançava.
+            Virou botão de verdade, que leva ao perfil. */}
+        <button
+          onClick={() => navigate('/perfil')}
+          aria-label={`Abrir o perfil de ${user?.nome_completo || 'usuário'}`}
           className="flex items-center justify-center rounded-full cursor-pointer"
           style={{
-            width: '34px', height: '34px',
-            background: '#003087', color: 'white',
+            width: '34px', height: '34px', border: 'none',
+            background: 'var(--accent-blue)', color: 'white',
             fontSize: '13px', fontWeight: 500,
           }}
         >
-          {initials}
-        </div>
+          <span aria-hidden="true">{initials}</span>
+        </button>
       </div>
     </header>
   )

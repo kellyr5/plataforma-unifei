@@ -121,6 +121,23 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
+  /api/auth/estatisticas/:
+    get:
+      operationId: auth_estatisticas_retrieve
+      description: Contagens agregadas para a tela de entrada.
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
   /api/auth/login/:
     post:
       operationId: auth_login_create
@@ -188,10 +205,20 @@ paths:
   /api/auth/me/:
     get:
       operationId: auth_me_retrieve
-      description: Retorna dados do usuario autenticado.
+      description: |-
+        GET   /api/auth/me/   dados do usuario autenticado
+        PATCH /api/auth/me/   altera os campos que a propria pessoa controla
+
+        Dados do usuario autenticado, incluindo os papeis que ele exerce.
+
+        Os papeis vao juntos de proposito. A interface precisa saber, logo no
+        carregamento, se deve exibir a area de moderacao ou as acoes de
+        coordenacao, e buscar isso em uma chamada separada por tela produziria
+        um piscar de itens aparecendo e sumindo. A permissao continua sendo
+        verificada no backend a cada requisicao; isto aqui e apresentacao.
       summary: Dados do usuario autenticado
       tags:
-      - auth
+      - Autenticacao
       security:
       - jwtAuth: []
       responses:
@@ -200,21 +227,69 @@ paths:
             application/json:
               schema:
                 type: object
-                properties:
-                  id:
-                    type: string
-                  nome_completo:
-                    type: string
-                  cpf:
-                    type: string
-                  email:
-                    type: string
-                  is_admin:
-                    type: boolean
-                  bio:
-                    type: string
-                  reputacao:
-                    type: integer
+                additionalProperties: {}
+          description: ''
+    patch:
+      operationId: auth_me_partial_update
+      description: |-
+        GET   /api/auth/me/   dados do usuario autenticado
+        PATCH /api/auth/me/   altera os campos que a propria pessoa controla
+
+        Dados do usuario autenticado, incluindo os papeis que ele exerce.
+
+        Os papeis vao juntos de proposito. A interface precisa saber, logo no
+        carregamento, se deve exibir a area de moderacao ou as acoes de
+        coordenacao, e buscar isso em uma chamada separada por tela produziria
+        um piscar de itens aparecendo e sumindo. A permissao continua sendo
+        verificada no backend a cada requisicao; isto aqui e apresentacao.
+      summary: Atualiza os dados editaveis do proprio perfil
+      tags:
+      - Autenticacao
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/auth/pre-cadastro/:
+    post:
+      operationId: auth_pre_cadastro_create
+      description: |-
+        POST /api/auth/pre-cadastro/
+
+        Cadastro institucional feito pela coordenacao.
+
+        Se o CPF ja existir, a pessoa nao e recriada: apenas atualizamos matricula
+        e nome, e seguimos para o vinculo. E o caso comum do monitor, que ja e
+        aluno da plataforma.
+      summary: Pre-cadastrar pessoa e vincular a disciplina
+      tags:
+      - Autenticacao
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreCadastroRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PreCadastroRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PreCadastroRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
           description: ''
   /api/auth/reenviar-codigo/:
     post:
@@ -314,6 +389,31 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
+  /api/auth/usuarios/:
+    get:
+      operationId: auth_usuarios_list
+      description: |-
+        GET /api/auth/usuarios/?busca=texto
+
+        Consulta de pessoas para as telas de atribuicao da coordenacao.
+
+        Exige ao menos tres caracteres e devolve poucos resultados de proposito:
+        e um campo de busca para encontrar alguem conhecido, nao uma listagem
+        navegavel de toda a base de usuarios.
+      summary: Buscar pessoas para atribuicao
+      tags:
+      - Autenticacao
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UsuarioResumo'
+          description: ''
   /api/auth/verify/:
     post:
       operationId: auth_verify_create
@@ -337,6 +437,887 @@ paths:
       responses:
         '200':
           description: No response body
+  /api/busca/:
+    get:
+      operationId: busca_list
+      description: |-
+        Procura publicacoes no forum das disciplinas de quem consulta.
+
+        GET /api/busca/?q=texto&disciplina=<uuid>&limite=20
+
+        A resposta traz o modo que respondeu:
+
+            semantica  comparacao por significado, com relevancia por resultado
+            textual    correspondencia dos termos digitados
+            vazia      nenhum termo informado
+      parameters:
+      - in: query
+        name: disciplina
+        schema:
+          type: string
+        description: Restringe a uma disciplina
+      - in: query
+        name: limite
+        schema:
+          type: integer
+        description: Maximo de resultados (ate 50)
+      - in: query
+        name: q
+        schema:
+          type: string
+        description: Texto procurado
+      tags:
+      - busca
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ResultadoBusca'
+          description: ''
+  /api/colaboracao/ajuda/:
+    get:
+      operationId: colaboracao_ajuda_list
+      description: |-
+        Pedidos de ajuda vindos das conversas de grupo.
+
+        Quem ensina ve os pedidos das suas disciplinas; quem pediu ve os proprios.
+        O conteudo do chat em volta continua invisivel para todos.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: Um número de página dentro do conjunto de resultados paginado.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Número de resultados a serem retornados por página.
+        schema:
+          type: integer
+      tags:
+      - colaboracao
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSolicitacaoAjudaList'
+          description: ''
+  /api/colaboracao/ajuda/{id}/:
+    get:
+      operationId: colaboracao_ajuda_retrieve
+      description: |-
+        Pedidos de ajuda vindos das conversas de grupo.
+
+        Quem ensina ve os pedidos das suas disciplinas; quem pediu ve os proprios.
+        O conteudo do chat em volta continua invisivel para todos.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Solicitacao de Ajuda.
+        required: true
+      tags:
+      - colaboracao
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitacaoAjuda'
+          description: ''
+  /api/colaboracao/ajuda/{id}/assumir/:
+    post:
+      operationId: colaboracao_ajuda_assumir_create
+      description: Sinaliza que alguem esta atendendo, evitando resposta duplicada.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Solicitacao de Ajuda.
+        required: true
+      tags:
+      - colaboracao
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SolicitacaoAjudaRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SolicitacaoAjudaRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SolicitacaoAjudaRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitacaoAjuda'
+          description: ''
+  /api/colaboracao/ajuda/{id}/responder/:
+    post:
+      operationId: colaboracao_ajuda_responder_create
+      description: |-
+        Pedidos de ajuda vindos das conversas de grupo.
+
+        Quem ensina ve os pedidos das suas disciplinas; quem pediu ve os proprios.
+        O conteudo do chat em volta continua invisivel para todos.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Solicitacao de Ajuda.
+        required: true
+      tags:
+      - colaboracao
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SolicitacaoAjudaRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SolicitacaoAjudaRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SolicitacaoAjudaRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitacaoAjuda'
+          description: ''
+  /api/colaboracao/conversas/:
+    get:
+      operationId: colaboracao_conversas_list
+      description: |-
+        Conversas de que a pessoa participa.
+
+        Nao ha criacao por aqui: a conversa de grupo nasce com o grupo, e a de
+        turma com a disciplina. Criar avulso produziria conversa sem dono.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: Um número de página dentro do conjunto de resultados paginado.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Número de resultados a serem retornados por página.
+        schema:
+          type: integer
+      tags:
+      - colaboracao
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedConversaList'
+          description: ''
+  /api/colaboracao/conversas/{id}/:
+    get:
+      operationId: colaboracao_conversas_retrieve
+      description: |-
+        Conversas de que a pessoa participa.
+
+        Nao ha criacao por aqui: a conversa de grupo nasce com o grupo, e a de
+        turma com a disciplina. Criar avulso produziria conversa sem dono.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Conversa.
+        required: true
+      tags:
+      - colaboracao
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversa'
+          description: ''
+  /api/colaboracao/conversas/{id}/marcar-lida/:
+    post:
+      operationId: colaboracao_conversas_marcar_lida_create
+      description: |-
+        Conversas de que a pessoa participa.
+
+        Nao ha criacao por aqui: a conversa de grupo nasce com o grupo, e a de
+        turma com a disciplina. Criar avulso produziria conversa sem dono.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Conversa.
+        required: true
+      tags:
+      - colaboracao
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversa'
+          description: ''
+  /api/colaboracao/conversas/{id}/mensagens/:
+    get:
+      operationId: colaboracao_conversas_mensagens_retrieve
+      description: |-
+        GET lista as mensagens; POST envia uma nova, com anexo opcional.
+
+        O envio tambem acontece pelo WebSocket. Este caminho existe para o
+        anexo, que nao trafega bem por socket, e como alternativa quando a
+        conexao em tempo real cai.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Conversa.
+        required: true
+      tags:
+      - colaboracao
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversa'
+          description: ''
+    post:
+      operationId: colaboracao_conversas_mensagens_create
+      description: |-
+        GET lista as mensagens; POST envia uma nova, com anexo opcional.
+
+        O envio tambem acontece pelo WebSocket. Este caminho existe para o
+        anexo, que nao trafega bem por socket, e como alternativa quando a
+        conexao em tempo real cai.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Conversa.
+        required: true
+      tags:
+      - colaboracao
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversa'
+          description: ''
+  /api/colaboracao/grupos/:
+    get:
+      operationId: colaboracao_grupos_list
+      description: Grupos de um trabalho, com entrada e saida dos participantes.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: Um número de página dentro do conjunto de resultados paginado.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Número de resultados a serem retornados por página.
+        schema:
+          type: integer
+      tags:
+      - colaboracao
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGrupoTrabalhoList'
+          description: ''
+    post:
+      operationId: colaboracao_grupos_create
+      description: Grupos de um trabalho, com entrada e saida dos participantes.
+      tags:
+      - colaboracao
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GrupoTrabalhoRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/GrupoTrabalhoRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/GrupoTrabalhoRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GrupoTrabalho'
+          description: ''
+  /api/colaboracao/grupos/{id}/:
+    get:
+      operationId: colaboracao_grupos_retrieve
+      description: Grupos de um trabalho, com entrada e saida dos participantes.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Grupo de Trabalho.
+        required: true
+      tags:
+      - colaboracao
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GrupoTrabalho'
+          description: ''
+    put:
+      operationId: colaboracao_grupos_update
+      description: Grupos de um trabalho, com entrada e saida dos participantes.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Grupo de Trabalho.
+        required: true
+      tags:
+      - colaboracao
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GrupoTrabalhoRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/GrupoTrabalhoRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/GrupoTrabalhoRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GrupoTrabalho'
+          description: ''
+    patch:
+      operationId: colaboracao_grupos_partial_update
+      description: Grupos de um trabalho, com entrada e saida dos participantes.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Grupo de Trabalho.
+        required: true
+      tags:
+      - colaboracao
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedGrupoTrabalhoRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedGrupoTrabalhoRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedGrupoTrabalhoRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GrupoTrabalho'
+          description: ''
+    delete:
+      operationId: colaboracao_grupos_destroy
+      description: Grupos de um trabalho, com entrada e saida dos participantes.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Grupo de Trabalho.
+        required: true
+      tags:
+      - colaboracao
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/colaboracao/grupos/{id}/definir-lider/:
+    post:
+      operationId: colaboracao_grupos_definir_lider_create
+      description: |-
+        Troca a lideranca.
+
+        Pode ser feito pelo lider atual ou por quem leciona. Deixar a cargo do
+        grupo evita que o professor precise mediar cada ajuste interno.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Grupo de Trabalho.
+        required: true
+      tags:
+      - colaboracao
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GrupoTrabalhoRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/GrupoTrabalhoRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/GrupoTrabalhoRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GrupoTrabalho'
+          description: ''
+  /api/colaboracao/grupos/{id}/entrar/:
+    post:
+      operationId: colaboracao_grupos_entrar_create
+      description: Grupos de um trabalho, com entrada e saida dos participantes.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Grupo de Trabalho.
+        required: true
+      tags:
+      - colaboracao
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GrupoTrabalhoRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/GrupoTrabalhoRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/GrupoTrabalhoRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GrupoTrabalho'
+          description: ''
+  /api/colaboracao/grupos/{id}/sair/:
+    post:
+      operationId: colaboracao_grupos_sair_create
+      description: Grupos de um trabalho, com entrada e saida dos participantes.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Grupo de Trabalho.
+        required: true
+      tags:
+      - colaboracao
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GrupoTrabalhoRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/GrupoTrabalhoRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/GrupoTrabalhoRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GrupoTrabalho'
+          description: ''
+  /api/colaboracao/mensagens/{id}/pedir-ajuda/:
+    post:
+      operationId: colaboracao_mensagens_pedir_ajuda_create
+      description: |-
+        Marca a mensagem como duvida e encaminha a quem ensina.
+
+        Somente esta mensagem e a descricao saem do grupo. E o unico ponto em
+        que conteudo da conversa privada chega ao professor.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Mensagem.
+        required: true
+      tags:
+      - colaboracao
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MensagemChatRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MensagemChatRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MensagemChatRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MensagemChat'
+          description: ''
+  /api/colaboracao/trabalhos/:
+    get:
+      operationId: colaboracao_trabalhos_list
+      description: |-
+        Trabalhos em grupo de uma disciplina.
+
+        Quem cursa a disciplina consulta; criar e alterar cabe a quem leciona ou
+        monitora, porque a divisao em grupos e decisao pedagogica.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: Um número de página dentro do conjunto de resultados paginado.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Número de resultados a serem retornados por página.
+        schema:
+          type: integer
+      tags:
+      - colaboracao
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTrabalhoList'
+          description: ''
+    post:
+      operationId: colaboracao_trabalhos_create
+      description: |-
+        Trabalhos em grupo de uma disciplina.
+
+        Quem cursa a disciplina consulta; criar e alterar cabe a quem leciona ou
+        monitora, porque a divisao em grupos e decisao pedagogica.
+      tags:
+      - colaboracao
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrabalhoRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TrabalhoRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TrabalhoRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trabalho'
+          description: ''
+  /api/colaboracao/trabalhos/{id}/:
+    get:
+      operationId: colaboracao_trabalhos_retrieve
+      description: |-
+        Trabalhos em grupo de uma disciplina.
+
+        Quem cursa a disciplina consulta; criar e alterar cabe a quem leciona ou
+        monitora, porque a divisao em grupos e decisao pedagogica.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Trabalho em Grupo.
+        required: true
+      tags:
+      - colaboracao
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trabalho'
+          description: ''
+    put:
+      operationId: colaboracao_trabalhos_update
+      description: |-
+        Trabalhos em grupo de uma disciplina.
+
+        Quem cursa a disciplina consulta; criar e alterar cabe a quem leciona ou
+        monitora, porque a divisao em grupos e decisao pedagogica.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Trabalho em Grupo.
+        required: true
+      tags:
+      - colaboracao
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrabalhoRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TrabalhoRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TrabalhoRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trabalho'
+          description: ''
+    patch:
+      operationId: colaboracao_trabalhos_partial_update
+      description: |-
+        Trabalhos em grupo de uma disciplina.
+
+        Quem cursa a disciplina consulta; criar e alterar cabe a quem leciona ou
+        monitora, porque a divisao em grupos e decisao pedagogica.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Trabalho em Grupo.
+        required: true
+      tags:
+      - colaboracao
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTrabalhoRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTrabalhoRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTrabalhoRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trabalho'
+          description: ''
+    delete:
+      operationId: colaboracao_trabalhos_destroy
+      description: |-
+        Trabalhos em grupo de uma disciplina.
+
+        Quem cursa a disciplina consulta; criar e alterar cabe a quem leciona ou
+        monitora, porque a divisao em grupos e decisao pedagogica.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Trabalho em Grupo.
+        required: true
+      tags:
+      - colaboracao
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/colaboracao/trabalhos/{id}/criar-grupos/:
+    post:
+      operationId: colaboracao_trabalhos_criar_grupos_create
+      description: Cria os grupos vazios previstos, para os alunos se organizarem.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Trabalho em Grupo.
+        required: true
+      tags:
+      - colaboracao
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrabalhoRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TrabalhoRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TrabalhoRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trabalho'
+          description: ''
+  /api/colaboracao/trabalhos/{id}/sortear/:
+    post:
+      operationId: colaboracao_trabalhos_sortear_create
+      description: Distribui os matriculados entre os grupos, por sorteio.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Trabalho em Grupo.
+        required: true
+      tags:
+      - colaboracao
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrabalhoRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TrabalhoRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TrabalhoRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trabalho'
+          description: ''
   /api/forum/alertas/:
     get:
       operationId: forum_alertas_list
@@ -528,6 +1509,39 @@ paths:
               schema:
                 $ref: '#/components/schemas/AlertaConteudo'
           description: ''
+  /api/forum/andamento/:
+    get:
+      operationId: forum_andamento_retrieve
+      description: |-
+        GET /api/forum/andamento/
+
+        Painel de acompanhamento do usuario, por disciplina.
+
+        Substitui a antiga area de reputacao. A diferenca nao e apenas de nome: em
+        vez de atribuir pontos e comparar pessoas, aqui o usuario ve o proprio
+        percurso na materia, quantas duvidas levantou, quantas respondeu e quantas
+        das suas respostas ajudaram alguem. O objetivo e o acompanhamento
+        individual, nao a competicao.
+
+        Alem dos totais, devolve a lista das interacoes com o identificador do
+        topico correspondente, para que a tela consiga levar o usuario direto a
+        discussao em que ele participou. Numa resposta, o topico e o post pai;
+        numa duvida, e o proprio post.
+
+        Aceita ?desde=AAAA-MM-DD e ?ate=AAAA-MM-DD para recortar por periodo.
+      summary: Meu andamento por disciplina
+      tags:
+      - Forum
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
   /api/forum/arquivos/:
     get:
       operationId: forum_arquivos_list
@@ -609,9 +1623,213 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/forum/cursos/:
+    get:
+      operationId: forum_cursos_list
+      description: |-
+        Cursos de graduacao.
+
+        Consulta liberada a qualquer pessoa autenticada, porque a lista organiza a
+        navegacao do forum. Manutencao restrita a coordenacao.
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Qual campo usar ao ordenar os resultados.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: Um número de página dentro do conjunto de resultados paginado.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Número de resultados a serem retornados por página.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: Um termo de busca.
+        schema:
+          type: string
+      tags:
+      - forum
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCursoList'
+          description: ''
+    post:
+      operationId: forum_cursos_create
+      description: |-
+        Cursos de graduacao.
+
+        Consulta liberada a qualquer pessoa autenticada, porque a lista organiza a
+        navegacao do forum. Manutencao restrita a coordenacao.
+      tags:
+      - forum
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CursoRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CursoRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CursoRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Curso'
+          description: ''
+  /api/forum/cursos/{id}/:
+    get:
+      operationId: forum_cursos_retrieve
+      description: |-
+        Cursos de graduacao.
+
+        Consulta liberada a qualquer pessoa autenticada, porque a lista organiza a
+        navegacao do forum. Manutencao restrita a coordenacao.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Curso.
+        required: true
+      tags:
+      - forum
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Curso'
+          description: ''
+    put:
+      operationId: forum_cursos_update
+      description: |-
+        Cursos de graduacao.
+
+        Consulta liberada a qualquer pessoa autenticada, porque a lista organiza a
+        navegacao do forum. Manutencao restrita a coordenacao.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Curso.
+        required: true
+      tags:
+      - forum
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CursoRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CursoRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CursoRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Curso'
+          description: ''
+    patch:
+      operationId: forum_cursos_partial_update
+      description: |-
+        Cursos de graduacao.
+
+        Consulta liberada a qualquer pessoa autenticada, porque a lista organiza a
+        navegacao do forum. Manutencao restrita a coordenacao.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Curso.
+        required: true
+      tags:
+      - forum
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCursoRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCursoRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCursoRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Curso'
+          description: ''
+    delete:
+      operationId: forum_cursos_destroy
+      description: |-
+        Cursos de graduacao.
+
+        Consulta liberada a qualquer pessoa autenticada, porque a lista organiza a
+        navegacao do forum. Manutencao restrita a coordenacao.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Curso.
+        required: true
+      tags:
+      - forum
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/forum/disciplinas/:
     get:
       operationId: forum_disciplinas_list
+      description: |-
+        Disciplinas da universidade.
+
+        Qualquer pessoa autenticada consulta, porque a lista alimenta a navegacao
+        do forum. Criar, alterar e remover cabe apenas a coordenacao, que e quem
+        conhece a oferta do curso no semestre.
       parameters:
       - name: ordering
         required: false
@@ -650,6 +1868,12 @@ paths:
           description: ''
     post:
       operationId: forum_disciplinas_create
+      description: |-
+        Disciplinas da universidade.
+
+        Qualquer pessoa autenticada consulta, porque a lista alimenta a navegacao
+        do forum. Criar, alterar e remover cabe apenas a coordenacao, que e quem
+        conhece a oferta do curso no semestre.
       tags:
       - forum
       requestBody:
@@ -676,6 +1900,12 @@ paths:
   /api/forum/disciplinas/{id}/:
     get:
       operationId: forum_disciplinas_retrieve
+      description: |-
+        Disciplinas da universidade.
+
+        Qualquer pessoa autenticada consulta, porque a lista alimenta a navegacao
+        do forum. Criar, alterar e remover cabe apenas a coordenacao, que e quem
+        conhece a oferta do curso no semestre.
       parameters:
       - in: path
         name: id
@@ -697,6 +1927,12 @@ paths:
           description: ''
     put:
       operationId: forum_disciplinas_update
+      description: |-
+        Disciplinas da universidade.
+
+        Qualquer pessoa autenticada consulta, porque a lista alimenta a navegacao
+        do forum. Criar, alterar e remover cabe apenas a coordenacao, que e quem
+        conhece a oferta do curso no semestre.
       parameters:
       - in: path
         name: id
@@ -730,6 +1966,12 @@ paths:
           description: ''
     patch:
       operationId: forum_disciplinas_partial_update
+      description: |-
+        Disciplinas da universidade.
+
+        Qualquer pessoa autenticada consulta, porque a lista alimenta a navegacao
+        do forum. Criar, alterar e remover cabe apenas a coordenacao, que e quem
+        conhece a oferta do curso no semestre.
       parameters:
       - in: path
         name: id
@@ -762,6 +2004,12 @@ paths:
           description: ''
     delete:
       operationId: forum_disciplinas_destroy
+      description: |-
+        Disciplinas da universidade.
+
+        Qualquer pessoa autenticada consulta, porque a lista alimenta a navegacao
+        do forum. Criar, alterar e remover cabe apenas a coordenacao, que e quem
+        conhece a oferta do curso no semestre.
       parameters:
       - in: path
         name: id
@@ -777,6 +2025,62 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/forum/minhas-disciplinas/:
+    get:
+      operationId: forum_minhas_disciplinas_retrieve
+      description: |-
+        GET /api/forum/minhas-disciplinas/?papel=professor|monitor
+
+        Disciplinas em que a pessoa atua, com o que exige acao em cada uma.
+
+        E a pagina inicial de quem leciona ou monitora. A ordenacao segue o mesmo
+        princípio do painel da coordenacao: primeiro o que esta esperando por
+        alguem. Uma disciplina com tres duvidas sem resposta ha dias importa mais
+        do que outra com trinta duvidas ja respondidas.
+      summary: Disciplinas em que atuo, com pendencias
+      tags:
+      - Forum
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/forum/painel-coordenacao/:
+    get:
+      operationId: forum_painel_coordenacao_retrieve
+      description: |-
+        GET /api/forum/painel-coordenacao/?curso={id}&semestre=2026.2
+
+        Visao do curso no semestre, repartida por disciplina.
+
+        A literatura de learning analytics chama isso de painel de nivel
+        intermediario: mostra o conjunto e permite descer ate a disciplina que
+        precisa de atencao. Por isso a ordenacao nao e alfabetica nem por codigo,
+        e sim por duvidas sem resposta: quem coordena precisa ver primeiro onde
+        esta faltando apoio, nao onde tudo corre bem.
+
+        O tempo ate a primeira resposta e o indicador mais revelador do conjunto.
+        Muitas duvidas com resposta rapida indicam turma ativa e bem acompanhada;
+        poucas duvidas com resposta lenta costumam indicar que os alunos pararam
+        de perguntar porque ninguem respondia.
+      summary: Painel da coordenacao por disciplina
+      tags:
+      - Forum
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
   /api/forum/permissoes/:
     get:
       operationId: forum_permissoes_list
@@ -812,6 +2116,13 @@ paths:
           description: ''
     post:
       operationId: forum_permissoes_create
+      description: |-
+        Cria ou atualiza o vinculo da pessoa com a disciplina.
+
+        Uma pessoa tem um unico papel por disciplina, garantido por constraint.
+        Quando a coordenacao promove alguem que ja e aluno a monitor, o certo
+        e trocar o papel, e nao recusar por duplicidade: era o que acontecia,
+        e a mensagem de erro do banco nao dizia nada a quem estava na tela.
       tags:
       - forum
       requestBody:
@@ -843,8 +2154,6 @@ paths:
         name: id
         schema:
           type: string
-          format: uuid
-        description: Um string UUID que identifica este Permissao de Disciplina.
         required: true
       tags:
       - forum
@@ -864,8 +2173,6 @@ paths:
         name: id
         schema:
           type: string
-          format: uuid
-        description: Um string UUID que identifica este Permissao de Disciplina.
         required: true
       tags:
       - forum
@@ -897,8 +2204,6 @@ paths:
         name: id
         schema:
           type: string
-          format: uuid
-        description: Um string UUID que identifica este Permissao de Disciplina.
         required: true
       tags:
       - forum
@@ -929,8 +2234,6 @@ paths:
         name: id
         schema:
           type: string
-          format: uuid
-        description: Um string UUID que identifica este Permissao de Disciplina.
         required: true
       tags:
       - forum
@@ -1050,8 +2353,6 @@ paths:
         name: id
         schema:
           type: string
-          format: uuid
-        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -1084,8 +2385,6 @@ paths:
         name: id
         schema:
           type: string
-          format: uuid
-        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -1130,8 +2429,6 @@ paths:
         name: id
         schema:
           type: string
-          format: uuid
-        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -1175,8 +2472,6 @@ paths:
         name: id
         schema:
           type: string
-          format: uuid
-        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -1198,8 +2493,6 @@ paths:
         name: id
         schema:
           type: string
-          format: uuid
-        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -1230,8 +2523,6 @@ paths:
         name: id
         schema:
           type: string
-          format: uuid
-        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -1265,8 +2556,6 @@ paths:
         name: id
         schema:
           type: string
-          format: uuid
-        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -1312,8 +2601,6 @@ paths:
         name: id
         schema:
           type: string
-          format: uuid
-        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -1358,8 +2645,6 @@ paths:
         name: id
         schema:
           type: string
-          format: uuid
-        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -1389,8 +2674,6 @@ paths:
         name: id
         schema:
           type: string
-          format: uuid
-        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -1435,8 +2718,6 @@ paths:
         name: id
         schema:
           type: string
-          format: uuid
-        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -1466,8 +2747,6 @@ paths:
         name: id
         schema:
           type: string
-          format: uuid
-        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -1480,6 +2759,69 @@ paths:
               schema:
                 $ref: '#/components/schemas/Post'
           description: ''
+  /api/forum/posts/{id}/restringir/:
+    post:
+      operationId: forum_posts_restringir_create
+      description: |-
+        POST /posts/{id}/restringir/    restringe, exigindo motivo
+        DELETE /posts/{id}/restringir/  libera novamente
+
+        Recurso pedagogico do monitor e do professor, distinto da remocao por
+        denuncia. O post sai da vista dos colegas mas continua acessivel ao
+        autor, com o motivo, para que ele entenda o que precisa corrigir sem
+        ser exposto a turma.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - forum
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PostRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+          description: ''
+    delete:
+      operationId: forum_posts_restringir_destroy
+      description: |-
+        POST /posts/{id}/restringir/    restringe, exigindo motivo
+        DELETE /posts/{id}/restringir/  libera novamente
+
+        Recurso pedagogico do monitor e do professor, distinto da remocao por
+        denuncia. O post sai da vista dos colegas mas continua acessivel ao
+        autor, com o motivo, para que ele entenda o que precisa corrigir sem
+        ser exposto a turma.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - forum
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/forum/posts/{id}/visualizar/:
     post:
       operationId: forum_posts_visualizar_create
@@ -1501,8 +2843,6 @@ paths:
         name: id
         schema:
           type: string
-          format: uuid
-        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -1548,8 +2888,6 @@ paths:
         name: id
         schema:
           type: string
-          format: uuid
-        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -1594,8 +2932,6 @@ paths:
         name: id
         schema:
           type: string
-          format: uuid
-        description: Um string UUID que identifica este Post.
         required: true
       tags:
       - forum
@@ -1610,12 +2946,18 @@ paths:
       description: |-
         Notificacoes do usuario autenticado.
 
+        A notificacao pertence a quem a recebeu, entao ele pode descarta-la. Nao
+        ha soft delete aqui: o aviso e efemero por natureza, e o que precisa ficar
+        registrado para prestacao de contas ja esta no log de auditoria.
+
         Acoes:
-        - GET /notificacoes/ -- lista todas (com filtro ?lida=true|false)
-        - GET /notificacoes/{id}/ -- detalha
-        - GET /notificacoes/nao-lidas/ -- contador rapido
-        - POST /notificacoes/{id}/marcar-lida/ -- marca uma como lida
-        - POST /notificacoes/marcar-todas-lidas/ -- marca todas como lidas
+        - GET    /notificacoes/                        lista (filtros ?lida= e ?tipo=)
+        - GET    /notificacoes/{id}/                   detalha
+        - DELETE /notificacoes/{id}/                   exclui uma
+        - GET    /notificacoes/nao-lidas/              contador rapido
+        - POST   /notificacoes/{id}/marcar-lida/       marca uma como lida
+        - POST   /notificacoes/marcar-todas-lidas/     marca todas como lidas
+        - POST   /notificacoes/limpar/                 exclui varias de uma vez
       parameters:
       - name: ordering
         required: false
@@ -1652,12 +2994,18 @@ paths:
       description: |-
         Notificacoes do usuario autenticado.
 
+        A notificacao pertence a quem a recebeu, entao ele pode descarta-la. Nao
+        ha soft delete aqui: o aviso e efemero por natureza, e o que precisa ficar
+        registrado para prestacao de contas ja esta no log de auditoria.
+
         Acoes:
-        - GET /notificacoes/ -- lista todas (com filtro ?lida=true|false)
-        - GET /notificacoes/{id}/ -- detalha
-        - GET /notificacoes/nao-lidas/ -- contador rapido
-        - POST /notificacoes/{id}/marcar-lida/ -- marca uma como lida
-        - POST /notificacoes/marcar-todas-lidas/ -- marca todas como lidas
+        - GET    /notificacoes/                        lista (filtros ?lida= e ?tipo=)
+        - GET    /notificacoes/{id}/                   detalha
+        - DELETE /notificacoes/{id}/                   exclui uma
+        - GET    /notificacoes/nao-lidas/              contador rapido
+        - POST   /notificacoes/{id}/marcar-lida/       marca uma como lida
+        - POST   /notificacoes/marcar-todas-lidas/     marca todas como lidas
+        - POST   /notificacoes/limpar/                 exclui varias de uma vez
       parameters:
       - in: path
         name: id
@@ -1677,6 +3025,38 @@ paths:
               schema:
                 $ref: '#/components/schemas/Notificacao'
           description: ''
+    delete:
+      operationId: notificacoes_destroy
+      description: |-
+        Notificacoes do usuario autenticado.
+
+        A notificacao pertence a quem a recebeu, entao ele pode descarta-la. Nao
+        ha soft delete aqui: o aviso e efemero por natureza, e o que precisa ficar
+        registrado para prestacao de contas ja esta no log de auditoria.
+
+        Acoes:
+        - GET    /notificacoes/                        lista (filtros ?lida= e ?tipo=)
+        - GET    /notificacoes/{id}/                   detalha
+        - DELETE /notificacoes/{id}/                   exclui uma
+        - GET    /notificacoes/nao-lidas/              contador rapido
+        - POST   /notificacoes/{id}/marcar-lida/       marca uma como lida
+        - POST   /notificacoes/marcar-todas-lidas/     marca todas como lidas
+        - POST   /notificacoes/limpar/                 exclui varias de uma vez
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Notificacao.
+        required: true
+      tags:
+      - notificacoes
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/notificacoes/{id}/marcar-lida/:
     post:
       operationId: notificacoes_marcar_lida_create
@@ -1689,6 +3069,26 @@ paths:
           format: uuid
         description: Um string UUID que identifica este Notificacao.
         required: true
+      tags:
+      - notificacoes
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notificacao'
+          description: ''
+  /api/notificacoes/limpar/:
+    post:
+      operationId: notificacoes_limpar_create
+      description: |-
+        Exclui notificacoes em lote.
+
+        Sem parametros, remove apenas as ja lidas, que e o caso comum de
+        arrumar a caixa sem perder o que ainda nao foi visto. Com
+        {"ids": [...]}, remove as indicadas. Com {"todas": true}, remove tudo.
       tags:
       - notificacoes
       security:
@@ -1729,135 +3129,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Notificacao'
-          description: ''
-  /api/reputacao/disciplina/{disciplina_id}/:
-    get:
-      operationId: reputacao_disciplina_retrieve
-      description: |-
-        GET /api/reputacao/disciplina/{disciplina_id}/
-
-        Retorna o ranking ao vivo de uma disciplina, ordenado por pontos.
-        Aceita ?limite=N para limitar o numero de posicoes (default 50).
-      summary: Ranking ao vivo de uma disciplina
-      parameters:
-      - in: path
-        name: disciplina_id
-        schema:
-          type: string
-          format: uuid
-        required: true
-      tags:
-      - Reputacao
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: {}
-          description: ''
-  /api/reputacao/minha/:
-    get:
-      operationId: reputacao_minha_list
-      description: |-
-        GET /api/reputacao/minha/
-
-        Retorna a reputacao do usuario autenticado em todas as disciplinas
-        onde ele tem pontuacao registrada.
-      summary: Minha reputacao em todas as disciplinas
-      tags:
-      - Reputacao
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/UsuarioDisciplinaReputacao'
-          description: ''
-  /api/reputacao/ranking-semestral/:
-    get:
-      operationId: reputacao_ranking_semestral_list
-      description: |-
-        Consulta de rankings semestrais historicos.
-
-        - GET /api/reputacao/ranking-semestral/ -- lista (filtros: disciplina, semestre)
-        - POST /api/reputacao/ranking-semestral/gerar/ -- gera snapshot (so admin)
-      parameters:
-      - name: page
-        required: false
-        in: query
-        description: Um número de página dentro do conjunto de resultados paginado.
-        schema:
-          type: integer
-      - name: page_size
-        required: false
-        in: query
-        description: Número de resultados a serem retornados por página.
-        schema:
-          type: integer
-      tags:
-      - reputacao
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedRankingSemestralList'
-          description: ''
-  /api/reputacao/ranking-semestral/{id}/:
-    get:
-      operationId: reputacao_ranking_semestral_retrieve
-      description: |-
-        Consulta de rankings semestrais historicos.
-
-        - GET /api/reputacao/ranking-semestral/ -- lista (filtros: disciplina, semestre)
-        - POST /api/reputacao/ranking-semestral/gerar/ -- gera snapshot (so admin)
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: Um string UUID que identifica este Ranking Semestral.
-        required: true
-      tags:
-      - reputacao
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RankingSemestral'
-          description: ''
-  /api/reputacao/ranking-semestral/gerar/:
-    post:
-      operationId: reputacao_ranking_semestral_gerar_create
-      description: |-
-        Gera um snapshot do ranking semestral de uma disciplina.
-
-        Body esperado: {"disciplina": "<uuid>", "semestre": "2026.1"}
-        Se ja existir ranking para essa disciplina/semestre, e substituido.
-        A operacao e atomica: ou o ranking inteiro e regerado, ou nada muda.
-      tags:
-      - reputacao
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RankingSemestral'
           description: ''
   /api/voluntariado/certificados/:
     get:
@@ -2262,13 +3533,13 @@ paths:
       - voluntariado
       requestBody:
         content:
-          application/json:
+          multipart/form-data:
             schema:
               $ref: '#/components/schemas/OportunidadeRequest'
           application/x-www-form-urlencoded:
             schema:
               $ref: '#/components/schemas/OportunidadeRequest'
-          multipart/form-data:
+          application/json:
             schema:
               $ref: '#/components/schemas/OportunidadeRequest'
         required: true
@@ -2329,13 +3600,13 @@ paths:
       - voluntariado
       requestBody:
         content:
-          application/json:
+          multipart/form-data:
             schema:
               $ref: '#/components/schemas/OportunidadeRequest'
           application/x-www-form-urlencoded:
             schema:
               $ref: '#/components/schemas/OportunidadeRequest'
-          multipart/form-data:
+          application/json:
             schema:
               $ref: '#/components/schemas/OportunidadeRequest'
         required: true
@@ -2368,13 +3639,13 @@ paths:
       - voluntariado
       requestBody:
         content:
-          application/json:
+          multipart/form-data:
             schema:
               $ref: '#/components/schemas/PatchedOportunidadeRequest'
           application/x-www-form-urlencoded:
             schema:
               $ref: '#/components/schemas/PatchedOportunidadeRequest'
-          multipart/form-data:
+          application/json:
             schema:
               $ref: '#/components/schemas/PatchedOportunidadeRequest'
       security:
@@ -2425,13 +3696,13 @@ paths:
       - voluntariado
       requestBody:
         content:
-          application/json:
+          multipart/form-data:
             schema:
               $ref: '#/components/schemas/OportunidadeRequest'
           application/x-www-form-urlencoded:
             schema:
               $ref: '#/components/schemas/OportunidadeRequest'
-          multipart/form-data:
+          application/json:
             schema:
               $ref: '#/components/schemas/OportunidadeRequest'
         required: true
@@ -2467,6 +3738,29 @@ paths:
               schema:
                 $ref: '#/components/schemas/Oportunidade'
           description: ''
+  /api/voluntariado/oportunidades/minhas/:
+    get:
+      operationId: voluntariado_oportunidades_minhas_retrieve
+      description: |-
+        GET /api/voluntariado/oportunidades/minhas/
+
+        Painel da organizacao: o que ela publicou e como cada vaga esta.
+
+        Traz as contagens por situacao porque e disso que a organizacao
+        precisa para agir. Inscricao pendente exige decisao dela; aprovada
+        aguardando conclusao exige acompanhamento; e a vaga sem ninguem
+        inscrito perto do prazo indica anuncio que nao alcancou ninguem.
+      tags:
+      - voluntariado
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Oportunidade'
+          description: ''
 components:
   schemas:
     AcaoEnum:
@@ -2480,6 +3774,7 @@ components:
       - post_criado
       - post_editado
       - post_removido
+      - post_restrito
       - marcou_melhor
       - desmarcou_melhor
       - denunciou
@@ -2502,6 +3797,7 @@ components:
         * `post_criado` - Post criado
         * `post_editado` - Post editado
         * `post_removido` - Post removido
+        * `post_restrito` - Publicacao restrita pela disciplina
         * `marcou_melhor` - Marcou resposta como melhor
         * `desmarcou_melhor` - Desmarcou melhor resposta
         * `denunciou` - Denunciou conteudo
@@ -2535,6 +3831,23 @@ components:
           readOnly: true
         disciplina_codigo:
           type: string
+          readOnly: true
+        post_conteudo:
+          type: string
+          readOnly: true
+        post_autor_nome:
+          type: string
+          readOnly: true
+        post_criado_em:
+          type: string
+          format: date-time
+          readOnly: true
+        post_removido:
+          type: boolean
+          readOnly: true
+        topico_id:
+          type: string
+          description: O proprio post, se for topico; o topico pai, se for resposta.
           readOnly: true
         motivo:
           type: string
@@ -2586,12 +3899,17 @@ components:
       - id
       - motivo
       - post
+      - post_autor_nome
+      - post_conteudo
+      - post_criado_em
+      - post_removido
       - post_titulo
       - resolucao
       - resolvido_em
       - resolvido_por
       - resolvido_por_nome
       - status
+      - topico_id
     AlertaConteudoRequest:
       type: object
       properties:
@@ -2835,6 +4153,159 @@ components:
       - nome_estudante
       - nome_oportunidade
       - nome_organizacao
+    Conversa:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        tipo:
+          allOf:
+          - $ref: '#/components/schemas/ConversaTipoEnum'
+          readOnly: true
+        titulo:
+          type: string
+          readOnly: true
+        disciplina:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+          description: Preenchido nas conversas de turma e de grupo
+        grupo:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        semestre:
+          type: string
+          readOnly: true
+        arquivada_em:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+          description: Preenchido no encerramento do semestre; torna a conversa somente
+            leitura
+        total_participantes:
+          type: integer
+          readOnly: true
+        nao_lidas:
+          type: integer
+          readOnly: true
+        ultima_mensagem:
+          type: object
+          additionalProperties: {}
+          nullable: true
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - arquivada_em
+      - created_at
+      - disciplina
+      - grupo
+      - id
+      - nao_lidas
+      - semestre
+      - tipo
+      - titulo
+      - total_participantes
+      - ultima_mensagem
+    ConversaTipoEnum:
+      enum:
+      - disciplina
+      - grupo
+      - privada
+      type: string
+      description: |-
+        * `disciplina` - Turma da disciplina
+        * `grupo` - Grupo de trabalho
+        * `privada` - Conversa privada
+    Curso:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        codigo:
+          type: string
+          maxLength: 20
+        nome:
+          type: string
+          maxLength: 255
+        grau:
+          type: string
+          description: Bacharelado, licenciatura, tecnologico
+          maxLength: 30
+        versao_ppc:
+          type: string
+          description: 'Versao do PPC que originou a matriz, ex: Jan/2025'
+          maxLength: 30
+        periodos:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          description: Quantidade de periodos previstos na matriz
+        ativo:
+          type: boolean
+        total_disciplinas:
+          type: integer
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - codigo
+      - created_at
+      - id
+      - nome
+      - total_disciplinas
+    CursoRequest:
+      type: object
+      properties:
+        codigo:
+          type: string
+          minLength: 1
+          maxLength: 20
+        nome:
+          type: string
+          minLength: 1
+          maxLength: 255
+        grau:
+          type: string
+          minLength: 1
+          description: Bacharelado, licenciatura, tecnologico
+          maxLength: 30
+        versao_ppc:
+          type: string
+          description: 'Versao do PPC que originou a matriz, ex: Jan/2025'
+          maxLength: 30
+        periodos:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          description: Quantidade de periodos previstos na matriz
+        ativo:
+          type: boolean
+      required:
+      - codigo
+      - nome
+    DestinoEnum:
+      enum:
+      - monitoria
+      - professor
+      - ambos
+      type: string
+      description: |-
+        * `monitoria` - Monitoria
+        * `professor` - Professor
+        * `ambos` - Monitoria e professor
     Disciplina:
       type: object
       properties:
@@ -2850,10 +4321,42 @@ components:
           maxLength: 255
         curso:
           type: string
-          maxLength: 100
+          format: uuid
+          nullable: true
+          description: Nulo em disciplinas de outros institutos ainda nao cadastradas
+        curso_codigo:
+          type: string
+          readOnly: true
+        curso_nome:
+          type: string
+          readOnly: true
+        periodo_sugerido:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          nullable: true
+          description: Periodo previsto na matriz curricular
+        carga_horaria:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          nullable: true
+          description: Carga horaria total em horas
+        optativa:
+          type: boolean
+        pre_requisitos:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Disciplinas que precisam ser cursadas antes
+        pre_requisitos_codigos:
+          type: array
+          items: {}
+          readOnly: true
         semestre:
           type: string
-          description: 'Ex: 2026.1'
+          description: 'Semestre de oferta, ex: 2026.1'
           maxLength: 10
         ativo:
           type: boolean
@@ -2864,9 +4367,11 @@ components:
       required:
       - codigo
       - created_at
-      - curso
+      - curso_codigo
+      - curso_nome
       - id
       - nome
+      - pre_requisitos_codigos
       - semestre
     DisciplinaRequest:
       type: object
@@ -2881,20 +4386,109 @@ components:
           maxLength: 255
         curso:
           type: string
-          minLength: 1
-          maxLength: 100
+          format: uuid
+          nullable: true
+          description: Nulo em disciplinas de outros institutos ainda nao cadastradas
+        periodo_sugerido:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          nullable: true
+          description: Periodo previsto na matriz curricular
+        carga_horaria:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          nullable: true
+          description: Carga horaria total em horas
+        optativa:
+          type: boolean
+        pre_requisitos:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Disciplinas que precisam ser cursadas antes
         semestre:
           type: string
           minLength: 1
-          description: 'Ex: 2026.1'
+          description: 'Semestre de oferta, ex: 2026.1'
           maxLength: 10
         ativo:
           type: boolean
       required:
       - codigo
-      - curso
       - nome
       - semestre
+    GrupoTrabalho:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        trabalho:
+          type: string
+          format: uuid
+        nome:
+          type: string
+          maxLength: 120
+        descricao:
+          type: string
+        especificacao_propria:
+          type: string
+          description: Tema especifico deste grupo. Vazio significa usar o do trabalho.
+        membros:
+          type: array
+          items:
+            $ref: '#/components/schemas/MembroGrupo'
+          readOnly: true
+        total_membros:
+          type: integer
+          readOnly: true
+        vagas_restantes:
+          type: integer
+          readOnly: true
+        conversa_id:
+          type: string
+          nullable: true
+          description: |-
+            Identificador da conversa, apenas para quem participa do grupo.
+
+            Quem esta de fora ve o grupo e sua composicao, porque isso e publico na
+            turma, mas nao recebe o caminho para a conversa privada.
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - conversa_id
+      - created_at
+      - id
+      - membros
+      - nome
+      - total_membros
+      - trabalho
+      - vagas_restantes
+    GrupoTrabalhoRequest:
+      type: object
+      properties:
+        trabalho:
+          type: string
+          format: uuid
+        nome:
+          type: string
+          minLength: 1
+          maxLength: 120
+        descricao:
+          type: string
+        especificacao_propria:
+          type: string
+          description: Tema especifico deste grupo. Vazio significa usar o do trabalho.
+      required:
+      - nome
+      - trabalho
     InscricaoVoluntariado:
       type: object
       description: Serializa inscricoes de voluntariado.
@@ -3021,6 +4615,110 @@ components:
           minLength: 1
       required:
       - refresh
+    MembroGrupo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        usuario:
+          type: string
+          format: uuid
+        usuario_nome:
+          type: string
+          readOnly: true
+        e_lider:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - usuario
+      - usuario_nome
+    MembroGrupoRequest:
+      type: object
+      properties:
+        usuario:
+          type: string
+          format: uuid
+        e_lider:
+          type: boolean
+      required:
+      - usuario
+    MensagemChat:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        conversa:
+          type: string
+          format: uuid
+          readOnly: true
+        autor:
+          type: string
+          format: uuid
+          readOnly: true
+        autor_nome:
+          type: string
+          readOnly: true
+        conteudo:
+          type: string
+        arquivo:
+          type: string
+          format: uri
+          nullable: true
+        arquivo_url:
+          type: string
+          nullable: true
+          readOnly: true
+        nome_original:
+          type: string
+          readOnly: true
+        tipo_midia:
+          $ref: '#/components/schemas/TipoMidiaEnum'
+        tem_pedido_ajuda:
+          type: boolean
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - arquivo_url
+      - autor
+      - autor_nome
+      - conversa
+      - created_at
+      - id
+      - nome_original
+      - tem_pedido_ajuda
+    MensagemChatRequest:
+      type: object
+      properties:
+        conteudo:
+          type: string
+        arquivo:
+          type: string
+          format: binary
+          nullable: true
+        tipo_midia:
+          $ref: '#/components/schemas/TipoMidiaEnum'
+    ModoFormacaoEnum:
+      enum:
+      - professor
+      - alunos
+      - sorteio
+      type: string
+      description: |-
+        * `professor` - O professor monta os grupos
+        * `alunos` - Os alunos se organizam
+        * `sorteio` - Sorteio automatico entre os matriculados
     Notificacao:
       type: object
       description: Serializa notificacoes para a API.
@@ -3031,7 +4729,7 @@ components:
           readOnly: true
         tipo:
           allOf:
-          - $ref: '#/components/schemas/TipoEnum'
+          - $ref: '#/components/schemas/NotificacaoTipoEnum'
           readOnly: true
         tipo_display:
           type: string
@@ -3088,6 +4786,44 @@ components:
       - tipo
       - tipo_display
       - titulo
+    NotificacaoTipoEnum:
+      enum:
+      - nova_resposta
+      - voto_recebido
+      - melhor_resposta
+      - reacao_persiste
+      - denuncia_resolvida
+      - post_removido
+      - post_restrito
+      - post_liberado
+      - papel_disciplina
+      - ajuda_solicitada
+      - ajuda_respondida
+      - grupo_formado
+      - mensagem_grupo
+      - inscricao_aprovada
+      - inscricao_rejeitada
+      - inscricao_removida
+      - voluntariado_concluido
+      type: string
+      description: |-
+        * `nova_resposta` - Nova resposta no seu topico
+        * `voto_recebido` - Novo voto no seu post
+        * `melhor_resposta` - Sua resposta foi marcada como melhor
+        * `reacao_persiste` - Reacao "duvida persiste" na sua resposta
+        * `denuncia_resolvida` - Sua denuncia foi resolvida
+        * `post_removido` - Seu post foi removido por moderacao
+        * `post_restrito` - Sua publicacao foi restrita pela disciplina
+        * `post_liberado` - A restricao da sua publicacao foi removida
+        * `papel_disciplina` - Voce foi adicionado a uma disciplina
+        * `ajuda_solicitada` - Pedido de ajuda em um grupo de trabalho
+        * `ajuda_respondida` - Seu pedido de ajuda foi respondido
+        * `grupo_formado` - Voce foi incluido em um grupo de trabalho
+        * `mensagem_grupo` - Nova mensagem no seu grupo
+        * `inscricao_aprovada` - Sua inscricao em voluntariado foi aprovada
+        * `inscricao_rejeitada` - Sua inscricao em voluntariado foi rejeitada
+        * `inscricao_removida` - Voce foi removido de uma oportunidade
+        * `voluntariado_concluido` - Sua participacao foi concluida e o certificado emitido
     Oportunidade:
       type: object
       description: Serializa oportunidades de voluntariado.
@@ -3104,11 +4840,36 @@ components:
         organizacao_nome:
           type: string
           readOnly: true
+        organizacao_foto_url:
+          type: string
+          nullable: true
+          description: |-
+            Logotipo de quem publica a oportunidade.
+
+            A foto enviada tem preferencia sobre o endereco externo: quem subiu a
+            imagem pela plataforma fez isso depois, e a intencao mais recente
+            prevalece. Sem nenhuma das duas, a tela desenha as iniciais do nome.
+          readOnly: true
         titulo:
           type: string
           maxLength: 255
         descricao:
           type: string
+        o_que_fazer:
+          type: string
+          description: Atividades que o voluntario ira desempenhar
+        requisitos:
+          type: string
+          description: O que se espera de quem se inscrever
+        imagem:
+          type: string
+          format: uri
+          nullable: true
+          description: Imagem de capa exibida no cartao da oportunidade
+        imagem_url:
+          type: string
+          nullable: true
+          readOnly: true
         area:
           $ref: '#/components/schemas/AreaEnum'
         area_display:
@@ -3127,6 +4888,16 @@ components:
           readOnly: true
         total_inscritos:
           type: integer
+          readOnly: true
+        minha_inscricao:
+          type: string
+          nullable: true
+          description: |-
+            Situacao da inscricao de quem esta consultando, quando existir.
+
+            E uma inscricao por pessoa em cada oportunidade, garantido por
+            constraint no banco. A tela precisa saber disso antes de oferecer o
+            botao, para nao convidar alguem a repetir algo que sera recusado.
           readOnly: true
         carga_horaria_total:
           type: integer
@@ -3171,8 +4942,11 @@ components:
       - descricao
       - esta_aberta_inscricao
       - id
+      - imagem_url
       - local
+      - minha_inscricao
       - organizacao
+      - organizacao_foto_url
       - organizacao_nome
       - prazo_inscricao
       - status_display
@@ -3191,6 +4965,17 @@ components:
         descricao:
           type: string
           minLength: 1
+        o_que_fazer:
+          type: string
+          description: Atividades que o voluntario ira desempenhar
+        requisitos:
+          type: string
+          description: O que se espera de quem se inscrever
+        imagem:
+          type: string
+          format: binary
+          nullable: true
+          description: Imagem de capa exibida no cartao da oportunidade
         area:
           $ref: '#/components/schemas/AreaEnum'
         local:
@@ -3332,6 +5117,52 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Certificado'
+    PaginatedConversaList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Conversa'
+    PaginatedCursoList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Curso'
     PaginatedDisciplinaList:
       type: object
       required:
@@ -3355,6 +5186,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Disciplina'
+    PaginatedGrupoTrabalhoList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/GrupoTrabalho'
     PaginatedInscricaoVoluntariadoList:
       type: object
       required:
@@ -3470,7 +5324,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Post'
-    PaginatedRankingSemestralList:
+    PaginatedSolicitacaoAjudaList:
       type: object
       required:
       - count
@@ -3492,17 +5346,57 @@ components:
         results:
           type: array
           items:
-            $ref: '#/components/schemas/RankingSemestral'
-    PapelEnum:
-      enum:
-      - aluno
-      - monitor
-      - professor
-      type: string
-      description: |-
-        * `aluno` - Aluno
-        * `monitor` - Monitor
-        * `professor` - Professor
+            $ref: '#/components/schemas/SolicitacaoAjuda'
+    PaginatedTrabalhoList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Trabalho'
+    PatchedCursoRequest:
+      type: object
+      properties:
+        codigo:
+          type: string
+          minLength: 1
+          maxLength: 20
+        nome:
+          type: string
+          minLength: 1
+          maxLength: 255
+        grau:
+          type: string
+          minLength: 1
+          description: Bacharelado, licenciatura, tecnologico
+          maxLength: 30
+        versao_ppc:
+          type: string
+          description: 'Versao do PPC que originou a matriz, ex: Jan/2025'
+          maxLength: 30
+        periodos:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          description: Quantidade de periodos previstos na matriz
+        ativo:
+          type: boolean
     PatchedDisciplinaRequest:
       type: object
       properties:
@@ -3516,15 +5410,51 @@ components:
           maxLength: 255
         curso:
           type: string
-          minLength: 1
-          maxLength: 100
+          format: uuid
+          nullable: true
+          description: Nulo em disciplinas de outros institutos ainda nao cadastradas
+        periodo_sugerido:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          nullable: true
+          description: Periodo previsto na matriz curricular
+        carga_horaria:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          nullable: true
+          description: Carga horaria total em horas
+        optativa:
+          type: boolean
+        pre_requisitos:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Disciplinas que precisam ser cursadas antes
         semestre:
           type: string
           minLength: 1
-          description: 'Ex: 2026.1'
+          description: 'Semestre de oferta, ex: 2026.1'
           maxLength: 10
         ativo:
           type: boolean
+    PatchedGrupoTrabalhoRequest:
+      type: object
+      properties:
+        trabalho:
+          type: string
+          format: uuid
+        nome:
+          type: string
+          minLength: 1
+          maxLength: 120
+        descricao:
+          type: string
+        especificacao_propria:
+          type: string
+          description: Tema especifico deste grupo. Vazio significa usar o do trabalho.
     PatchedOportunidadeRequest:
       type: object
       description: Serializa oportunidades de voluntariado.
@@ -3536,6 +5466,17 @@ components:
         descricao:
           type: string
           minLength: 1
+        o_que_fazer:
+          type: string
+          description: Atividades que o voluntario ira desempenhar
+        requisitos:
+          type: string
+          description: O que se espera de quem se inscrever
+        imagem:
+          type: string
+          format: binary
+          nullable: true
+          description: Imagem de capa exibida no cartao da oportunidade
         area:
           $ref: '#/components/schemas/AreaEnum'
         local:
@@ -3576,7 +5517,7 @@ components:
           type: string
           format: uuid
         papel:
-          $ref: '#/components/schemas/PapelEnum'
+          $ref: '#/components/schemas/PermissaoDisciplinaPapelEnum'
         ativo:
           type: boolean
     PatchedPostRequest:
@@ -3596,6 +5537,36 @@ components:
         conteudo:
           type: string
           minLength: 1
+    PatchedTrabalhoRequest:
+      type: object
+      properties:
+        disciplina:
+          type: string
+          format: uuid
+        titulo:
+          type: string
+          minLength: 1
+          maxLength: 255
+        especificacao:
+          type: string
+          description: Enunciado valido para todos os grupos
+        total_grupos:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          description: Quantidade de grupos previstos na turma
+        tamanho_maximo:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          description: Maximo de participantes por grupo
+        modo_formacao:
+          $ref: '#/components/schemas/ModoFormacaoEnum'
+        prazo_entrega:
+          type: string
+          format: date
+        encerrado:
+          type: boolean
     PermissaoDisciplina:
       type: object
       properties:
@@ -3622,7 +5593,7 @@ components:
           type: string
           readOnly: true
         papel:
-          $ref: '#/components/schemas/PapelEnum'
+          $ref: '#/components/schemas/PermissaoDisciplinaPapelEnum'
         ativo:
           type: boolean
         created_at:
@@ -3639,6 +5610,16 @@ components:
       - usuario
       - usuario_cpf
       - usuario_nome
+    PermissaoDisciplinaPapelEnum:
+      enum:
+      - aluno
+      - monitor
+      - professor
+      type: string
+      description: |-
+        * `aluno` - Aluno
+        * `monitor` - Monitor
+        * `professor` - Professor
     PermissaoDisciplinaRequest:
       type: object
       properties:
@@ -3649,7 +5630,7 @@ components:
           type: string
           format: uuid
         papel:
-          $ref: '#/components/schemas/PapelEnum'
+          $ref: '#/components/schemas/PermissaoDisciplinaPapelEnum'
         ativo:
           type: boolean
       required:
@@ -3706,6 +5687,15 @@ components:
         total_respostas:
           type: integer
           readOnly: true
+        restrito:
+          type: boolean
+          readOnly: true
+        motivo_restricao:
+          type: string
+          readOnly: true
+        restrito_por_nome:
+          type: string
+          readOnly: true
         created_at:
           type: string
           format: date-time
@@ -3724,7 +5714,10 @@ components:
       - e_melhor
       - e_topico
       - id
+      - motivo_restricao
       - pontuacao
+      - restrito
+      - restrito_por_nome
       - total_reacoes_persiste
       - total_respostas
       - updated_at
@@ -3749,52 +5742,52 @@ components:
       required:
       - conteudo
       - disciplina
-    RankingSemestral:
+    PreCadastroPapelEnum:
+      enum:
+      - aluno
+      - monitor
+      - professor
+      type: string
+      description: |-
+        * `aluno` - aluno
+        * `monitor` - monitor
+        * `professor` - professor
+    PreCadastroRequest:
       type: object
-      description: Serializa uma posicao em um ranking semestral historico.
+      description: |-
+        Pre-cadastro feito pela coordenacao, no modelo do SIGAA.
+
+        A conta nasce inativa e sem senha utilizavel. Quem verificou o vinculo
+        institucional foi a coordenacao, mas a pessoa ainda precisa provar que
+        controla o email informado, e isso acontece no primeiro acesso, pelo mesmo
+        fluxo de ativacao por codigo que os demais usuarios ja usam. Assim nao
+        existe senha provisoria circulando por terceiros.
       properties:
-        id:
+        nome_completo:
           type: string
-          format: uuid
-          readOnly: true
+          minLength: 1
+          maxLength: 255
+        cpf:
+          type: string
+          minLength: 1
+          maxLength: 14
+        email:
+          type: string
+          format: email
+          minLength: 1
+        matricula:
+          type: string
+          maxLength: 20
         disciplina:
           type: string
           format: uuid
-          readOnly: true
-        disciplina_codigo:
-          type: string
-          readOnly: true
-        semestre:
-          type: string
-          readOnly: true
-          description: 'Ex: 2026.1'
-        posicao:
-          type: integer
-          readOnly: true
-        usuario:
-          type: string
-          format: uuid
-          readOnly: true
-        nome_usuario:
-          type: string
-          readOnly: true
-        pontos:
-          type: integer
-          readOnly: true
-        gerado_em:
-          type: string
-          format: date-time
-          readOnly: true
+          nullable: true
+        papel:
+          $ref: '#/components/schemas/PreCadastroPapelEnum'
       required:
-      - disciplina
-      - disciplina_codigo
-      - gerado_em
-      - id
-      - nome_usuario
-      - pontos
-      - posicao
-      - semestre
-      - usuario
+      - cpf
+      - email
+      - nome_completo
     ReenvioCodigoRequest:
       type: object
       description: Serializer para reenvio de codigo de ativacao.
@@ -3874,32 +5867,161 @@ components:
       - nome_completo
       - password
       - password_confirm
-    TipoEnum:
+    ResultadoBusca:
+      type: object
+      description: |-
+        Um resultado da busca.
+
+        Nao e um ModelSerializer porque o objeto entregue e um par (post,
+        relevancia): a relevancia nasce da consulta e nao existe no modelo.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        titulo:
+          type: string
+          readOnly: true
+        trecho:
+          type: string
+          readOnly: true
+        autor_nome:
+          type: string
+          readOnly: true
+        disciplina_codigo:
+          type: string
+          readOnly: true
+        topico_id:
+          type: string
+          format: uuid
+          readOnly: true
+        e_resposta:
+          type: boolean
+          readOnly: true
+        relevancia:
+          type: number
+          format: double
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - autor_nome
+      - created_at
+      - disciplina_codigo
+      - e_resposta
+      - id
+      - relevancia
+      - titulo
+      - topico_id
+      - trecho
+    SolicitacaoAjuda:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        mensagem:
+          type: string
+          format: uuid
+        mensagem_conteudo:
+          type: string
+          readOnly: true
+        solicitante:
+          type: string
+          format: uuid
+          readOnly: true
+        solicitante_nome:
+          type: string
+          readOnly: true
+        descricao:
+          type: string
+          description: Complemento escrito por quem pediu ajuda
+        destino:
+          $ref: '#/components/schemas/DestinoEnum'
+        status:
+          allOf:
+          - $ref: '#/components/schemas/SolicitacaoAjudaStatusEnum'
+          readOnly: true
+        disciplina_codigo:
+          type: string
+          readOnly: true
+        grupo_nome:
+          type: string
+          nullable: true
+          readOnly: true
+        atendido_por:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        atendido_por_nome:
+          type: string
+          readOnly: true
+        resposta:
+          type: string
+          readOnly: true
+        respondido_em:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - atendido_por
+      - atendido_por_nome
+      - created_at
+      - disciplina_codigo
+      - grupo_nome
+      - id
+      - mensagem
+      - mensagem_conteudo
+      - respondido_em
+      - resposta
+      - solicitante
+      - solicitante_nome
+      - status
+    SolicitacaoAjudaRequest:
+      type: object
+      properties:
+        mensagem:
+          type: string
+          format: uuid
+        descricao:
+          type: string
+          description: Complemento escrito por quem pediu ajuda
+        destino:
+          $ref: '#/components/schemas/DestinoEnum'
+      required:
+      - mensagem
+    SolicitacaoAjudaStatusEnum:
       enum:
-      - nova_resposta
-      - voto_recebido
-      - melhor_resposta
-      - reacao_persiste
-      - denuncia_resolvida
-      - post_removido
-      - papel_disciplina
-      - inscricao_aprovada
-      - inscricao_rejeitada
-      - inscricao_removida
-      - voluntariado_concluido
+      - aberta
+      - em_atendimento
+      - resolvida
       type: string
       description: |-
-        * `nova_resposta` - Nova resposta no seu topico
-        * `voto_recebido` - Novo voto no seu post
-        * `melhor_resposta` - Sua resposta foi marcada como melhor
-        * `reacao_persiste` - Reacao "duvida persiste" na sua resposta
-        * `denuncia_resolvida` - Sua denuncia foi resolvida
-        * `post_removido` - Seu post foi removido por moderacao
-        * `papel_disciplina` - Voce foi adicionado a uma disciplina
-        * `inscricao_aprovada` - Sua inscricao em voluntariado foi aprovada
-        * `inscricao_rejeitada` - Sua inscricao em voluntariado foi rejeitada
-        * `inscricao_removida` - Voce foi removido de uma oportunidade
-        * `voluntariado_concluido` - Sua participacao foi concluida e o certificado emitido
+        * `aberta` - Aberta
+        * `em_atendimento` - Em atendimento
+        * `resolvida` - Resolvida
+    TipoMidiaEnum:
+      enum:
+      - texto
+      - imagem
+      - documento
+      - audio
+      type: string
+      description: |-
+        * `texto` - Somente texto
+        * `imagem` - Imagem
+        * `documento` - Documento
+        * `audio` - Audio
     TokenObtainPair:
       type: object
       properties:
@@ -3935,63 +6057,143 @@ components:
           minLength: 1
       required:
       - token
-    UsuarioDisciplinaReputacao:
+    Trabalho:
       type: object
-      description: Serializa a reputacao de um usuario em uma disciplina.
       properties:
         id:
           type: string
           format: uuid
           readOnly: true
-        usuario:
-          type: string
-          format: uuid
-          readOnly: true
-        usuario_nome:
-          type: string
-          readOnly: true
         disciplina:
           type: string
           format: uuid
-          readOnly: true
         disciplina_codigo:
           type: string
           readOnly: true
-        disciplina_nome:
+        criado_por:
+          type: string
+          format: uuid
+          readOnly: true
+        criado_por_nome:
           type: string
           readOnly: true
-        pontos:
+        titulo:
+          type: string
+          maxLength: 255
+        especificacao:
+          type: string
+          description: Enunciado valido para todos os grupos
+        total_grupos:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          description: Quantidade de grupos previstos na turma
+        tamanho_maximo:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          description: Maximo de participantes por grupo
+        modo_formacao:
+          $ref: '#/components/schemas/ModoFormacaoEnum'
+        prazo_entrega:
+          type: string
+          format: date
+        encerrado:
+          type: boolean
+        total_grupos_criados:
           type: integer
           readOnly: true
-        total_posts:
-          type: integer
+        meu_grupo:
+          type: string
+          nullable: true
+          description: Grupo de quem consulta, para a tela saber se ja ha escolha
+            feita.
           readOnly: true
-        total_respostas:
-          type: integer
+        created_at:
+          type: string
+          format: date-time
           readOnly: true
-        total_votos_recebidos:
-          type: integer
-          readOnly: true
-        total_melhores_respostas:
-          type: integer
-          readOnly: true
-        atualizado_em:
+        updated_at:
           type: string
           format: date-time
           readOnly: true
       required:
-      - atualizado_em
+      - created_at
+      - criado_por
+      - criado_por_nome
       - disciplina
       - disciplina_codigo
-      - disciplina_nome
       - id
-      - pontos
-      - total_melhores_respostas
-      - total_posts
-      - total_respostas
-      - total_votos_recebidos
-      - usuario
-      - usuario_nome
+      - meu_grupo
+      - prazo_entrega
+      - titulo
+      - total_grupos
+      - total_grupos_criados
+      - updated_at
+    TrabalhoRequest:
+      type: object
+      properties:
+        disciplina:
+          type: string
+          format: uuid
+        titulo:
+          type: string
+          minLength: 1
+          maxLength: 255
+        especificacao:
+          type: string
+          description: Enunciado valido para todos os grupos
+        total_grupos:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          description: Quantidade de grupos previstos na turma
+        tamanho_maximo:
+          type: integer
+          maximum: 32767
+          minimum: 0
+          description: Maximo de participantes por grupo
+        modo_formacao:
+          $ref: '#/components/schemas/ModoFormacaoEnum'
+        prazo_entrega:
+          type: string
+          format: date
+        encerrado:
+          type: boolean
+      required:
+      - disciplina
+      - prazo_entrega
+      - titulo
+      - total_grupos
+    UsuarioResumo:
+      type: object
+      description: Dados minimos para escolher uma pessoa numa lista de atribuicao.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        nome_completo:
+          type: string
+          maxLength: 255
+        cpf:
+          type: string
+          maxLength: 11
+        matricula:
+          type: string
+          description: Matrícula institucional, usada no pré-cadastro pela coordenação
+          maxLength: 20
+        email:
+          type: string
+          format: email
+          maxLength: 150
+        ativo:
+          type: boolean
+      required:
+      - cpf
+      - email
+      - id
+      - nome_completo
   securitySchemes:
     jwtAuth:
       type: http

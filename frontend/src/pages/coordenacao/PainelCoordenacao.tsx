@@ -54,7 +54,7 @@ interface Curso {
   nome: string
 }
 
-const AZUL = '#003087'
+const AZUL = 'var(--accent-blue)'
 
 function esperaLegivel(horas: number | null): string {
   if (horas === null) return '—'
@@ -231,23 +231,20 @@ function LinhaDisciplinaTabela({ linha, navegar }: {
         />
       </td>
 
-      {/* Ações */}
+      {/* Ação.
+          Havia três botões por linha, e dois deles levavam exatamente aonde os
+          números já levam: "Discussões" repetia a coluna de dúvidas e
+          "Moderação" repetia a de denúncias. Somados, empurravam a tabela para
+          além da largura da tela e cortavam a própria coluna de ações.
+
+          Ficou o que não tem outro caminho: a página da disciplina, onde a
+          coordenação atribui professor e monitoria. */}
       <td style={{ ...celula, textAlign: 'right' }}>
-        <div className="flex items-center justify-end" style={{ gap: '6px' }}>
-          <BotaoAcao
-            rotulo="Discussões"
-            onClick={() => navegar(`/forum?disciplina=${linha.disciplina_id}`)}
-          />
-          <BotaoAcao
-            rotulo="Moderação"
-            onClick={() => navegar(`/moderacao?disciplina=${linha.disciplina_id}`)}
-          />
-          <BotaoAcao
-            rotulo={semProfessor ? 'Atribuir' : 'Gerenciar'}
-            primario={semProfessor}
-            onClick={() => navegar(`/coordenacao/disciplina/${linha.disciplina_id}`)}
-          />
-        </div>
+        <BotaoAcao
+          rotulo={semProfessor ? 'Atribuir' : 'Gerenciar'}
+          primario={semProfessor}
+          onClick={() => navegar(`/coordenacao/disciplina/${linha.disciplina_id}`)}
+        />
       </td>
     </tr>
   )
@@ -414,11 +411,11 @@ export default function PainelCoordenacao() {
           </div>
         ) : (
           <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 330px)' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '980px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '860px' }}>
               <thead>
                 <tr>
-                  <th style={{ ...cabecalho, textAlign: 'left', width: '30%' }}>Disciplina</th>
-                  <th style={{ ...cabecalho, textAlign: 'left', width: '20%' }}>Responsáveis</th>
+                  <th style={{ ...cabecalho, textAlign: 'left', width: '26%' }}>Disciplina</th>
+                  <th style={{ ...cabecalho, textAlign: 'left', width: '18%' }}>Responsáveis</th>
                   <th style={cabecalhoNumero}>Dúvidas</th>
                   <th style={cabecalhoNumero}>Sem resposta</th>
                   <th

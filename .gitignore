@@ -37,4 +37,23 @@ Thumbs.db
 *.egg-info/
 dist/
 build/
+
+# Frontend
+node_modules/
+frontend/dist/
+frontend/node_modules/
+*.tsbuildinfo
+
+# Saidas de diagnostico.
+#
+# Sao geradas para inspecionar o banco local e refletem um estado de maquina,
+# nao o projeto. O script que as produz entra no repositorio; o resultado, nao.
 docs/saida-testes.txt
+docs/diagnostico.txt
+
+# Cache do modelo de embeddings.
+#
+# Sao centenas de megabytes baixados pelo sentence-transformers na primeira
+# execucao, e o proprio pacote os recria quando faltam.
+.cache/
+models/

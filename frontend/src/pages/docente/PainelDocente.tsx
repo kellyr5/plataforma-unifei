@@ -42,7 +42,7 @@ interface Resumo {
   matriculados: number
 }
 
-const AZUL = '#003087'
+const AZUL = 'var(--accent-blue)'
 
 function tempoDesde(valor: string | null): string {
   if (!valor) return 'sem movimento'
@@ -51,7 +51,8 @@ function tempoDesde(valor: string | null): string {
   if (dias < 1) return 'hoje'
   if (dias === 1) return 'ontem'
   if (dias < 30) return `há ${dias} dias`
-  return `há ${Math.floor(dias / 30)} mês(es)`
+  const meses = Math.floor(dias / 30)
+  return `há ${meses} ${meses === 1 ? 'mês' : 'meses'}`
 }
 
 function Metrica({ valor, rotulo, destaque }: {
@@ -137,7 +138,8 @@ function CartaoDisciplina({ item, navegar }: {
             {item.nome}
           </div>
           <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '3px' }}>
-            {item.matriculados} matriculado(s) · última movimentação {tempoDesde(item.ultima_atividade)}
+            {item.matriculados} matriculado{item.matriculados === 1 ? '' : 's'}
+            {' · '}última movimentação {tempoDesde(item.ultima_atividade)}
           </div>
         </div>
 
@@ -158,7 +160,11 @@ function CartaoDisciplina({ item, navegar }: {
       >
         {item.sem_resposta > 0 && (
           <Acao
-            rotulo={`Responder ${item.sem_resposta} pendente(s)`}
+            rotulo={
+              item.sem_resposta === 1
+                ? 'Responder 1 pendente'
+                : `Responder ${item.sem_resposta} pendentes`
+            }
             primario
             onClick={() => navegar(`/forum?disciplina=${item.disciplina_id}&sem_resposta=1`)}
           />

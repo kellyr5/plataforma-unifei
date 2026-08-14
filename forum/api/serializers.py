@@ -121,11 +121,27 @@ class AlertaConteudoSerializer(serializers.ModelSerializer):
     assumido_por_nome = serializers.CharField(source='assumido_por.nome_completo', read_only=True)
     resolvido_por_nome = serializers.CharField(source='resolvido_por.nome_completo', read_only=True)
 
+    # O conteudo denunciado vem junto do alerta. Sem ele, a analise exigiria
+    # abrir o topico numa segunda tela, e julgar por titulo e motivo e
+    # exatamente o que a moderacao nao deve fazer.
+    post_conteudo = serializers.CharField(source='post.conteudo', read_only=True)
+    post_autor_nome = serializers.CharField(
+        source='post.autor.nome_completo', read_only=True,
+    )
+    post_criado_em = serializers.DateTimeField(source='post.created_at', read_only=True)
+    post_removido = serializers.SerializerMethodField()
+
+    # Identificador do topico, para o moderador poder ler a discussao em volta.
+    # Numa resposta, o que importa e a pergunta que ela responde.
+    topico_id = serializers.SerializerMethodField()
+
     class Meta:
         model = AlertaConteudo
         fields = [
             'id', 'denunciante', 'denunciante_nome',
             'post', 'post_titulo', 'disciplina_codigo',
+            'post_conteudo', 'post_autor_nome', 'post_criado_em',
+            'post_removido', 'topico_id',
             'motivo', 'status',
             'assumido_por', 'assumido_por_nome', 'assumido_em',
             'resolvido_por', 'resolvido_por_nome',
@@ -134,6 +150,8 @@ class AlertaConteudoSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id', 'denunciante', 'denunciante_nome', 'post_titulo',
             'disciplina_codigo', 'status',
+            'post_conteudo', 'post_autor_nome', 'post_criado_em',
+            'post_removido', 'topico_id',
             'assumido_por', 'assumido_por_nome', 'assumido_em',
             'resolvido_por', 'resolvido_por_nome',
             'resolucao', 'created_at', 'resolvido_em',
@@ -143,6 +161,13 @@ class AlertaConteudoSerializer(serializers.ModelSerializer):
         if obj.post.titulo:
             return obj.post.titulo
         return f'Resposta em: {obj.post.post_pai.titulo[:50]}' if obj.post.post_pai else '(sem titulo)'
+
+    def get_post_removido(self, obj) -> bool:
+        return obj.post.deleted_at is not None
+
+    def get_topico_id(self, obj) -> str:
+        """O proprio post, se for topico; o topico pai, se for resposta."""
+        return str(obj.post.post_pai_id or obj.post_id)
 
 
 class ReacaoPersisteSerializer(serializers.ModelSerializer):

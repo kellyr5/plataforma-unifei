@@ -15,7 +15,7 @@ import toast, { Toaster } from 'react-hot-toast'
 
 import api from '../../services/api'
 
-const AZUL = '#003087'
+const AZUL = 'var(--accent-blue)'
 
 const AREAS = [
   ['educacao', 'Educação'],

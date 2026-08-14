@@ -25,15 +25,18 @@ from channels.routing import ProtocolTypeRouter, URLRouter  # noqa: E402
 from channels.security.websocket import AllowedHostsOriginValidator  # noqa: E402
 from django.conf import settings  # noqa: E402
 
+from colaboracao.routing import websocket_urlpatterns as rotas_conversas  # noqa: E402
 from config.ws_auth import JWTAuthMiddleware  # noqa: E402
-from notificacoes.routing import websocket_urlpatterns  # noqa: E402
+from notificacoes.routing import websocket_urlpatterns as rotas_notificacoes  # noqa: E402
 
 
 # A autenticacao por JWT ja protege o canal. O validador de origem e uma
 # segunda barreira contra cross-site hijacking, importante em producao, mas
 # atrapalha em desenvolvimento no WSL, onde o IP da rede muda a cada reboot e
 # raramente coincide com o ALLOWED_HOSTS.
-aplicacao_websocket = JWTAuthMiddleware(URLRouter(websocket_urlpatterns))
+aplicacao_websocket = JWTAuthMiddleware(
+    URLRouter(rotas_notificacoes + rotas_conversas)
+)
 
 if not settings.DEBUG:
     aplicacao_websocket = AllowedHostsOriginValidator(aplicacao_websocket)

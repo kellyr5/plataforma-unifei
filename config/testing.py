@@ -158,15 +158,25 @@ def matricular(usuario, disciplina, papel='aluno'):
     return vinculo
 
 
-def criar_topico(autor, disciplina, titulo='Dúvida sobre complexidade'):
-    """Cria um tópico, ou seja, um post sem post_pai."""
+def criar_topico(
+    autor,
+    disciplina,
+    titulo='Dúvida sobre complexidade',
+    conteudo='Não entendi a análise assintótica do quicksort.',
+):
+    """
+    Cria um tópico, ou seja, um post sem post_pai.
+
+    O conteúdo é parametrizável porque os testes de busca precisam controlar o
+    texto: procurar por um termo exige saber que ele está lá.
+    """
     matricular(autor, disciplina)
 
     return Post.objects.create(
         disciplina=disciplina,
         autor=autor,
         titulo=titulo,
-        conteudo='Não entendi a análise assintótica do quicksort.',
+        conteudo=conteudo,
     )
 
 

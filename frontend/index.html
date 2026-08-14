@@ -1,5 +1,11 @@
 <!doctype html>
-<html lang="en">
+<!--
+  O idioma declarado no elemento raiz é o que faz o leitor de tela escolher a
+  pronúncia. Com lang="en", "dúvida" e "matriculados" saem lidos com fonética
+  inglesa, e a interface fica incompreensível para quem depende de áudio.
+  Era o valor padrão do gerador do projeto e nunca foi corrigido.
+-->
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -7,7 +13,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <meta name="description" content="Fórum acadêmico por disciplina e voluntariado universitário da Universidade Federal de Itajubá." />
+    <title>Plataforma UNIFEI — Fórum acadêmico e voluntariado</title>
   </head>
   <body>
     <div id="root"></div>

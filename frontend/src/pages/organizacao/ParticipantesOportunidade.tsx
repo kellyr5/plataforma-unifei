@@ -39,7 +39,7 @@ interface Oportunidade {
   status_display: string
 }
 
-const AZUL = '#003087'
+const AZUL = 'var(--accent-blue)'
 
 function data(valor: string): string {
   return new Date(valor).toLocaleDateString('pt-BR')
@@ -232,7 +232,8 @@ export default function ParticipantesOportunidade() {
           </h1>
           <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', marginTop: '3px' }}>
             {oportunidade.local} · {oportunidade.carga_horaria_total}h ·
-            {' '}{oportunidade.vagas_disponiveis} de {oportunidade.vagas} vaga(s) livre(s)
+            {' '}{oportunidade.vagas_disponiveis} de {oportunidade.vagas}
+            {oportunidade.vagas === 1 ? ' vaga livre' : ' vagas livres'}
           </p>
         </div>
 

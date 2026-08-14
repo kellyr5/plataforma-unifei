@@ -73,6 +73,18 @@ PERFIS = [
         'admin': False,
     },
     {
+        # Segundo estudante na mesma turma. Existe porque conversa de grupo,
+        # divisao de trabalho e pedido de ajuda so podem ser avaliados com duas
+        # pessoas distintas: com uma so, a tela nunca mostra o outro lado.
+        'chave': 'aluno2',
+        'cpf': '10000000006',
+        'nome': 'Larissa Campos',
+        'email': 'aluno2.demo@unifei.edu.br',
+        'matricula': '2024005679',
+        'genero': 'f',
+        'admin': False,
+    },
+    {
         'chave': 'organizacao',
         'cpf': '10000000005',
         'nome': 'Instituto Semear',
@@ -259,6 +271,7 @@ class Command(BaseCommand):
         for indice, disciplina in enumerate(ativas):
             vinculos.append((usuarios['professor'], disciplina, 'professor'))
             vinculos.append((usuarios['aluno'], disciplina, 'aluno'))
+            vinculos.append((usuarios['aluno2'], disciplina, 'aluno'))
 
             # A monitora monitora duas e cursa a terceira como aluna, que e o
             # caso real: ela continua sendo estudante nas proprias materias.
@@ -286,11 +299,11 @@ class Command(BaseCommand):
         topico, _ = Post.objects.get_or_create(
             disciplina=disciplina,
             autor=usuarios['aluno'],
-            titulo='Por que a solucao usa laco duplo se a complexidade e linear?',
+            titulo='Por que a solução usa laço duplo se a complexidade é linear?',
             defaults={
                 'conteudo': (
-                    'O enunciado pede algoritmo em O(n), mas a solucao do gabarito '
-                    'tem um for dentro do outro. Isso nao seria O(n^2)?'
+                    'O enunciado pede algoritmo em O(n), mas a solução do gabarito '
+                    'tem um for dentro do outro. Isso não seria O(n²)?'
                 ),
             },
         )
@@ -301,10 +314,10 @@ class Command(BaseCommand):
             post_pai=topico,
             defaults={
                 'conteudo': (
-                    'O laco interno percorre sempre 26 posicoes, uma para cada letra '
-                    'do alfabeto, e nao depende do tamanho da entrada. Como esse '
-                    'numero e constante, ele sai da analise assintotica e sobra O(n). '
-                    'Laco aninhado so multiplica a complexidade quando os dois '
+                    'O laço interno percorre sempre 26 posições, uma para cada letra '
+                    'do alfabeto, e não depende do tamanho da entrada. Como esse '
+                    'número é constante, ele sai da análise assintótica e sobra O(n). '
+                    'Laço aninhado só multiplica a complexidade quando os dois '
                     'crescem com a entrada.'
                 ),
                 'e_melhor': True,
@@ -315,11 +328,11 @@ class Command(BaseCommand):
         inadequado, _ = Post.objects.get_or_create(
             disciplina=disciplina,
             autor=usuarios['aluno'],
-            titulo='Alguem tem a prova aplicada no semestre passado?',
+            titulo='Alguém tem a prova aplicada no semestre passado?',
             defaults={
                 'conteudo': (
-                    'Se alguem tiver a prova do semestre anterior salva, poderia '
-                    'compartilhar aqui no forum? Ajudaria muito a estudar.'
+                    'Se alguém tiver a prova do semestre anterior salva, poderia '
+                    'compartilhar aqui no fórum? Ajudaria muito a estudar.'
                 ),
             },
         )
@@ -329,8 +342,8 @@ class Command(BaseCommand):
             post=inadequado,
             defaults={
                 'motivo': (
-                    'Pedido de compartilhamento de prova aplicada, que e material '
-                    'de avaliacao de uso restrito ao docente.'
+                    'Pedido de compartilhamento de prova aplicada, que é material '
+                    'de avaliação de uso restrito ao docente.'
                 ),
             },
         )
@@ -338,9 +351,9 @@ class Command(BaseCommand):
         criar_notificacao(
             destinatario=usuarios['aluno'],
             tipo='melhor_resposta',
-            titulo='Sua duvida foi respondida',
+            titulo='Sua dúvida foi respondida',
             mensagem=(
-                'A monitoria respondeu sua duvida sobre complexidade de lacos '
+                'A monitoria respondeu sua dúvida sobre complexidade de laços '
                 'aninhados e a resposta foi marcada como a melhor.'
             ),
             remetente=usuarios['monitor'],
@@ -364,33 +377,33 @@ class Command(BaseCommand):
         roteiro = [
             (
                 2,
-                'Diferenca entre passagem por valor e por referencia em C',
-                'Quando passo um vetor para uma funcao e altero dentro dela, a '
-                'mudanca permanece depois. Mas com uma variavel int isso nao '
+                'Diferença entre passagem por valor e por referência em C',
+                'Quando passo um vetor para uma função e altero dentro dela, a '
+                'mudança permanece depois. Mas com uma variável int isso não '
                 'acontece. Por que os dois casos se comportam diferente?',
                 'Porque em C o nome do vetor decai para um ponteiro ao primeiro '
-                'elemento, entao a funcao recebe o endereco e escreve na memoria '
-                'original. Com o int voce recebe uma copia do valor, e alterar a '
-                'copia nao afeta o original. Se quiser o mesmo efeito com int, '
+                'elemento, então a função recebe o endereço e escreve na memória '
+                'original. Com o int você recebe uma cópia do valor, e alterar a '
+                'cópia não afeta o original. Se quiser o mesmo efeito com int, '
                 'passe &variavel e receba como int*.',
                 3,
             ),
             (
                 5,
-                'Por que meu laco de repeticao executa uma vez a mais?',
+                'Por que meu laço de repetição executa uma vez a mais?',
                 'Escrevi for (i = 0; i <= n; i++) para percorrer um vetor de n '
-                'posicoes e o programa acessa uma posicao invalida no fim.',
-                'O vetor de n posicoes vai do indice 0 ao n-1, entao o teste tem '
-                'de ser i < n. Com i <= n voce entra uma vez a mais e acessa '
-                'memoria fora do vetor, o que as vezes nem da erro, apenas le lixo. '
-                'Esse deslocamento de um e tao comum que tem nome: erro de off-by-one.',
+                'posições e o programa acessa uma posição inválida no fim.',
+                'O vetor de n posições vai do índice 0 ao n-1, então o teste tem '
+                'de ser i < n. Com i <= n você entra uma vez a mais e acessa '
+                'memória fora do vetor, o que às vezes nem dá erro, apenas lê lixo. '
+                'Esse deslocamento de um é tão comum que tem nome: erro de off-by-one.',
                 20,
             ),
             (
                 9,
-                'Como saber se um algoritmo e O(n) ou O(n log n)?',
-                'Consigo calcular a complexidade quando o codigo tem lacos '
-                'aninhados, mas travo quando aparece recursao que divide a entrada '
+                'Como saber se um algoritmo é O(n) ou O(n log n)?',
+                'Consigo calcular a complexidade quando o código tem laços '
+                'aninhados, mas travo quando aparece recursão que divide a entrada '
                 'ao meio.',
                 # Sem resposta de proposito: e o caso que o painel do professor
                 # precisa sinalizar como pendente.
@@ -399,32 +412,32 @@ class Command(BaseCommand):
             ),
             (
                 1,
-                'A prova cobra demonstracao ou so aplicacao?',
-                'Vi nos exercicios que algumas questoes pedem para provar a '
-                'propriedade e outras so para aplicar a formula. Queria saber o que '
-                'esperar na avaliacao.',
-                'A avaliacao cobra os dois, com peso maior na aplicacao. As '
-                'demonstracoes pedidas sao as que fizemos em aula, entao vale '
-                'refazer as tres do material sem olhar a resposta antes.',
+                'A prova cobra demonstração ou só aplicação?',
+                'Vi nos exercícios que algumas questões pedem para provar a '
+                'propriedade e outras só para aplicar a fórmula. Queria saber o que '
+                'esperar na avaliação.',
+                'A avaliação cobra os dois, com peso maior na aplicação. As '
+                'demonstrações pedidas são as que fizemos em aula, então vale '
+                'refazer as três do material sem olhar a resposta antes.',
                 6,
             ),
             (
                 14,
-                'Erro de segmentacao ao liberar memoria',
-                'Uso free() no fim da funcao e o programa quebra. Se eu tirar o '
+                'Erro de segmentação ao liberar memória',
+                'Uso free() no fim da função e o programa quebra. Se eu tirar o '
                 'free ele roda, mas imagino que fique errado do mesmo jeito.',
                 None,
                 None,
             ),
             (
                 4,
-                'Qual a diferenca entre pilha e fila na pratica?',
-                'Entendi que uma e LIFO e a outra FIFO, mas nao consigo pensar em '
+                'Qual a diferença entre pilha e fila na prática?',
+                'Entendi que uma é LIFO e a outra FIFO, mas não consigo pensar em '
                 'quando escolher uma ou outra num problema real.',
-                'Pense no que voce precisa recuperar primeiro. Desfazer acoes num '
-                'editor pede pilha, porque o ultimo comando e o primeiro a ser '
+                'Pense no que você precisa recuperar primeiro. Desfazer ações num '
+                'editor pede pilha, porque o último comando é o primeiro a ser '
                 'desfeito. Atendimento por ordem de chegada pede fila. Quando o '
-                'enunciado fala em voltar atras, costuma ser pilha; quando fala em '
+                'enunciado fala em voltar atrás, costuma ser pilha; quando fala em '
                 'ordem de chegada, fila.',
                 2,
             ),
@@ -482,14 +495,14 @@ class Command(BaseCommand):
 
         Oportunidade.objects.get_or_create(
             organizacao=usuarios['organizacao'],
-            titulo='Oficina de logica para o ensino medio',
+            titulo='Oficina de lógica para o ensino médio',
             defaults={
                 'descricao': (
-                    'Acompanhamento de estudantes da rede publica em oficinas '
-                    'semanais de raciocinio logico e introducao a programacao.'
+                    'Acompanhamento de estudantes da rede pública em oficinas '
+                    'semanais de raciocínio lógico e introdução à programação.'
                 ),
                 'area': 'educacao',
-                'local': 'Itajuba - MG',
+                'local': 'Itajubá - MG',
                 'vagas': 5,
                 'carga_horaria_total': 40,
                 'data_inicio': hoje + timedelta(days=15),
@@ -509,7 +522,8 @@ class Command(BaseCommand):
             'coordenacao': 've tudo, incluindo moderacao de todas as disciplinas',
             'professor': 'professor nas disciplinas do 1o e 2o periodos, menos a ultima de cada',
             'monitor': 'monitora em duas disciplinas e aluna em outras duas',
-            'aluno': 'matriculado em quatro disciplinas do semestre',
+            'aluno': 'matriculado nas tres disciplinas ativas do semestre',
+            'aluno2': 'matriculada nas mesmas tres, para testar grupo e chat',
             'organizacao': 'publica oportunidades de voluntariado',
         }
 

@@ -51,7 +51,7 @@ interface Resumo {
   concluidas: number
 }
 
-const AZUL = '#003087'
+const AZUL = 'var(--accent-blue)'
 
 function data(valor: string): string {
   return new Date(valor + 'T00:00:00').toLocaleDateString('pt-BR')
@@ -170,7 +170,11 @@ function CartaoOportunidade({ item, navegar }: {
         >
           {pendentes > 0 && (
             <Botao
-              rotulo={`Avaliar ${pendentes} inscrição(ões)`}
+              rotulo={
+                pendentes === 1
+                  ? 'Avaliar 1 inscrição'
+                  : `Avaliar ${pendentes} inscrições`
+              }
               primario
               onClick={() => navegar(`/organizacao/oportunidade/${item.id}`)}
             />

@@ -8,6 +8,7 @@ O fluxo segue o padrao OTP-based registration:
 """
 
 from rest_framework import status, permissions
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -39,6 +40,42 @@ from autenticacao.utils import (
     enviar_email_ativacao,
     validar_codigo_ativacao,
 )
+
+
+class EstatisticasPublicasView(APIView):
+    """
+    GET /api/auth/estatisticas/
+
+    Numeros exibidos na tela de entrada, antes de qualquer autenticacao.
+
+    Existe porque a tela mostrava valores fixos escritos no codigo. Numero
+    inventado numa tela institucional e um problema de credibilidade: quem
+    perguntar de onde vem nao tem resposta. Aqui os tres vem de contagem real,
+    e a tela passa a dizer a verdade mesmo quando a verdade e zero.
+
+    Sao agregados, sem identificar ninguem, o que permite servir a visitantes
+    nao autenticados sem expor dado pessoal.
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    @extend_schema(
+        responses={200: dict},
+        description='Contagens agregadas para a tela de entrada.',
+    )
+    def get(self, request):
+        from forum.models import Post
+        from voluntariado.models import Certificado
+
+        return Response({
+            'estudantes': Usuario.objects.filter(
+                ativo=True, deleted_at__isnull=True,
+            ).count(),
+            'topicos': Post.objects.filter(
+                post_pai__isnull=True, deleted_at__isnull=True,
+            ).count(),
+            'certificados': Certificado.objects.count(),
+        })
 
 
 class RegistroView(APIView):
@@ -371,7 +408,8 @@ class LogoutView(APIView):
 
 class MeView(APIView):
     """
-    GET /api/auth/me/
+    GET   /api/auth/me/   dados do usuario autenticado
+    PATCH /api/auth/me/   altera os campos que a propria pessoa controla
 
     Dados do usuario autenticado, incluindo os papeis que ele exerce.
 
@@ -383,6 +421,9 @@ class MeView(APIView):
     """
 
     permission_classes = [permissions.IsAuthenticated]
+    # A foto sobe por multipart; o restante do formulario continua chegando
+    # como JSON quando nao ha arquivo.
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     @extend_schema(
         summary='Dados do usuario autenticado',
@@ -396,7 +437,7 @@ class MeView(APIView):
 
         vinculos = list(
             PermissaoDisciplina.objects.filter(usuario=u, ativo=True)
-            .select_related('disciplina')
+            .select_related('disciplina', 'disciplina__curso')
         )
 
         papeis_disciplina = [
@@ -418,6 +459,31 @@ class MeView(APIView):
         e_professor = any(v.papel == 'professor' for v in vinculos)
         e_organizacao = 'ong' in papeis_globais
 
+        # Curso e periodo, derivados das disciplinas em que a pessoa esta
+        # matriculada como aluno. Nao guardamos esses dados no cadastro de
+        # proposito: matricula e periodo mudam a cada semestre, e um campo
+        # copiado fica desatualizado no dia seguinte. O vinculo com a
+        # disciplina, que ja existe e e mantido pela coordenacao, e a fonte
+        # verdadeira.
+        #
+        # O periodo e o maior entre as disciplinas cursadas, e nao a media:
+        # quem esta pegando materia de terceiro e de quinto esta no quinto,
+        # mesmo carregando pendencia de tras.
+        matriculas = [v for v in vinculos if v.papel == 'aluno']
+        cursos = {
+            v.disciplina.curso for v in matriculas if v.disciplina.curso_id
+        }
+        periodos = [
+            v.disciplina.periodo_sugerido
+            for v in matriculas
+            if v.disciplina.periodo_sugerido
+        ]
+
+        # Mais de um curso significa que a pessoa cursa disciplina fora do
+        # proprio curso, o que acontece com optativa. Nesse caso nao ha um
+        # curso unico a declarar, e preferimos nao declarar nenhum a errar.
+        curso = cursos.pop() if len(cursos) == 1 else None
+
         return Response({
             'id': str(u.id),
             'nome_completo': u.nome_completo,
@@ -426,7 +492,16 @@ class MeView(APIView):
             'email': u.email,
             'is_admin': u.is_admin,
             'bio': u.bio or '',
-            'avatar_url': u.avatar_url or '',
+            # A foto enviada tem preferencia sobre o endereco externo: quem
+            # subiu a imagem pela plataforma fez isso depois.
+            'avatar_url': (
+                request.build_absolute_uri(u.foto.url) if u.foto
+                else (u.avatar_url or '')
+            ),
+
+            'curso_nome': curso.nome if curso else '',
+            'curso_codigo': curso.codigo if curso else '',
+            'periodo_atual': max(periodos) if periodos else None,
 
             'genero': u.genero,
             'nome_responsavel': u.nome_responsavel,
@@ -445,6 +520,64 @@ class MeView(APIView):
                 u.genero, e_coordenacao, e_professor, e_monitor, e_organizacao
             ),
         })
+
+    # Campos que a propria pessoa altera. Lista fechada de proposito: nome,
+    # CPF e matricula vem do vinculo institucional e nao se editam por aqui,
+    # senao o certificado emitido deixaria de corresponder ao registro
+    # academico. Papeis e permissoes tambem ficam de fora — quem define quem
+    # leciona o que e a coordenacao, nao o interessado.
+    CAMPOS_EDITAVEIS = ('bio', 'genero', 'data_nascimento', 'foto')
+
+    # A organizacao parceira assina o certificado que emite, entao precisa
+    # manter esses dois campos e a imagem da assinatura.
+    CAMPOS_DA_ORGANIZACAO = ('nome_responsavel', 'cargo_responsavel', 'assinatura')
+
+    @extend_schema(
+        summary='Atualiza os dados editaveis do proprio perfil',
+        request=None,
+        responses={200: dict},
+        tags=['Autenticacao'],
+    )
+    def patch(self, request):
+        usuario = request.user
+
+        permitidos = list(self.CAMPOS_EDITAVEIS)
+
+        if usuario.roles_globais.filter(role='ong').exists():
+            permitidos += list(self.CAMPOS_DA_ORGANIZACAO)
+
+        alterados = []
+
+        for campo in permitidos:
+            if campo in request.FILES:
+                setattr(usuario, campo, request.FILES[campo])
+                alterados.append(campo)
+            elif campo in request.data:
+                valor = request.data[campo]
+
+                # Campo de data em branco chega como string vazia do formulario
+                # e o banco espera nulo.
+                if campo == 'data_nascimento' and valor == '':
+                    valor = None
+
+                setattr(usuario, campo, valor)
+                alterados.append(campo)
+
+        if not alterados:
+            return Response(
+                {'detail': 'Nenhum campo editável foi enviado.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        usuario.save(update_fields=alterados)
+
+        registrar_acao(
+            acao='perfil_atualizado',
+            objeto_afetado=usuario,
+            descricao=f'Campos alterados: {", ".join(alterados)}.',
+        )
+
+        return self.get(request)
 
     @staticmethod
     def _rotular(genero, coordenacao, professor, monitor, organizacao):

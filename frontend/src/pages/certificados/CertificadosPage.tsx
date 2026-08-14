@@ -41,16 +41,8 @@ interface ValidacaoResult {
   codigo_validacao: string
 }
 
-const areaCores: Record<string, string> = {
-  'Educação': '#10B981', 'Educacao': '#10B981',
-  'Saúde': '#3B82F6', 'Saude': '#3B82F6',
-  'Meio Ambiente': '#22C55E',
-  'Assistência Social': '#F59E0B', 'Assistencia Social': '#F59E0B',
-  'Direitos Humanos': '#EC4899',
-  'Cultura': '#8B5CF6',
-  'Tecnologia': '#6366F1',
-  'Esporte': '#EF4444',
-}
+/* Ver a nota em DashboardPage sobre a remoção da cor por área. */
+const CorArea = 'var(--text-secondary)'
 
 function formatDate(dateStr: string): string {
   if (!dateStr) return ''
@@ -61,7 +53,7 @@ function formatDate(dateStr: string): string {
 
 function CertCard({ cert }: { cert: Certificado }) {
   const [hovered, setHovered] = useState(false)
-  const cor = areaCores[cert.area_atuacao] || '#6B7280'
+  const cor = CorArea
 
   return (
     <div
@@ -71,12 +63,16 @@ function CertCard({ cert }: { cert: Certificado }) {
       style={{
         padding: '22px', background: 'var(--bg-card)',
         border: `1px solid ${hovered ? cor + '40' : 'var(--border)'}`,
-        boxShadow: hovered ? `0 4px 12px ${cor}10` : 'none',
+        boxShadow: 'none',
       }}
     >
       {/* Header */}
       <div className="flex items-center justify-between" style={{ marginBottom: '12px' }}>
-        <span className="rounded-md" style={{ padding: '3px 10px', fontSize: '11px', fontWeight: 500, background: `${cor}12`, color: cor }}>
+        <span className="rounded-md" style={{
+          padding: '3px 10px', fontSize: '11px', fontWeight: 500,
+          background: 'var(--bg-input)', color: 'var(--text-secondary)',
+          border: '1px solid var(--border)',
+        }}>
           {cert.area_atuacao}
         </span>
         <div className="flex items-center" style={{ gap: '4px', fontSize: '12px', color: 'var(--text-tertiary)' }}>
@@ -136,7 +132,7 @@ function CertCard({ cert }: { cert: Certificado }) {
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center rounded-lg font-medium transition-all duration-150 cursor-pointer text-white"
-            style={{ padding: '8px 16px', gap: '6px', fontSize: '13px', background: '#003087' }}
+            style={{ padding: '8px 16px', gap: '6px', fontSize: '13px', background: 'var(--accent-blue)' }}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
@@ -219,12 +215,12 @@ export default function CertificadosPage() {
               background: 'var(--bg-input)', border: '1.5px solid var(--border)',
               color: 'var(--text-primary)',
             }}
-            onFocus={e => e.target.style.borderColor = '#003087'}
+            onFocus={e => e.target.style.borderColor = 'var(--accent-blue)'}
             onBlur={e => e.target.style.borderColor = 'var(--border)'}
           />
           <button type="submit" disabled={validando || !codigoInput.trim()}
             className="flex items-center rounded-xl font-medium text-white cursor-pointer transition-all duration-200"
-            style={{ padding: '10px 20px', gap: '6px', fontSize: '14px', background: '#003087', opacity: validando ? 0.7 : 1, flexShrink: 0 }}>
+            style={{ padding: '10px 20px', gap: '6px', fontSize: '14px', background: 'var(--accent-blue)', opacity: validando ? 0.7 : 1, flexShrink: 0 }}>
             {validando ? 'Validando...' : 'Validar'}
           </button>
         </form>
@@ -232,16 +228,16 @@ export default function CertificadosPage() {
         {/* Resultado da validação */}
         {validacaoErro && (
           <div className="flex items-center rounded-xl" style={{ marginTop: '14px', padding: '14px 16px', gap: '10px', background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.15)' }}>
-            <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="#EF4444" strokeWidth={1.5}>
+            <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="var(--accent-red)" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
             </svg>
-            <span style={{ fontSize: '14px', color: '#EF4444' }}>{validacaoErro}</span>
+            <span style={{ fontSize: '14px', color: 'var(--accent-red)' }}>{validacaoErro}</span>
           </div>
         )}
 
         {validacao && (
-          <div className="rounded-xl" style={{ marginTop: '14px', padding: '18px', background: 'rgba(16,185,129,0.03)', border: '1px solid rgba(16,185,129,0.15)' }}>
-            <div className="flex items-center" style={{ gap: '8px', marginBottom: '14px', color: '#10B981', fontSize: '14px', fontWeight: 600 }}>
+          <div className="rounded-xl" style={{ marginTop: '14px', padding: '18px', background: 'var(--accent-blue-soft)', border: '1px solid var(--accent-blue-border)' }}>
+            <div className="flex items-center" style={{ gap: '8px', marginBottom: '14px', color: 'var(--accent-blue-text)', fontSize: '14px', fontWeight: 600 }}>
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>

@@ -8,9 +8,10 @@
  * - Botao de inscrever-se
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../../services/api'
+import { SeloOrganizacao } from '../../components/ui/SeloOrganizacao'
 
 interface Oportunidade {
   id: string
@@ -27,6 +28,9 @@ interface Oportunidade {
   prazo_inscricao: string
   esta_aberta_inscricao: boolean
   organizacao_nome: string
+  /* Logotipo de quem publica. Quem procura voluntariado reconhece a
+     instituição pela marca antes de ler o nome. */
+  organizacao_foto_url: string | null
   requer_aprovacao: boolean
   created_at: string
   imagem_url: string | null
@@ -57,11 +61,9 @@ const areas = [
   { value: 'esporte', label: 'Esporte' },
 ]
 
-const areaCores: Record<string, string> = {
-  educacao: '#10B981', saude: '#3B82F6', meio_ambiente: '#22C55E',
-  assistencia_social: '#F59E0B', direitos_humanos: '#EC4899',
-  cultura: '#8B5CF6', tecnologia: '#6366F1', esporte: '#EF4444', outro: '#6B7280',
-}
+/* Área é classificação, não julgamento: um tom neutro para todas. Ver a nota
+   em DashboardPage sobre por que a cor por área foi removida. */
+const CorArea = 'var(--text-secondary)'
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -69,7 +71,7 @@ function formatDate(dateStr: string): string {
 
 function OpCard({ op, onClick }: { op: Oportunidade; onClick: () => void }) {
   const [hovered, setHovered] = useState(false)
-  const cor = areaCores[op.area] || '#6B7280'
+  const cor = CorArea
   const preenchidas = op.vagas - op.vagas_disponiveis
   const porcent = op.vagas > 0 ? (preenchidas / op.vagas) * 100 : 0
 
@@ -81,12 +83,13 @@ function OpCard({ op, onClick }: { op: Oportunidade; onClick: () => void }) {
       onMouseLeave={() => setHovered(false)}
       style={{
         background: 'var(--bg-card)',
-        border: `1px solid ${hovered ? cor + '55' : 'var(--border)'}`,
-        boxShadow: hovered
-          ? '0 10px 24px rgba(15,23,42,0.10)'
-          : '0 1px 2px rgba(15,23,42,0.04)',
-        transform: hovered ? 'translateY(-3px)' : 'translateY(0)',
-        transition: 'transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease',
+        /* Sem concatenar transparência ao fim da cor — com variável CSS isso
+           invalida a declaração inteira e o cartão fica sem borda. */
+        border: `1px solid ${hovered ? 'var(--accent-blue-border)' : 'var(--border)'}`,
+        /* Ação encerrada continua legível, mas recua um passo: quem procura
+           onde se inscrever precisa distinguir uma da outra de relance. */
+        opacity: op.esta_aberta_inscricao ? 1 : 0.72,
+        transition: 'border-color 0.2s ease, opacity 0.2s ease',
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
@@ -108,7 +111,10 @@ function OpCard({ op, onClick }: { op: Oportunidade; onClick: () => void }) {
         ) : (
           <div style={{
             width: '100%', height: '100%',
-            background: `linear-gradient(135deg, ${cor}22 0%, ${cor}0d 60%, var(--bg-input) 100%)`,
+            /* Sem concatenar transparência ao fim da cor: isso só funciona
+               com hexadecimal, e com variável CSS invalida a declaração
+               inteira — o bloco fica transparente e a capa some. */
+            background: 'var(--bg-input)',
           }} />
         )}
 
@@ -124,7 +130,10 @@ function OpCard({ op, onClick }: { op: Oportunidade; onClick: () => void }) {
           {op.area_display}
         </span>
 
-        {op.minha_inscricao && (
+        {/* A situação da própria inscrição vem antes do estado da ação: para
+            quem participou, "Participação concluída" diz mais do que
+            "Encerrada". */}
+        {op.minha_inscricao ? (
           <span
             className="rounded-md"
             style={{
@@ -135,6 +144,17 @@ function OpCard({ op, onClick }: { op: Oportunidade; onClick: () => void }) {
           >
             {SITUACAO_ROTULO[op.minha_inscricao] || 'Inscrito'}
           </span>
+        ) : !op.esta_aberta_inscricao && (
+          <span
+            className="rounded-md"
+            style={{
+              position: 'absolute', top: '10px', right: '12px',
+              padding: '3px 10px', fontSize: '11px', fontWeight: 600,
+              background: 'rgba(255,255,255,0.92)', color: 'var(--text-secondary)',
+            }}
+          >
+            Encerrada
+          </span>
         )}
       </div>
 
@@ -144,9 +164,14 @@ function OpCard({ op, onClick }: { op: Oportunidade; onClick: () => void }) {
         {op.titulo}
       </div>
 
-      {/* Organizacao */}
-      <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-        por {op.organizacao_nome}
+      {/* Quem publica. O logotipo vem antes do nome porque é o que identifica
+          a instituição num relance; sem imagem enviada, as iniciais ocupam o
+          mesmo espaço e o alinhamento da grade não muda. */}
+      <div className="flex items-center" style={{ gap: '9px', marginBottom: '14px' }}>
+        <SeloOrganizacao nome={op.organizacao_nome} foto={op.organizacao_foto_url} />
+        <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+          {op.organizacao_nome}
+        </span>
       </div>
 
       {/* Info */}
@@ -193,7 +218,8 @@ function OpCard({ op, onClick }: { op: Oportunidade; onClick: () => void }) {
 
 export default function VoluntariadoPage() {
   const navigate = useNavigate()
-  const [oportunidades, setOportunidades] = useState<Oportunidade[]>([])
+  const [todas, setTodas] = useState<Oportunidade[]>([])
+  const [situacao, setSituacao] = useState<'abertas' | 'encerradas' | 'todas'>('abertas')
   const [loading, setLoading] = useState(true)
   const [busca, setBusca] = useState('')
   const [buscaInput, setBuscaInput] = useState('')
@@ -205,19 +231,42 @@ export default function VoluntariadoPage() {
 
   useEffect(() => {
     setLoading(true)
-    /* Só as que ainda aceitam inscrição. Listar oportunidade encerrada é
-       oferecer ao aluno algo em que ele não pode entrar. */
-    const params: Record<string, string> = {
-      ordering: '-created_at',
-      status: 'ativa',
-    }
+
+    const params: Record<string, string> = { ordering: '-created_at' }
     if (busca) params.search = busca
 
     api.get('/voluntariado/oportunidades/', { params }).then(res => {
       const data = Array.isArray(res.data) ? res.data : res.data.results || []
-      setOportunidades(data.filter((op: Oportunidade) => op.esta_aberta_inscricao))
+      setTodas(data)
     }).catch(console.error).finally(() => setLoading(false))
   }, [busca])
+
+  /**
+   * Recorte por situação da inscrição.
+   *
+   * A tela mostrava apenas o que estava aberto, e a decisão tinha uma razão:
+   * oferecer ao estudante algo em que ele não pode entrar é frustrante. Mas
+   * esconder o que encerrou tem custo próprio — quem participou de uma ação
+   * perdia o caminho para ela, e quem chega ao fim do prazo não entende se a
+   * vaga sumiu ou nunca existiu.
+   *
+   * A escolha explícita resolve os dois: abre nas disponíveis, que é o caso
+   * comum, e deixa as encerradas a um clique.
+   */
+  const oportunidades = useMemo(() => {
+    if (situacao === 'encerradas') {
+      return todas.filter(op => !op.esta_aberta_inscricao)
+    }
+
+    if (situacao === 'abertas') {
+      return todas.filter(op => op.esta_aberta_inscricao)
+    }
+
+    return todas
+  }, [todas, situacao])
+
+  const abertas = todas.filter(op => op.esta_aberta_inscricao).length
+  const encerradas = todas.length - abertas
 
   return (
     <div style={{ maxWidth: '1000px' }}>
@@ -227,7 +276,11 @@ export default function VoluntariadoPage() {
           Voluntariado
         </h1>
         <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-          {oportunidades.length} oportunidade(s) com inscrições abertas
+          {oportunidades.length}
+          {oportunidades.length === 1 ? ' oportunidade' : ' oportunidades'}
+          {situacao === 'abertas' ? ' com inscrições abertas'
+            : situacao === 'encerradas' ? ' com inscrições encerradas'
+            : ' cadastradas'}
         </p>
       </div>
 
@@ -249,7 +302,38 @@ export default function VoluntariadoPage() {
 
         {/* Sem filtro por área: são poucas oportunidades por vez, e recortar
             por tema esconde vagas que o aluno aceitaria se tivesse visto.
-            A busca por texto cobre quem já sabe o que procura. */}
+            A busca por texto cobre quem já sabe o que procura.
+
+            O filtro de situação existe por outro motivo: quem participou de
+            uma ação encerrada precisa de um caminho de volta até ela. */}
+        <div className="flex items-center" style={{ gap: '7px' }}>
+          {([
+            ['abertas', 'Abertas', abertas],
+            ['encerradas', 'Encerradas', encerradas],
+            ['todas', 'Todas', todas.length],
+          ] as const).map(([chave, rotulo, total]) => (
+            <button
+              key={chave}
+              onClick={() => setSituacao(chave)}
+              aria-pressed={situacao === chave}
+              className="flex items-center rounded-lg cursor-pointer"
+              style={{
+                padding: '8px 14px', gap: '7px', fontSize: '13px', fontWeight: 500,
+                background: situacao === chave ? 'var(--accent-blue)' : 'var(--bg-card)',
+                color: situacao === chave ? '#FFFFFF' : 'var(--text-secondary)',
+                border: `1px solid ${situacao === chave ? 'var(--accent-blue)' : 'var(--border)'}`,
+              }}
+            >
+              {rotulo}
+              <span style={{
+                padding: '0 6px', borderRadius: '9px', fontSize: '11px',
+                background: situacao === chave ? 'rgba(255,255,255,0.22)' : 'var(--bg-input)',
+              }}>
+                {total}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Lista */}

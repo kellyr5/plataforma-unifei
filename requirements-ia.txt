@@ -1,0 +1,34 @@
+# Dependencias da busca semantica (fase 1, execucao local).
+#
+# Separadas do requirements.txt porque a plataforma inteira funciona sem elas:
+# sem estas bibliotecas a busca do forum responde por correspondencia de termos.
+#
+# --------------------------------------------------------------------------
+# IMPORTANTE: instale o PyTorch pela versao de CPU.
+#
+# O indice do PyPI entrega, por padrao, a build com CUDA, que arrasta cerca de
+# 2 GB de bibliotecas da NVIDIA. Elas so servem em maquina com placa de video
+# dedicada, e o modelo que usamos foi escolhido justamente por rodar bem em
+# CPU. A linha --extra-index-url abaixo aponta para a build sem CUDA, de
+# aproximadamente 200 MB.
+# --------------------------------------------------------------------------
+#
+# Instalacao:
+#     python -m pip install --upgrade pip
+#     pip install -r requirements-ia.txt
+#
+# Extensao do PostgreSQL, uma unica vez (e binario do servidor, nao vem do pip):
+#     sudo apt install postgresql-14-pgvector
+#     sudo service postgresql restart
+#
+# No .env:
+#     BUSCA_SEMANTICA_ATIVA=True
+#
+# Por fim, para indexar o que ja existe:
+#     python manage.py migrate
+#     python manage.py indexar_forum
+
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+torch==2.5.1+cpu
+sentence-transformers==3.3.1

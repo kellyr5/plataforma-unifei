@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import api from '../../services/api'
+import { SeloOrganizacao } from '../../components/ui/SeloOrganizacao'
 import toast, { Toaster } from 'react-hot-toast'
 
 interface Oportunidade {
@@ -22,14 +23,24 @@ interface Oportunidade {
   prazo_inscricao: string
   esta_aberta_inscricao: boolean
   organizacao_nome: string
+  organizacao_foto_url: string | null
+  /* Situação da inscrição de quem está vendo, quando existir. */
+  minha_inscricao: string | null
   requer_aprovacao: boolean
   total_inscritos: number
 }
 
-const areaCores: Record<string, string> = {
-  educacao: '#10B981', saude: '#3B82F6', meio_ambiente: '#22C55E',
-  assistencia_social: '#F59E0B', direitos_humanos: '#EC4899',
-  cultura: '#8B5CF6', tecnologia: '#6366F1', esporte: '#EF4444', outro: '#6B7280',
+/* Ver a nota em DashboardPage: a cor por área confundia classificação com
+   julgamento, porque compartilhava a paleta dos estados de inscrição. */
+const CorArea = 'var(--text-secondary)'
+
+const SITUACAO_INSCRICAO: Record<string, string> = {
+  pendente: 'Inscrição enviada, aguardando a organização',
+  aprovada: 'Você participa desta ação',
+  concluida: 'Participação concluída',
+  rejeitada: 'Sua inscrição não foi aceita',
+  removida: 'Você foi removido desta ação',
+  desistente: 'Você desistiu desta ação',
 }
 
 function formatDate(dateStr: string): string {
@@ -104,7 +115,7 @@ export default function OportunidadePage() {
 
   if (!op) return null
 
-  const cor = areaCores[op.area] || '#6B7280'
+  const cor = CorArea
   const preenchidas = op.vagas - op.vagas_disponiveis
   const porcent = op.vagas > 0 ? (preenchidas / op.vagas) * 100 : 0
 
@@ -124,28 +135,55 @@ export default function OportunidadePage() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
           </svg>
         </button>
-        <span className="rounded-md" style={{ padding: '4px 12px', fontSize: '12px', fontWeight: 500, background: `${cor}12`, color: cor }}>
+        <span className="rounded-md" style={{
+          padding: '4px 12px', fontSize: '12px', fontWeight: 500,
+          background: 'var(--bg-input)', color: 'var(--text-secondary)',
+          border: '1px solid var(--border)',
+        }}>
           {op.area_display}
         </span>
         {op.esta_aberta_inscricao ? (
-          <span className="rounded-md" style={{ padding: '4px 12px', fontSize: '12px', fontWeight: 500, background: 'rgba(16,185,129,0.06)', color: '#10B981' }}>
+          <span className="rounded-md" style={{ padding: '4px 12px', fontSize: '12px', fontWeight: 500, background: 'var(--accent-blue-soft)', color: 'var(--accent-blue-text)', border: '1px solid var(--accent-blue-border)' }}>
             Inscrições abertas
           </span>
         ) : (
-          <span className="rounded-md" style={{ padding: '4px 12px', fontSize: '12px', fontWeight: 500, background: 'rgba(239,68,68,0.06)', color: '#EF4444' }}>
+          <span className="rounded-md" style={{ padding: '4px 12px', fontSize: '12px', fontWeight: 500, background: 'var(--bg-input)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
             Inscrições encerradas
           </span>
         )}
       </div>
 
       {/* Card principal */}
-      <div className="rounded-xl" style={{ padding: '28px', background: 'var(--bg-card)', border: '1px solid var(--border)', marginBottom: '20px' }}>
+      <div className="rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', marginBottom: '20px', overflow: 'hidden' }}>
+        {/* Capa da ação. A listagem já mostrava a imagem e a página de
+            detalhe não — quem clicava para saber mais via menos do que na
+            lista de onde veio. */}
+        {op.imagem_url && (
+          <img
+            src={op.imagem_url}
+            alt=""
+            style={{
+              width: '100%', height: '180px', objectFit: 'cover',
+              display: 'block', borderBottom: '1px solid var(--border)',
+            }}
+          />
+        )}
+
+        <div style={{ padding: '28px' }}>
         <h1 className="font-bold" style={{ fontSize: '22px', color: 'var(--text-primary)', marginBottom: '6px', lineHeight: 1.3 }}>
           {op.titulo}
         </h1>
-        <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
-          Organizado por <strong style={{ fontWeight: 500 }}>{op.organizacao_nome}</strong>
-        </p>
+        <div className="flex items-center" style={{ gap: '11px', marginBottom: '22px' }}>
+          <SeloOrganizacao nome={op.organizacao_nome} foto={op.organizacao_foto_url} tamanho={38} />
+          <div>
+            <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Organização responsável
+            </div>
+            <div className="font-medium" style={{ fontSize: '14px', color: 'var(--text-primary)' }}>
+              {op.organizacao_nome}
+            </div>
+          </div>
+        </div>
 
         {/* Descricao */}
         <div style={{ fontSize: '14px', color: 'var(--text-primary)', lineHeight: 1.7, whiteSpace: 'pre-wrap', marginBottom: '24px' }}>
@@ -172,23 +210,47 @@ export default function OportunidadePage() {
             <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Vagas preenchidas</span>
             <span className="font-medium" style={{ fontSize: '13px', color: 'var(--text-primary)' }}>{preenchidas}/{op.vagas}</span>
           </div>
-          <div className="rounded-full" style={{ height: '6px', background: 'var(--border)' }}>
-            <div className="rounded-full transition-all duration-500" style={{ height: '6px', background: cor, width: `${porcent}%` }} />
+          <div className="rounded-full" style={{ height: '6px', background: 'var(--bg-input)' }}>
+            <div className="rounded-full transition-all duration-500" style={{ height: '6px', background: 'var(--accent-blue)', width: `${porcent}%` }} />
           </div>
+        </div>
         </div>
       </div>
 
-      {/* Botao de inscricao */}
-      {op.esta_aberta_inscricao && (
+      {/* Inscrição.
+          A situação de quem já se inscreveu vem antes do convite: oferecer
+          "Quero me inscrever" a quem já participou da ação é pedir que a
+          pessoa descubra pelo erro do servidor que não pode. */}
+      {op.minha_inscricao ? (
+        <div className="rounded-xl" style={{
+          padding: '20px 24px', background: 'var(--bg-card)', border: '1px solid var(--border)',
+        }}>
+          <div className="font-medium" style={{ fontSize: '14.5px', color: 'var(--text-primary)', marginBottom: '4px' }}>
+            {SITUACAO_INSCRICAO[op.minha_inscricao] || 'Você já se inscreveu nesta ação'}
+          </div>
+          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+            {op.minha_inscricao === 'concluida'
+              ? 'Sua participação foi encerrada e o certificado está disponível em Certificados.'
+              : 'Acompanhe a situação da sua inscrição em Meu perfil.'}
+          </p>
+        </div>
+      ) : !op.esta_aberta_inscricao ? (
+        <div className="rounded-xl" style={{
+          padding: '20px 24px', background: 'var(--bg-card)', border: '1px solid var(--border)',
+        }}>
+          <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)' }}>
+            As inscrições para esta ação estão encerradas.
+          </p>
+        </div>
+      ) : (
         <div className="rounded-xl" style={{ padding: '24px', background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
           {!showMotivacao ? (
             <button
               onClick={() => setShowMotivacao(true)}
-              className="w-full flex items-center justify-center rounded-xl font-semibold text-white cursor-pointer transition-all duration-200"
+              className="w-full flex items-center justify-center rounded-xl font-semibold text-white cursor-pointer"
               style={{
-                padding: '14px', gap: '8px', fontSize: '15px',
-                background: `linear-gradient(135deg, ${cor} 0%, ${cor}dd 100%)`,
-                boxShadow: `0 4px 12px ${cor}30`,
+                padding: '14px', gap: '8px', fontSize: '15px', border: 'none',
+                background: 'var(--accent-blue)',
               }}
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -212,7 +274,7 @@ export default function OportunidadePage() {
                   background: 'var(--bg-input)', border: '1.5px solid var(--border)',
                   color: 'var(--text-primary)', marginBottom: '14px',
                 }}
-                onFocus={e => e.target.style.borderColor = cor}
+                onFocus={e => e.target.style.borderColor = 'var(--accent-blue)'}
                 onBlur={e => e.target.style.borderColor = 'var(--border)'}
               />
               <div className="flex items-center justify-end" style={{ gap: '10px' }}>
@@ -223,7 +285,10 @@ export default function OportunidadePage() {
                 </button>
                 <button onClick={handleInscrever} disabled={inscrevendo}
                   className="rounded-xl font-semibold text-white cursor-pointer"
-                  style={{ padding: '10px 24px', fontSize: '14px', background: cor, opacity: inscrevendo ? 0.7 : 1 }}>
+                  style={{
+                    padding: '10px 24px', fontSize: '14px', border: 'none',
+                    background: 'var(--accent-blue)', opacity: inscrevendo ? 0.7 : 1,
+                  }}>
                   {inscrevendo ? 'Inscrevendo...' : 'Confirmar inscrição'}
                 </button>
               </div>

@@ -81,6 +81,17 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     data_nascimento = models.DateField(null=True, blank=True)
     avatar_url = models.CharField(max_length=255, blank=True, default='')
 
+    # Imagem enviada pela propria pessoa. Para a organizacao parceira e o
+    # logotipo: quem procura oportunidade reconhece a instituicao pela marca
+    # antes de ler o nome, e uma lista de oportunidades sem identificacao
+    # visual obriga a ler tudo para saber quem esta oferecendo o que.
+    foto = models.ImageField(
+        upload_to='perfis/%Y/%m/',
+        null=True,
+        blank=True,
+        help_text='Foto de perfil, ou logotipo no caso da organizacao parceira',
+    )
+
     # Dados usados na assinatura do certificado emitido pela organizacao.
     nome_responsavel = models.CharField(max_length=255, blank=True, default='')
     cargo_responsavel = models.CharField(max_length=120, blank=True, default='')

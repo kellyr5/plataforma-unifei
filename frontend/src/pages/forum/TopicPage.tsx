@@ -81,11 +81,15 @@ function BlocoRestricao({ post, podeModerar, onMudou }: {
 
   if (post.restrito) {
     return (
+      /* Restrição pedagógica não é punição: o professor tira a publicação de
+         circulação porque ela antecipa a resposta de um exercício, ou porque
+         precisa ser reescrita. O âmbar de alerta que havia aqui sugeria falta
+         cometida — a moldura neutra deixa o motivo escrito falar por si. */
       <div className="rounded-lg" style={{
         padding: '12px 14px', marginTop: '12px',
-        background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)',
+        background: 'var(--bg-input)', border: '1px solid var(--border)',
       }}>
-        <div className="font-medium" style={{ fontSize: '13px', color: '#B45309', marginBottom: '3px' }}>
+        <div className="font-medium" style={{ fontSize: '13px', color: 'var(--text-primary)', marginBottom: '3px' }}>
           Publicação restrita
         </div>
         <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
@@ -102,7 +106,7 @@ function BlocoRestricao({ post, podeModerar, onMudou }: {
             className="cursor-pointer"
             style={{
               marginTop: '10px', fontSize: '12px', fontWeight: 500,
-              background: 'none', border: 'none', color: '#003087',
+              background: 'none', border: 'none', color: 'var(--accent-blue)',
             }}
           >
             Remover restrição
@@ -150,7 +154,7 @@ function BlocoRestricao({ post, podeModerar, onMudou }: {
           className="rounded-lg font-medium cursor-pointer"
           style={{
             padding: '7px 14px', fontSize: '13px', border: 'none',
-            background: '#F59E0B', color: 'white', opacity: enviando ? 0.6 : 1,
+            background: 'var(--accent-blue)', color: 'white', opacity: enviando ? 0.6 : 1,
           }}
         >
           Confirmar restrição
@@ -175,7 +179,10 @@ function tempoRelativo(dateStr: string): string {
   const h = Math.floor(min / 60)
   if (h < 24) return `ha ${h}h`
   const d = Math.floor(h / 24)
-  return d < 30 ? `ha ${d}d` : `ha ${Math.floor(d / 30)} mes(es)`
+  if (d < 30) return `há ${d} d`
+
+  const meses = Math.floor(d / 30)
+  return `há ${meses} ${meses === 1 ? 'mês' : 'meses'}`
 }
 
 /* ============================================================
@@ -207,7 +214,7 @@ function VoteBlock({ postId, totalVotos, onVoted }: {
         className="flex items-center justify-center rounded-lg cursor-pointer transition-all duration-150"
         style={{
           width: '40px', height: '40px',
-          background: 'rgba(0,48,135,0.06)', color: '#003087',
+          background: 'rgba(0,48,135,0.06)', color: 'var(--accent-blue)',
           border: '1px solid rgba(0,48,135,0.1)',
         }}
       >
@@ -215,7 +222,7 @@ function VoteBlock({ postId, totalVotos, onVoted }: {
           <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
         </svg>
       </button>
-      <span className="font-bold" style={{ fontSize: '18px', color: '#003087' }}>{totalVotos}</span>
+      <span className="font-bold" style={{ fontSize: '18px', color: 'var(--accent-blue)' }}>{totalVotos}</span>
       <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>votos</span>
     </div>
   )
@@ -263,8 +270,11 @@ function ResponseCard({ post, topicAuthorId, onAction }: {
       {/* Conteudo */}
       <div className="flex-1 min-w-0">
         {/* Badge melhor resposta */}
+        {/* Verde-oliva é cor oficial da UNIFEI, e aqui marca a resposta que
+            resolveu a dúvida. É o único destaque cromático da interface, e
+            existe porque quem chega depois procura exatamente por ela. */}
         {post.e_melhor && (
-          <div className="flex items-center" style={{ gap: '6px', marginBottom: '10px', color: '#10B981', fontSize: '13px', fontWeight: 500 }}>
+          <div className="flex items-center" style={{ gap: '6px', marginBottom: '10px', color: 'var(--accent-oliva-texto)', fontSize: '13px', fontWeight: 600 }}>
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -283,7 +293,7 @@ function ResponseCard({ post, topicAuthorId, onAction }: {
           <div className="flex items-center" style={{ gap: '8px', fontSize: '12px', color: 'var(--text-tertiary)' }}>
             <div className="flex items-center justify-center rounded-full" style={{
               width: '24px', height: '24px', background: 'rgba(0,48,135,0.08)',
-              color: '#003087', fontSize: '11px', fontWeight: 600,
+              color: 'var(--accent-blue)', fontSize: '11px', fontWeight: 600,
             }}>
               {post.autor_nome?.[0]?.toUpperCase() || 'U'}
             </div>
@@ -300,15 +310,17 @@ function ResponseCard({ post, topicAuthorId, onAction }: {
               className="flex items-center rounded-lg cursor-pointer transition-all duration-150"
               style={{
                 padding: '6px 12px', gap: '4px', fontSize: '12px',
-                background: (post.total_reacoes_persiste || 0) > 0 ? 'rgba(245,158,11,0.06)' : 'var(--bg-input)',
-                color: (post.total_reacoes_persiste || 0) > 0 ? '#F59E0B' : 'var(--text-tertiary)',
+                background: (post.total_reacoes_persiste || 0) > 0 ? 'var(--accent-blue-soft)' : 'var(--bg-input)',
+                color: (post.total_reacoes_persiste || 0) > 0 ? 'var(--accent-blue-text)' : 'var(--text-tertiary)',
                 border: '1px solid var(--border)',
               }}
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
               </svg>
-              {(post.total_reacoes_persiste || 0) > 0 ? `${post.total_reacoes_persiste} dúvida(s)` : 'Dúvida persiste'}
+              {(post.total_reacoes_persiste || 0) > 0
+                ? `${post.total_reacoes_persiste} ${post.total_reacoes_persiste === 1 ? 'dúvida' : 'dúvidas'}`
+                : 'Dúvida persiste'}
             </button>
 
             {/* Marcar melhor (so pra autor do topico ou admin) */}
@@ -319,8 +331,8 @@ function ResponseCard({ post, topicAuthorId, onAction }: {
                 className="flex items-center rounded-lg cursor-pointer transition-all duration-150"
                 style={{
                   padding: '6px 12px', gap: '4px', fontSize: '12px',
-                  background: 'rgba(16,185,129,0.06)', color: '#10B981',
-                  border: '1px solid rgba(16,185,129,0.15)',
+                  background: 'var(--accent-blue-soft)', color: 'var(--accent-blue-text)',
+                  border: '1px solid var(--accent-blue-border)',
                 }}
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -464,7 +476,7 @@ export default function TopicPage() {
         <div>
           <span className="rounded-md" style={{
             padding: '3px 10px', fontSize: '12px', fontWeight: 500,
-            background: 'rgba(0,48,135,0.06)', color: '#003087',
+            background: 'rgba(0,48,135,0.06)', color: 'var(--accent-blue)',
           }}>
             {topic.disciplina_codigo}{topic.disciplina_nome ? ` - ${topic.disciplina_nome}` : ''}
           </span>
@@ -472,7 +484,7 @@ export default function TopicPage() {
         {hasResolved && (
           <span className="rounded-md flex items-center" style={{
             padding: '3px 10px', fontSize: '12px', fontWeight: 500, gap: '4px',
-            background: 'rgba(16,185,129,0.06)', color: '#10B981',
+            background: 'rgba(174,189,9,0.10)', color: 'var(--accent-oliva-texto)',
           }}>
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
@@ -500,7 +512,7 @@ export default function TopicPage() {
           <div className="flex items-center" style={{ marginTop: '16px', gap: '8px', fontSize: '12px', color: 'var(--text-tertiary)' }}>
             <div className="flex items-center justify-center rounded-full" style={{
               width: '24px', height: '24px', background: 'rgba(0,48,135,0.08)',
-              color: '#003087', fontSize: '11px', fontWeight: 600,
+              color: 'var(--accent-blue)', fontSize: '11px', fontWeight: 600,
             }}>
               {topic.autor_nome?.[0]?.toUpperCase() || 'U'}
             </div>
@@ -561,7 +573,7 @@ export default function TopicPage() {
               background: 'var(--bg-input)', border: '1.5px solid var(--border)',
               color: 'var(--text-primary)', marginBottom: '14px',
             }}
-            onFocus={e => e.target.style.borderColor = '#003087'}
+            onFocus={e => e.target.style.borderColor = 'var(--accent-blue)'}
             onBlur={e => e.target.style.borderColor = 'var(--border)'}
           />
           {/* Anexo na resposta: material de apoio costuma explicar melhor do
@@ -575,7 +587,7 @@ export default function TopicPage() {
               className="flex items-center rounded-lg font-medium cursor-pointer"
               style={{
                 padding: '8px 14px', gap: '7px', fontSize: '13px',
-                color: '#003087',
+                color: 'var(--accent-blue)',
                 background: 'rgba(0,48,135,0.06)',
                 border: '1px solid rgba(0,48,135,0.25)',
               }}
@@ -645,7 +657,7 @@ export default function TopicPage() {
               className="flex items-center rounded-xl font-medium cursor-pointer transition-all duration-200 text-white"
               style={{
                 padding: '10px 24px', gap: '8px', fontSize: '14px',
-                background: '#003087',
+                background: 'var(--accent-blue)',
                 opacity: enviando || !novaResposta.trim() ? 0.5 : 1,
               }}
             >

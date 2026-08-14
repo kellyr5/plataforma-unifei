@@ -8,6 +8,7 @@ class OportunidadeSerializer(serializers.ModelSerializer):
     organizacao_nome = serializers.CharField(
         source='organizacao.nome_completo', read_only=True
     )
+    organizacao_foto_url = serializers.SerializerMethodField()
     area_display = serializers.CharField(source='get_area_display', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     vagas_disponiveis = serializers.IntegerField(read_only=True)
@@ -20,7 +21,7 @@ class OportunidadeSerializer(serializers.ModelSerializer):
         model = Oportunidade
         fields = [
             'id',
-            'organizacao', 'organizacao_nome',
+            'organizacao', 'organizacao_nome', 'organizacao_foto_url',
             'titulo', 'descricao', 'o_que_fazer', 'requisitos',
             'imagem', 'imagem_url',
             'area', 'area_display',
@@ -43,6 +44,22 @@ class OportunidadeSerializer(serializers.ModelSerializer):
         if obj.imagem and request:
             return request.build_absolute_uri(obj.imagem.url)
         return None
+
+    def get_organizacao_foto_url(self, obj) -> str | None:
+        """
+        Logotipo de quem publica a oportunidade.
+
+        A foto enviada tem preferencia sobre o endereco externo: quem subiu a
+        imagem pela plataforma fez isso depois, e a intencao mais recente
+        prevalece. Sem nenhuma das duas, a tela desenha as iniciais do nome.
+        """
+        organizacao = obj.organizacao
+        request = self.context.get('request')
+
+        if getattr(organizacao, 'foto', None) and request:
+            return request.build_absolute_uri(organizacao.foto.url)
+
+        return organizacao.avatar_url or None
 
     def get_minha_inscricao(self, obj) -> str | None:
         """

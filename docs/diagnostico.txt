@@ -1,65 +1,86 @@
-22 objects imported automatically (use -v 2 for details).
+30 objects imported automatically (use -v 2 for details).
 
+========================================================================
+CURSOS
+========================================================================
+CCO      Ciência da Computação              32 disciplina(s), 32 obrigatoria(s)
 
-============================================================
-PROFESSOR: Bruno Professor (10000000002)
-============================================================
+========================================================================
+OBRIGATORIAS POR PERIODO
+========================================================================
+  1o periodo: 5 disciplina(s)
+  2o periodo: 4 disciplina(s)
+  3o periodo: 6 disciplina(s)
+  4o periodo: 6 disciplina(s)
+  5o periodo: 5 disciplina(s)
+  6o periodo: 2 disciplina(s)
+  7o periodo: 3 disciplina(s)
+  8o periodo: 1 disciplina(s)
 
-Vinculos ativos: 8
-  professor  XDES01   periodo=1 semestre=2026.2
-  professor  CRSC03   periodo=1 semestre=2026.2
-  professor  MAT00A   periodo=1 semestre=2026.2
-  professor  XMAC01   periodo=1 semestre=2026.2
-  professor  CAHC04   periodo=1 semestre=2026.2
-  professor  CRSC04   periodo=2 semestre=2026.2
-  professor  CTCO01   periodo=2 semestre=2026.2
-  professor  CMAC04   periodo=2 semestre=2026.2
+  Total: 32 (o PPC preve 31)
 
---- GET /api/forum/minhas-disciplinas/ ---
-status: 200
-resumo: {'disciplinas': 8, 'sem_resposta': 3, 'denuncias_pendentes': 1, 'matriculados': 15}
-  CAHC04   papel=professor  duvidas=3 sem_resposta=1 matriculados=1
-  MAT00A   papel=professor  duvidas=1 sem_resposta=1 matriculados=2
-  XMAC01   papel=professor  duvidas=1 sem_resposta=1 matriculados=2
-  XDES01   papel=professor  duvidas=0 sem_resposta=0 matriculados=2
-  CRSC03   papel=professor  duvidas=1 sem_resposta=0 matriculados=2
-  CRSC04   papel=professor  duvidas=1 sem_resposta=0 matriculados=2
-  CTCO01   papel=professor  duvidas=0 sem_resposta=0 matriculados=2
-  CMAC04   papel=professor  duvidas=1 sem_resposta=0 matriculados=2
+========================================================================
+CODIGOS REPETIDOS
+========================================================================
+  Nenhum codigo repetido.
 
---- GET /api/forum/minhas-disciplinas/?papel=monitor ---
-status: 200
-resumo: {'disciplinas': 0, 'sem_resposta': 0, 'denuncias_pendentes': 0, 'matriculados': 0}
+========================================================================
+SEM CURSO OU SEM PERIODO
+========================================================================
+  Nenhuma.
 
---- GET /api/auth/me/ ---
-status: 200
-e_professor=True e_monitor=False e_coordenacao=False rotulo=Professor
+========================================================================
+LISTA COMPLETA DAS OBRIGATORIAS
+========================================================================
+  Confira contra o PPC: a que sobrar e a que deve sair.
 
-============================================================
-MONITORA: Carla Monitora (10000000003)
-============================================================
+  1o  CAHC04     Projeto Integrado                              0 vinculo(s), 0 post(s)
+  1o  CRSC03     Arquitetura de Computadores I                  0 vinculo(s), 0 post(s)
+  1o  MAT00A     Cálculo A                                      0 vinculo(s), 0 post(s)
+  1o  XDES01     Fundamentos de Programação                     0 vinculo(s), 0 post(s)
+  1o  XMAC01     Matemática Discreta                            0 vinculo(s), 0 post(s)
+  2o  CMAC04     Modelagem Computacional                        3 vinculo(s), 5 post(s)
+  2o  CRSC04     Arquitetura de Computadores II                 3 vinculo(s), 2 post(s)
+  2o  CTCO01     Algoritmos e Estrutura de Dados I              3 vinculo(s), 1 post(s)
+  2o  MAT00B     Cálculo B                                      0 vinculo(s), 0 post(s)
+  3o  CMAC03     Algoritmos em Grafos                           0 vinculo(s), 0 post(s)
+  3o  CRSC02     Sistemas Operacionais                          0 vinculo(s), 0 post(s)
+  3o  CTCO02     Algoritmos e Estrutura de Dados II             0 vinculo(s), 0 post(s)
+  3o  XDES02     Programação Orientada a Objetos                0 vinculo(s), 0 post(s)
+  3o  XDES04     Engenharia de Software I                       0 vinculo(s), 0 post(s)
+  3o  XMAC02     Métodos Matemáticos para Análise de Dados      0 vinculo(s), 0 post(s)
+  4o  CDES05     Programação Lógica e Funcional                 0 vinculo(s), 0 post(s)
+  4o  CMAC05     Cálculo Numérico para Computação               0 vinculo(s), 0 post(s)
+  4o  CRSC05     Sistemas Embarcados                            0 vinculo(s), 0 post(s)
+  4o  CTCO04     Projeto e Análise de Algoritmos                0 vinculo(s), 0 post(s)
+  4o  XDES03     Programação Web                                0 vinculo(s), 0 post(s)
+  4o  XRSC01     Redes de Computadores                          0 vinculo(s), 0 post(s)
+  5o  CMCO05     Introdução à Computação Visual                 0 vinculo(s), 0 post(s)
+  5o  CTCO03     Análise e Projeto Orientados a Objeto          0 vinculo(s), 0 post(s)
+  5o  CTCO05     Teoria da Computação                           0 vinculo(s), 0 post(s)
+  5o  XMCO01     Inteligência Artificial                        0 vinculo(s), 0 post(s)
+  5o  XPAD01     Banco de Dados I                               0 vinculo(s), 0 post(s)
+  6o  CTCO06     Compiladores                                   0 vinculo(s), 0 post(s)
+  6o  XAHC02     Interação Humano-Computador                    0 vinculo(s), 0 post(s)
+  7o  TCC1       Trabalho de Conclusão de Curso 1               0 vinculo(s), 0 post(s)
+  7o  XAHC01     Computação e Sociedade                         0 vinculo(s), 0 post(s)
+  7o  XAHC03     Metodologia Científica                         0 vinculo(s), 0 post(s)
+  8o  TCC2       Trabalho de Conclusão de Curso 2               0 vinculo(s), 0 post(s)
 
-Vinculos ativos: 9
-  aluno      XDES01   periodo=1 semestre=2026.2
-  aluno      CRSC03   periodo=1 semestre=2026.2
-  aluno      MAT00A   periodo=1 semestre=2026.2
-  aluno      XMAC01   periodo=1 semestre=2026.2
-  monitor    CAHC04   periodo=1 semestre=2026.2
-  aluno      CRSC04   periodo=2 semestre=2026.2
-  aluno      CTCO01   periodo=2 semestre=2026.2
-  aluno      MAT00B   periodo=2 semestre=2026.2
-  aluno      CMAC04   periodo=2 semestre=2026.2
+========================================================================
+COMO REMOVER, DEPOIS DE IDENTIFICAR
+========================================================================
 
---- GET /api/forum/minhas-disciplinas/ ---
-status: 200
-resumo: {'disciplinas': 1, 'sem_resposta': 1, 'denuncias_pendentes': 1, 'matriculados': 1}
-  CAHC04   papel=monitor    duvidas=3 sem_resposta=1 matriculados=1
+Soft delete preserva o historico e e o caminho seguro:
 
---- GET /api/forum/minhas-disciplinas/?papel=monitor ---
-status: 200
-resumo: {'disciplinas': 1, 'sem_resposta': 1, 'denuncias_pendentes': 1, 'matriculados': 1}
-  CAHC04   papel=monitor    duvidas=3 sem_resposta=1 matriculados=1
+    from django.utils import timezone
+    from forum.models import Disciplina
 
---- GET /api/auth/me/ ---
-status: 200
-e_professor=False e_monitor=True e_coordenacao=False rotulo=Monitora
+    d = Disciplina.objects.get(codigo='CODIGO_AQUI')
+    d.deleted_at = timezone.now()
+    d.save(update_fields=['deleted_at'])
+
+Se a disciplina nao tiver vinculo nem post, apagar de vez tambem e seguro:
+
+    Disciplina.objects.filter(codigo='CODIGO_AQUI').delete()
+

@@ -47,7 +47,7 @@ interface Pessoa {
   ativo: boolean
 }
 
-const AZUL = '#003087'
+const AZUL = 'var(--accent-blue)'
 
 const PAPEL_ROTULO: Record<Vinculo['papel'], string> = {
   professor: 'Professor',
@@ -409,7 +409,9 @@ export default function DisciplinaCoordenacao() {
           <p style={{ fontSize: '12.5px', color: 'var(--text-tertiary)', marginTop: '3px' }}>
             {disciplina.curso_nome}
             {disciplina.carga_horaria ? ` · ${disciplina.carga_horaria}h` : ''}
-            {` · ${alunos} estudante(s) matriculado(s)`}
+            {alunos === 1
+              ? ' · 1 estudante matriculado'
+              : ` · ${alunos} estudantes matriculados`}
             {disciplina.pre_requisitos_codigos.length > 0
               && ` · pré-requisitos: ${disciplina.pre_requisitos_codigos.join(', ')}`}
           </p>
@@ -453,7 +455,7 @@ export default function DisciplinaCoordenacao() {
       {/* A matrícula de estudantes não é atribuição da coordenação aqui: ela
           vem do sistema acadêmico. Mostramos o número apenas como contexto. */}
       <p style={{ fontSize: '12.5px', color: 'var(--text-tertiary)', marginTop: '14px' }}>
-        Os {alunos} estudante(s) matriculado(s) vêm do sistema acadêmico e não
+        {alunos === 1 ? 'O estudante matriculado vem' : `Os ${alunos} estudantes matriculados vêm`} do sistema acadêmico e não
         são atribuídos por aqui.
       </p>
     </div>

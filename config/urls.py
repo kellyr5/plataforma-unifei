@@ -23,6 +23,8 @@ urlpatterns = [
     path('api/notificacoes/', include('notificacoes.api.urls')),
     path('api/auditoria/', include('auditoria.api.urls')),
     path('api/voluntariado/', include('voluntariado.api.urls')),
+    path('api/colaboracao/', include('colaboracao.api.urls')),
+    path('api/busca/', include('busca.api.urls')),
 ]
 
 if settings.DEBUG:

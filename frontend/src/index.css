@@ -2,38 +2,97 @@
 @source "../src/**/*.{tsx,ts,jsx,js}";
 @source "../src/**/*.{tsx,ts,jsx,js}";
 
+/* ============================================================================
+   Paleta institucional
+
+   Os valores vêm do site oficial da UNIFEI (unifei.edu.br), amostrados das
+   cores efetivamente aplicadas na barra superior, na assinatura e nos links.
+   O azul que a plataforma usava antes, #003087, era uma aproximação de
+   memória: parecido, porém não é a cor da instituição.
+
+   O verde-oliva é cor oficial da UNIFEI e aparece com muita frequência no
+   site. Aqui ele entra apenas como marcador — a melhor resposta, o item em
+   destaque — e nunca como sinal de "certo" ou "concluído". Cor que classifica
+   em bom e ruim é o que estamos justamente tirando da interface.
+   ============================================================================ */
 :root {
+  /* Marca */
+  --unifei-azul: #003364;
+  --unifei-azul-escuro: #002D59;
+  --unifei-azul-medio: #04539F;
+  --unifei-azul-claro: #7FB2EC;
+  --unifei-oliva: #AEBD09;
+
   --bg-main: #F8F9FB;
   --bg-card: #FFFFFF;
   --bg-sidebar: #FFFFFF;
   --bg-input: #F0F1F5;
-  --bg-hover: #F0F1F5;
+  --bg-hover: #EDEFF4;
   --border: #E2E4E9;
-  --border-focus: #003087;
+  --border-focus: var(--unifei-azul);
   --text-primary: #1A1D27;
-  --text-secondary: #6B7080;
-  --text-tertiary: #9CA3AF;
-  --accent-blue: #003087;
-  --accent-teal: #10B981;
-  --accent-yellow: #F59E0B;
+  --text-secondary: #5C6270;
+  --text-tertiary: #8A909E;
+
+  /* Preenchimento de botões e barras, sempre com texto branco por cima. */
+  --accent-blue: var(--unifei-azul);
+  /* Texto, ícones e links que ficam sobre o fundo da página. No tema claro é
+     a mesma cor; no escuro precisa ser mais clara para continuar legível. */
+  --accent-blue-text: var(--unifei-azul);
+  /* Fundo tênue da mesma família, para destacar sem encher de cor. */
+  --accent-blue-soft: rgba(0, 51, 100, 0.07);
+  --accent-blue-border: rgba(0, 51, 100, 0.28);
+
+  /* O oliva institucional é claro demais para texto sobre fundo branco: dá
+     cerca de 2,3:1 de contraste, abaixo do mínimo legível. A versão escura
+     abaixo mantém a mesma matiz e serve para escrita e ícones; o oliva puro
+     fica para preenchimentos e barras, onde a área é grande. */
+  --accent-oliva: var(--unifei-oliva);
+  --accent-oliva-texto: #6E7906;
+
+  /* Único vermelho da interface, reservado a ação destrutiva confirmada. */
   --accent-red: #C8102E;
-  --accent-purple: #8B5CF6;
+
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
+/* ----------------------------------------------------------------------------
+   Tema escuro
+
+   O azul institucional tem luminosidade baixa e desaparece sobre fundo quase
+   preto: um botão #003364 sobre #0F1117 fica praticamente invisível, e era
+   assim que a interface estava. Aqui a marca é reproduzida em duas versões
+   mais claras da mesma matiz — uma para preenchimento, outra para texto —
+   preservando a identidade e devolvendo o contraste.
+   ---------------------------------------------------------------------------- */
 [data-theme="dark"] {
   --bg-main: #0F1117;
   --bg-card: #1A1D27;
   --bg-sidebar: #141620;
   --bg-input: #252836;
-  --bg-hover: #252836;
+  --bg-hover: #2D3141;
   --border: #2A2D37;
-  --border-focus: #003087;
+  --border-focus: var(--unifei-azul-claro);
   --text-primary: #E8E9ED;
-  --text-secondary: #8B8D97;
-  --text-tertiary: #5A5D67;
+  --text-secondary: #9CA0AC;
+  --text-tertiary: #6B7080;
+
+  /* Valor escolhido para servir aos dois usos: branco por cima passa no
+     contraste mínimo, e ele próprio continua legível como texto sobre o fundo
+     escuro. É o que permite um único token atravessar a interface inteira. */
+  --accent-blue: #2E74C2;
+  --accent-blue-text: var(--unifei-azul-claro);
+  --accent-blue-soft: rgba(127, 178, 236, 0.10);
+  --accent-blue-border: rgba(127, 178, 236, 0.30);
+
+  /* No escuro a relação se inverte: o oliva puro é escuro demais contra o
+     fundo, e a versão clara é que serve para texto. */
+  --accent-oliva: #C7D62F;
+  --accent-oliva-texto: #C7D62F;
+  --accent-red: #E05A6E;
+
   --shadow-sm: none;
   --shadow-md: none;
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.3);
@@ -61,4 +120,101 @@ input, button, textarea, select {
 a {
   text-decoration: none;
   color: inherit;
+}
+
+/* ============================================================================
+   Acessibilidade
+
+   A plataforma atende uma universidade pública federal, e acessibilidade
+   digital nesse contexto e obrigacao legal — Decreto 5.296/2004 e a Lei
+   Brasileira de Inclusao — nao recurso opcional. O que segue e a base:
+   indicacao de foco, respeito a preferencia de movimento e alvos de toque
+   com area minima.
+   ============================================================================ */
+
+/**
+ * Indicador de foco.
+ *
+ * Quem navega por teclado precisa saber onde esta. O navegador desenha esse
+ * contorno por padrao, e o `outline: none` que costuma acompanhar o reset de
+ * estilo o remove — deixando a pessoa avancando as cegas pela tela.
+ *
+ * Usamos :focus-visible em vez de :focus para que o contorno apareca na
+ * navegacao por teclado e nao no clique de mouse, onde ele so polui.
+ */
+:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Elemento com rolagem propria precisa receber foco para ser percorrido pelo
+   teclado, e por isso tambem precisa indicar quando o tem. */
+[tabindex]:focus-visible,
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
+}
+
+/**
+ * Atalho para o conteudo.
+ *
+ * A barra lateral tem mais de dez itens. Sem este atalho, quem usa teclado ou
+ * leitor de tela percorre todos eles a cada troca de pagina antes de chegar ao
+ * que veio ler. O link fica escondido ate receber foco.
+ */
+.pular-para-conteudo {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  padding: 12px 18px;
+  background: var(--accent-blue);
+  color: #FFFFFF;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 0 0 8px 0;
+}
+
+.pular-para-conteudo:focus {
+  left: 0;
+}
+
+/**
+ * Conteudo visivel apenas para tecnologia assistiva.
+ *
+ * Serve para dar nome a um controle cujo significado, na tela, vem so do
+ * icone. Nao usamos display:none porque isso o removeria tambem do leitor.
+ */
+.apenas-leitor {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/**
+ * Respeito a preferencia do sistema por menos movimento.
+ *
+ * Animacao pode desencadear enxaqueca e desconforto vestibular. Quem sinalizou
+ * essa preferencia no sistema operacional espera que a aplicacao a obedeca.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

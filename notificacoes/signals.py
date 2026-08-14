@@ -36,7 +36,7 @@ def notificar_nova_resposta(sender, instance, created, **kwargs):
         destinatario=topico.autor,
         remetente=instance.autor,
         tipo='nova_resposta',
-        titulo=f'{instance.autor.nome_completo} respondeu seu topico',
+        titulo=f'{instance.autor.nome_completo} respondeu sua dúvida',
         mensagem=f'Nova resposta em "{topico.titulo}".',
         objeto_relacionado=topico,
     )
@@ -55,8 +55,8 @@ def notificar_voto_recebido(sender, instance, created, **kwargs):
         destinatario=post.autor,
         remetente=instance.usuario,
         tipo='voto_recebido',
-        titulo=f'{instance.usuario.nome_completo} votou em seu post',
-        mensagem=f'Seu post "{titulo_post}" recebeu um novo voto positivo.',
+        titulo=f'{instance.usuario.nome_completo} votou na sua publicação',
+        mensagem=f'"{titulo_post}" recebeu um novo voto positivo.',
         objeto_relacionado=post,
     )
 
@@ -96,15 +96,18 @@ def notificar_reacao_persiste(sender, instance, created, **kwargs):
     if not topico:
         return
 
-    mensagem = f'Um usuario marcou que sua resposta em "{topico.titulo}" nao resolveu a duvida.'
+    mensagem = (
+        f'Alguém marcou que sua resposta em "{topico.titulo}" '
+        f'não resolveu a dúvida.'
+    )
     if instance.comentario:
-        mensagem += f' Comentario: "{instance.comentario}"'
+        mensagem += f' Comentário: "{instance.comentario}"'
 
     criar_notificacao(
         destinatario=resposta.autor,
         remetente=instance.usuario,
         tipo='reacao_persiste',
-        titulo='Sua resposta recebeu uma reacao "duvida persiste"',
+        titulo='Sua resposta recebeu a reação "dúvida persiste"',
         mensagem=mensagem,
         objeto_relacionado=resposta,
     )
@@ -132,8 +135,8 @@ def notificar_eventos_denuncia(sender, instance, created, **kwargs):
         destinatario=instance.denunciante,
         remetente=instance.resolvido_por,
         tipo='denuncia_resolvida',
-        titulo=f'Sua denuncia foi avaliada como {decisao_legivel}',
-        mensagem=f'A moderacao analisou sua denuncia. Resolucao: {instance.resolucao}',
+        titulo=f'Sua denúncia foi avaliada como {decisao_legivel.lower()}',
+        mensagem=f'A moderação analisou sua denúncia. Resolução: {instance.resolucao}',
         objeto_relacionado=instance.post,
     )
 
@@ -143,9 +146,9 @@ def notificar_eventos_denuncia(sender, instance, created, **kwargs):
             destinatario=instance.post.autor,
             remetente=instance.resolvido_por,
             tipo='post_removido',
-            titulo='Seu post foi removido por moderacao',
+            titulo='Sua publicação foi removida pela moderação',
             mensagem=(
-                f'Seu post foi analisado pela moderacao e removido. '
+                f'Sua publicação foi analisada pela moderação e removida. '
                 f'Motivo: {instance.resolucao}'
             ),
             objeto_relacionado=instance.post,
@@ -165,10 +168,10 @@ def notificar_papel_disciplina(sender, instance, created, **kwargs):
     criar_notificacao(
         destinatario=instance.usuario,
         tipo='papel_disciplina',
-        titulo=f'Voce foi adicionado como {papel_legivel}',
+        titulo=f'Você foi adicionado como {papel_legivel.lower()}',
         mensagem=(
-            f'Voce agora e {papel_legivel} da disciplina '
-            f'{instance.disciplina.codigo} - {instance.disciplina.nome}.'
+            f'Você agora é {papel_legivel.lower()} da disciplina '
+            f'{instance.disciplina.codigo} — {instance.disciplina.nome}.'
         ),
         objeto_relacionado=instance.disciplina,
     )

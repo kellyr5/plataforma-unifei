@@ -34,6 +34,11 @@ class Notificacao(models.Model):
         ('post_restrito', 'Sua publicacao foi restrita pela disciplina'),
         ('post_liberado', 'A restricao da sua publicacao foi removida'),
         ('papel_disciplina', 'Voce foi adicionado a uma disciplina'),
+        # Trabalhos em grupo e chat
+        ('ajuda_solicitada', 'Pedido de ajuda em um grupo de trabalho'),
+        ('ajuda_respondida', 'Seu pedido de ajuda foi respondido'),
+        ('grupo_formado', 'Voce foi incluido em um grupo de trabalho'),
+        ('mensagem_grupo', 'Nova mensagem no seu grupo'),
         # Voluntariado
         ('inscricao_aprovada', 'Sua inscricao em voluntariado foi aprovada'),
         ('inscricao_rejeitada', 'Sua inscricao em voluntariado foi rejeitada'),

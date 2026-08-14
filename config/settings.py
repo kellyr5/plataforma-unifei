@@ -51,7 +51,17 @@ INSTALLED_APPS = [
     'auditoria',
     'voluntariado',
     'colaboracao',
+    'busca',
 ]
+
+# Busca semantica do forum.
+#
+# Desligada por padrao porque depende de um modelo de aprendizado de maquina
+# que nem todo ambiente precisa carregar: sem ela, a busca do forum responde
+# por correspondencia de termos e o resto da plataforma nao muda. Ligar exige,
+# alem da variavel, `pip install sentence-transformers pgvector` e a extensao
+# vector criada no PostgreSQL.
+BUSCA_SEMANTICA_ATIVA = config('BUSCA_SEMANTICA_ATIVA', default=False, cast=bool)
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
