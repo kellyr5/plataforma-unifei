@@ -28,6 +28,11 @@ DEBUG = config('DEBUG', default=False, cast=bool)
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv())
 
+# Enderecos autorizados a enviar formularios. Atras de HTTPS, o Django exige
+# a origem completa, com esquema, para aceitar requisicoes que alteram estado.
+# Sem isso, o painel administrativo recusa qualquer envio em producao.
+CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='', cast=Csv())
+
 
 # Application definition
 
