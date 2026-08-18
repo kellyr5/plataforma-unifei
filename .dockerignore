@@ -10,6 +10,12 @@ frontend/dist/
 media/
 staticfiles/
 artigo/
-docs/*.txt
 .pytest_cache/
 .cache/
+
+# As saidas de diagnostico refletem o banco local e nao servem em producao.
+# O ppc-cco.txt fica de fora desta exclusao de proposito: e ele que alimenta
+# a importacao da matriz curricular na carga inicial, e sem ele a plataforma
+# sobe sem nenhuma disciplina cadastrada.
+docs/diagnostico.txt
+docs/saida-testes.txt

@@ -289,9 +289,17 @@ AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME', default='')
 STORAGES = {
     'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
     'staticfiles': {
-        # WhiteNoise comprime e versiona os arquivos estaticos, dispensando um
-        # servidor web separado so para entrega-los.
-        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+        # WhiteNoise comprime os estaticos e os entrega, dispensando um
+        # servidor web separado.
+        #
+        # Usamos a versao sem manifesto de proposito. A variante com manifesto
+        # renomeia cada arquivo com um hash e falha a coleta inteira se
+        # qualquer referencia dentro de um CSS nao resolver — situacao comum
+        # em build de SPA, que costuma apontar para fontes e mapas de origem
+        # que nao vao para producao. Como o Vite ja gera nomes com hash, o
+        # manifesto nao acrescentaria cache-busting; acrescentaria apenas um
+        # modo de a implantacao morrer no collectstatic.
+        'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage',
     },
 }
 
