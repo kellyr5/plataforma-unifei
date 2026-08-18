@@ -15,6 +15,8 @@ git-filter-repo==2.47.0
 inflection==0.5.1
 jsonschema==4.26.0
 jsonschema-specifications==2025.9.1
+boto3==1.35.99
+django-storages==1.14.4
 pgvector==0.3.6
 pillow==12.2.0
 psycopg2-binary==2.9.12
@@ -34,4 +36,5 @@ typing_extensions==4.15.0
 uritemplate==4.2.0
 weasyprint==68.1
 webencodings==0.5.1
+whitenoise==6.8.2
 zopfli==0.4.1

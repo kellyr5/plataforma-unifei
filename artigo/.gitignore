@@ -1,0 +1,23 @@
+# Arquivos gerados pela compilacao do LaTeX.
+#
+# O Overleaf os recria a cada build, e versiona-los produz conflito a cada
+# sincronizacao sem nenhum ganho: nada aqui e fonte, tudo e derivado.
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+*.lof
+*.lot
+*.nav
+*.snm
+*.vrb
+*.xdv
+
+# O PDF final e derivado do .tex. Se precisar entregar uma versao, anexe-a
+# fora do repositorio ou remova esta linha conscientemente.
+main.pdf

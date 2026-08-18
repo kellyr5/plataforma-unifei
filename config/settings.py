@@ -65,6 +65,9 @@ BUSCA_SEMANTICA_ATIVA = config('BUSCA_SEMANTICA_ATIVA', default=False, cast=bool
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # Precisa vir logo apos o SecurityMiddleware: e ele que entrega os
+    # arquivos estaticos em producao, no lugar de um servidor web separado.
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -79,7 +82,9 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        # O index.html gerado pelo build do React e tratado como template, o
+        # que permite ao Django devolve-lo em qualquer rota da interface.
+        'DIRS': [BASE_DIR / 'frontend' / 'dist'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -123,6 +128,23 @@ LOGGING = {
 # API, que le do PostgreSQL. O backend de filas manteria uma leitura
 # bloqueante no Redis, que estoura o tempo limite em conexoes ociosas.
 
+# ===== Camada de canais e cache =====
+#
+# O Redis existe aqui para duas coisas: distribuir mensagens de WebSocket
+# entre varias instancias da aplicacao e guardar dados de vida curta, como os
+# refresh tokens invalidados.
+#
+# Quando a aplicacao roda em uma instancia unica, nenhuma das duas exige um
+# servidor externo: a camada em memoria do Channels distribui as mensagens
+# dentro do proprio processo, e o cache local guarda os tokens. Foi o caso da
+# implantacao gratuita, e evitar o Redis ali removeu um servico a configurar,
+# monitorar e ver cair.
+#
+# Em qualquer ambiente com mais de uma instancia o Redis volta a ser
+# obrigatorio, porque uma mensagem publicada em um processo precisa alcancar
+# quem esta conectado no outro. Por isso o padrao continua sendo ele.
+USAR_REDIS = config('USAR_REDIS', default=True, cast=bool)
+
 REDIS_HOST = config('REDIS_HOST', default='127.0.0.1')
 REDIS_PORT = config('REDIS_PORT', default=6379, cast=int)
 REDIS_DB_CHANNELS = config('REDIS_DB_CHANNELS', default=1, cast=int)
@@ -154,20 +176,57 @@ CACHES = {
     },
 }
 
+if not USAR_REDIS:
+    CHANNEL_LAYERS = {
+        'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'},
+    }
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'plataforma-unifei',
+        },
+    }
+
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+#
+# DATABASE_URL tem prioridade sobre as variaveis separadas. Os servicos de
+# banco gerenciados entregam a conexao nesse formato unico, e montar a URL a
+# partir de cinco variaveis soltas so cria oportunidade de errar uma delas.
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME'),
-        'USER': config('DB_USER'),
-        'PASSWORD': config('DB_PASSWORD'),
-        'HOST': config('DB_HOST', default='localhost'),
-        'PORT': config('DB_PORT', default='5432'),
+DATABASE_URL = config('DATABASE_URL', default='')
+
+if DATABASE_URL:
+    from urllib.parse import unquote, urlparse
+
+    url = urlparse(DATABASE_URL)
+
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': url.path.lstrip('/'),
+            'USER': unquote(url.username or ''),
+            'PASSWORD': unquote(url.password or ''),
+            'HOST': url.hostname or '',
+            'PORT': str(url.port or 5432),
+            # Conexao persistente: em plano gratuito, abrir uma conexao nova a
+            # cada requisicao pesa mais do que mante-la aberta.
+            'CONN_MAX_AGE': 600,
+            'OPTIONS': {'sslmode': config('DB_SSLMODE', default='require')},
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('DB_NAME'),
+            'USER': config('DB_USER'),
+            'PASSWORD': config('DB_PASSWORD'),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default='5432'),
+        }
+    }
 
 
 # Password validation
@@ -206,6 +265,49 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# O build do React entra como arquivo estatico do Django, servido pela mesma
+# aplicacao que responde a API. Manter os dois no mesmo endereco evita CORS e
+# faz o WebSocket apontar para a propria origem, sem configuracao extra.
+STATICFILES_DIRS = (
+    [BASE_DIR / 'frontend' / 'dist'] if (BASE_DIR / 'frontend' / 'dist').exists() else []
+)
+
+MEDIA_URL = 'media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+
+# ===== Armazenamento =====
+#
+# Em producao, o disco da instancia e efemero: some a cada reinicio. Foto de
+# perfil, capa de oportunidade e o PDF do certificado precisam, portanto, de
+# armazenamento externo. Usamos um servico compativel com S3, configurado por
+# variavel de ambiente; sem essas variaveis, o projeto continua gravando em
+# disco, que e o comportamento correto em desenvolvimento.
+AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME', default='')
+
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {
+        # WhiteNoise comprime e versiona os arquivos estaticos, dispensando um
+        # servidor web separado so para entrega-los.
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
+
+if AWS_STORAGE_BUCKET_NAME:
+    AWS_ACCESS_KEY_ID = config('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY')
+    AWS_S3_ENDPOINT_URL = config('AWS_S3_ENDPOINT_URL')
+    AWS_S3_CUSTOM_DOMAIN = config('AWS_S3_CUSTOM_DOMAIN', default='')
+    AWS_S3_REGION_NAME = config('AWS_S3_REGION_NAME', default='auto')
+    AWS_DEFAULT_ACL = None
+    AWS_QUERYSTRING_AUTH = False
+    AWS_S3_FILE_OVERWRITE = False
+
+    STORAGES['default'] = {
+        'BACKEND': 'storages.backends.s3.S3Storage',
+    }
 
 
 # ===== Seguranca em producao =====

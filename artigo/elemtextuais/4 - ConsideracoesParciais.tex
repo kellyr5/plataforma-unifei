@@ -1,0 +1,37 @@
+\section{Considerações Parciais}
+
+Este trabalho apresentou a proposta de uma plataforma web que junta um fórum
+acadêmico organizado por disciplina e um sistema de voluntariado voltado para a
+comunidade da UNIFEI. Foi feito o levantamento bibliográfico nos eixos de
+comunicação em ambientes educacionais, fóruns de discussão, aprendizagem
+colaborativa e voluntariado universitário, junto com a análise comparativa entre
+as plataformas usadas pela UNIFEI, USP, UFMG e UNESPAR, que acabou deixando
+claro algo que se repete em todas as instituições analisadas: a falta de uma
+ferramenta que junte a discussão acadêmica estruturada com mecanismos de
+engajamento e com uma gestão integrada do voluntariado.
+
+A partir desse levantamento, foram documentados 53 requisitos funcionais e mais
+de 30 requisitos não funcionais, foi feita a modelagem do banco de dados com 17
+tabelas em terceira forma normal, foi definida a arquitetura do sistema com a
+separação entre frontend, backend, banco de dados e cache, e foram construídos
+os diagramas de entidade-relacionamento, casos de uso, processos e implantação.
+O escopo do MLP foi delimitado dando prioridade às funcionalidades que entregam
+valor e uma boa experiência ao usuário desde a primeira versão, contemplando o
+login por CPF, a criação de tópicos ligados às disciplinas, a votação nas
+respostas, a marcação de melhor resposta, a busca textual e, no módulo de
+voluntariado, a inscrição nas oportunidades com a certificação integrada.
+
+Para o TCC-2 estão previstas a implementação do protótipo funcional, usando o
+React.js com TypeScript no frontend e o Django com o Django REST Framework e o
+Django Channels no backend, e a realização de testes com usuários da UNIFEI
+para validar se a plataforma de fato responde aos problemas que foram
+levantados. Também está prevista a integração de um assistente inteligente ao
+fórum, que vai reconhecer o que o aluno está procurando e direcionar a sua
+dúvida para o lugar certo, seja o contato de um professor, uma informação da
+UNIFEI, o material de uma matéria, um tópico parecido que já foi respondido
+antes, a disciplina correta ou uma oportunidade de voluntariado, ajudando o
+aluno a chegar mais rápido no que precisa sem se perder no caminho. Além disso,
+está previsto o desenvolvimento das funcionalidades que ficaram planejadas para
+as próximas versões, como as notificações em tempo real, o ranking semestral, a
+moderação avançada e a integração com o SIGAA, deixando o sistema cada vez mais
+perto de atender o que a comunidade acadêmica realmente precisa no dia a dia.

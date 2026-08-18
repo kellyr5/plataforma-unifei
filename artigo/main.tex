@@ -1,0 +1,61 @@
+% Universidade Federal de Itajuba
+% Instituto de Matematica e Computacao
+%
+% Modelo LaTeX para escrita de Trabalho de Conclusao de Curso
+% para os cursos de Ciencia da Computacao e Sistemas de Informacao, em formato de artigo.
+%
+% Desenvolvimento:
+% - Luiz Olmes Carvalho - olmes@unifei.edu.br
+% - Rafael de Magalhaes Dias Frinhani - frinhani@unifei.edu.br
+%
+% Arte da capa:
+% - Elisa de Cassia Silva Rodrigues - elisa.rodrigues@unifei.edu.br
+%
+%   ALTERE ESTE ARQUIVO APENAS NOS LOCAIS INDICADOS NOS COMENTARIOS
+
+% Passe, entre os colchetes, a sigla do curso: cco/sin (letras minusculas)
+\documentclass[cco]{imc}
+\usepackage{float}
+
+% Definicao dos dados do autor do trabalho
+% Edite o arquivo 'configuracao.tex'
+\input{configuracao} % Nao altere este comando
+
+% Inicio do documento
+\begin{document} % Nao altere este comando
+
+% Gera a capa, folha de rosto, ficha catalografica e folha de aprovacao: obrigatorios no texto.
+\maketitle % Nao altere este comando
+
+% Secoes do texto: para inserir novas secoes, seguir o mesmo modelo abaixo.
+\input{./elemtextuais/1-Introducao}
+\input{./elemtextuais/2-Referencial}
+\input{./elemtextuais/3-Desenvolvimento}
+% As Consideracoes Parciais eram o fechamento do TCC-1, quando o sistema ainda
+% era proposta. Com a implementacao concluida, o lugar delas passa a ser a
+% Secao 4 (Resultados) e a Secao 5 (Conclusoes). O arquivo permanece na pasta
+% como referencia enquanto as duas secoes nao estiverem escritas.
+% \input{./elemtextuais/4 - ConsideracoesParciais}
+\input{./elemtextuais/4-Resultados}
+\input{./elemtextuais/5-Conclusoes}
+
+% Agradecimentos: elemento opcional
+% Edite o arquivo 'elemtextuais/agradecimentos.tex'
+% Deve ser uma secao sem numeracao (\section*{}), antes das referencias
+% Para retirar essa secao, comente a linha a seguir.
+\input{./elemtextuais/agradecimentos}
+
+% Estilo da bilbliografia
+\bibliographystyle{apalike2_ptBR} % Nao altere este comando
+
+% Bibliografia no formato BibTeX:
+% Edite o arquivo 'referencias.bib'
+\bibliography{referencias}
+
+% Apendices/Anexos: 
+% Se muito necessarios, apendices/anexos devem ser inseridos como \section*{}
+% Para inserir estes elementos, seguir o mesmo modelo abaixo.
+%\input{nome-do-arquivo}
+
+% Fim do documento
+\end{document} % Nao altere este comando

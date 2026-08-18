@@ -1,0 +1,15 @@
+# Nao entram na imagem: ou sao recriados no build, ou nao pertencem a producao.
+venv/
+__pycache__/
+*.pyc
+node_modules/
+frontend/node_modules/
+frontend/dist/
+.git/
+.env
+media/
+staticfiles/
+artigo/
+docs/*.txt
+.pytest_cache/
+.cache/

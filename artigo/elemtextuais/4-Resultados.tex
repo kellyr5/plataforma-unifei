@@ -1,0 +1,68 @@
+\section{Resultados}
+\label{resultados}
+
+Esta seção apresenta o que foi efetivamente construído, como o sistema se comporta em operação e quais verificações sustentam a afirmação de que ele funciona. A avaliação com usuários da comunidade acadêmica é tratada na Subseção \ref{avaliacao-usuarios}.
+
+\subsection{A Plataforma em Operação}
+
+A plataforma está implementada e em funcionamento, com os cinco perfis previstos ativos: estudante, monitor, professor, coordenação e organização parceira. A interface não é a mesma para todos. Cada perfil abre em uma página inicial construída a partir do que aquela pessoa precisa decidir, escolha que se mostrou mais produtiva do que apresentar um painel único com itens ocultos conforme a permissão.
+
+O estudante entra em um painel que ordena as suas dúvidas colocando primeiro as que ainda não receberam resposta, acompanhadas dos trabalhos em grupo, das oportunidades de voluntariado abertas e do seu percurso por disciplina. O professor abre no que exige ação: quantas dúvidas aguardam resposta em cada uma das suas turmas, há quanto tempo aguardam e quantas denúncias esperam análise. A organização parceira não enxerga o fórum, porque não participa dele; sua tela reúne as oportunidades publicadas, as inscrições a avaliar e os certificados emitidos.
+
+O painel da coordenação, apresentado na Figura \ref{fig-painel-coordenacao}, concentra a contribuição mais distante do que as plataformas analisadas oferecem hoje. Ele lista as disciplinas ofertadas no semestre corrente e, para cada uma, o número de dúvidas, quantas seguem sem resposta, a espera média até a primeira resposta, os estudantes ativos e as denúncias pendentes. A espera média é o indicador que dá sentido aos demais: poucas dúvidas com espera longa costumam indicar turma que desistiu de perguntar, e não turma sem dúvidas. As disciplinas sem professor ou sem monitoria atribuídos aparecem sinalizadas no topo, uma vez que a ausência de responsável explica boa parte da inatividade observada.
+
+\begin{figure}[!ht]
+\centering
+\includegraphics[width=\columnwidth]{figs/painel-coordenacao.png}
+\caption{Painel da coordenação, com os indicadores por disciplina do semestre corrente.}
+\label{fig-painel-coordenacao}
+\textit{\scriptsize Fonte: Elaborado pela autora (2026).}
+\end{figure}
+
+No fórum, cada pessoa enxerga apenas as disciplinas em que possui vínculo, e as dúvidas sem resposta aparecem separadas no topo, ordenadas da mais antiga para a mais recente. A busca opera em dois modos, conforme descrito na Subseção \ref{busca-semantica}, e informa qual deles respondeu — distinção que importa a quem procura, já que não encontrar nada por termo significa reformular a pergunta, enquanto não encontrar nada por significado significa que ninguém publicou algo semelhante.
+
+O módulo de colaboração, mostrado na Figura \ref{fig-trabalhos}, apresenta os trabalhos propostos em cada disciplina com os grupos formados, as vagas restantes exibidas como posições em aberto e o material de apoio anexado pelo professor. A conversa de cada grupo funciona sobre WebSocket, com histórico recuperado por requisição HTTP na abertura, anexos, mensagens de voz e exclusão da própria mensagem dentro de três minutos após o envio.
+
+\begin{figure}[!ht]
+\centering
+\includegraphics[width=\columnwidth]{figs/trabalhos-grupo.png}
+\caption{Trabalhos em grupo de uma disciplina, com a composição das equipes e as vagas em aberto.}
+\label{fig-trabalhos}
+\textit{\scriptsize Fonte: Elaborado pela autora (2026).}
+\end{figure}
+
+No voluntariado, o percurso que hoje exige três etapas manuais foi reduzido a uma. A organização confirma a participação e o certificado é gerado em PDF, com código de validação pública que permite verificar a autenticidade do documento sem depender da organização emissora.
+
+\subsection{Verificação por Testes Automatizados}
+
+O comportamento do sistema é verificado por uma suíte de testes automatizados que cobre os módulos de autenticação, fórum, colaboração, voluntariado, notificações, auditoria e busca. Os testes exercitam tanto os caminhos esperados quanto as tentativas de uso indevido, e é nesta segunda categoria que reside a sua maior utilidade.
+
+Regras de acesso falham em silêncio. Quando um recorte de permissão se rompe, nada na interface muda e ninguém percebe até que alguém veja o que não deveria. Por isso a suíte verifica explicitamente que um estudante não enxerga o fórum de disciplina em que não está matriculado, que o professor não acessa a conversa privada dos grupos da sua própria turma, que um integrante do grupo não visualiza pedido de ajuda alheio e que a coordenação, embora enxergue os trabalhos de todo o curso, não os organiza. Nesses casos, a resposta correta do sistema é negar a existência do recurso, e não recusar o acesso a ele: informar que algo existe mas está protegido já revela mais do que se deveria.
+
+Três defeitos encontrados durante o desenvolvimento ilustram o tipo de erro que só aparece em uso real. O primeiro foi um botão de inscrição que existia, respondia ao clique e permanecia invisível, porque um valor de cor inválido invalidava toda a declaração de fundo e deixava texto branco sobre superfície branca — falha que não gera erro no console, não interrompe a compilação e não é detectada por teste de \textit{backend}. O segundo foi a exibição de vagas disponíveis com o rótulo de vagas preenchidas, o que fazia uma ação lotada informar zero ocupações ao lado de uma barra de progresso completa. O terceiro foi a coordenação recebendo a opção de ingressar em grupos de trabalho, consequência de tratar privilégio administrativo como se equivalesse a participação. Os dois primeiros foram corrigidos na interface; o terceiro exigiu a distinção entre supervisionar e participar descrita na Seção \ref{referencial} e passou a ser coberto por testes.
+
+\subsection{Avaliação com Usuários}
+\label{avaliacao-usuarios}
+
+% ===========================================================================
+% SUBSECAO PENDENTE — escrever apos a validacao com usuarios.
+%
+% Roteiro sugerido, para que o texto final tenha o que relatar:
+%
+%   - Perfil e numero de participantes (estudantes, monitores, professores)
+%   - Tarefas executadas por cada participante. Ex.: publicar uma duvida;
+%     localizar uma discussao anterior pela busca; entrar em um grupo de
+%     trabalho; encaminhar uma duvida a monitoria; inscrever-se em uma
+%     oportunidade de voluntariado
+%   - Forma de coleta: observacao, questionario, escala SUS
+%   - O que foi observado: tarefas concluidas sem auxilio, pontos de duvida,
+%     tempo ate a conclusao
+%   - Comentarios espontaneos e sugestoes recebidas
+%   - Limitacoes: numero de participantes, ambiente controlado, ausencia de
+%     uso ao longo de um semestre completo
+%
+% Esta subsecao responde ao verbo "avaliar" do objetivo geral. Sem ela, o
+% objetivo fica parcialmente respondido.
+% ===========================================================================
+
+\textit{Esta subseção será redigida após a realização da validação com usuários da comunidade acadêmica da UNIFEI.}
