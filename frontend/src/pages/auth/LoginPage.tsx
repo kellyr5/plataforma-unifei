@@ -40,7 +40,6 @@ export default function LoginPage() {
   const [cpf, setCpf] = useState('')
   const [senha, setSenha] = useState('')
   const [email, setEmail] = useState('')
-  const [nome, setNome] = useState('')
   const [codigo, setCodigo] = useState(['', '', '', '', '', ''])
 
   /* Redireciona se ja autenticado */
@@ -92,7 +91,7 @@ export default function LoginPage() {
 
     setLoading(true)
     try {
-      const data = await login({ cpf: digits, password: senha })
+      await login({ cpf: digits, password: senha })
       await fetchMe()
       toast.success('Login realizado com sucesso!')
       navigate('/dashboard', { replace: true })
@@ -121,7 +120,11 @@ export default function LoginPage() {
       await register({
         cpf: digits,
         email,
-        nome_completo: nome || email.split('@')[0],
+        /* O formulário de primeiro acesso não pede o nome: ele vem do
+           cadastro institucional feito pela coordenação. Enquanto o vínculo
+           não é confirmado, o trecho antes do arroba serve de identificação
+           provisória. */
+        nome_completo: email.split('@')[0],
         password: senha,
       })
       toast.success('Código enviado para seu email!')
@@ -144,7 +147,7 @@ export default function LoginPage() {
 
     setLoading(true)
     try {
-      const data = await activate({ email, codigo: codigoStr })
+      await activate({ email, codigo: codigoStr })
       await fetchMe()
       toast.success('Conta ativada com sucesso!')
       navigate('/dashboard', { replace: true })

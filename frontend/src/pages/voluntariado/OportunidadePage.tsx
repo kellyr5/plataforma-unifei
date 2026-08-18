@@ -24,15 +24,18 @@ interface Oportunidade {
   esta_aberta_inscricao: boolean
   organizacao_nome: string
   organizacao_foto_url: string | null
+  /* Capa da ação, exibida no topo do cartão. */
+  imagem_url: string | null
   /* Situação da inscrição de quem está vendo, quando existir. */
   minha_inscricao: string | null
   requer_aprovacao: boolean
   total_inscritos: number
 }
 
-/* Ver a nota em DashboardPage: a cor por área confundia classificação com
-   julgamento, porque compartilhava a paleta dos estados de inscrição. */
-const CorArea = 'var(--text-secondary)'
+/* A cor por área foi removida daqui: ela confundia classificação com
+   julgamento, porque compartilhava a paleta dos estados de inscrição. A
+   etiqueta da área usa os tokens neutros do tema. Ver a nota em
+   DashboardPage. */
 
 const SITUACAO_INSCRICAO: Record<string, string> = {
   pendente: 'Inscrição enviada, aguardando a organização',
@@ -115,7 +118,6 @@ export default function OportunidadePage() {
 
   if (!op) return null
 
-  const cor = CorArea
   const preenchidas = op.vagas - op.vagas_disponiveis
   const porcent = op.vagas > 0 ? (preenchidas / op.vagas) * 100 : 0
 

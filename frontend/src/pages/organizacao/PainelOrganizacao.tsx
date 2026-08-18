@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import toast, { Toaster } from 'react-hot-toast'
+import { Toaster } from 'react-hot-toast'
 
 import api from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'

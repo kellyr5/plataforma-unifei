@@ -22,6 +22,9 @@ interface Andamento {
   total_posts: number
   total_respostas: number
   total_melhores_respostas: number
+  /* Votos recebidos nas publicações da disciplina. Pode não vir na resposta,
+     e por isso é opcional: a tela mostra zero quando ausente. */
+  total_votos_recebidos?: number
 }
 
 interface Certificado {
@@ -154,7 +157,7 @@ function RepCard({ rep, aoClicar }: { rep: Andamento; aoClicar: () => void }) {
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
           </svg>
-          {rep.pontuacao_recebidos || 0} votos
+          {rep.total_votos_recebidos || 0} votos
         </div>
       </div>
     </div>

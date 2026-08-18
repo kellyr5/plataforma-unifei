@@ -49,19 +49,10 @@ const SITUACAO_ROTULO: Record<string, string> = {
   desistente: 'Você desistiu desta ação',
 }
 
-const areas = [
-  { value: '', label: 'Todas' },
-  { value: 'educacao', label: 'Educação' },
-  { value: 'saude', label: 'Saúde' },
-  { value: 'meio_ambiente', label: 'Meio Ambiente' },
-  { value: 'assistencia_social', label: 'Assistência Social' },
-  { value: 'direitos_humanos', label: 'Direitos Humanos' },
-  { value: 'cultura', label: 'Cultura' },
-  { value: 'tecnologia', label: 'Tecnologia' },
-  { value: 'esporte', label: 'Esporte' },
-]
+/* A lista de áreas saiu junto com o filtro por tema. Ver o comentário no bloco
+   de filtros sobre por que a busca por texto cobre melhor esse caso.
 
-/* Área é classificação, não julgamento: um tom neutro para todas. Ver a nota
+   Área é classificação, não julgamento: um tom neutro para todas. Ver a nota
    em DashboardPage sobre por que a cor por área foi removida. */
 const CorArea = 'var(--text-secondary)'
 
