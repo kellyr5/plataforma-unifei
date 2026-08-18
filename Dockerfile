@@ -22,14 +22,25 @@ FROM python:3.12-slim
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
-# O WeasyPrint gera o PDF do certificado e depende destas bibliotecas do
-# sistema para renderizar texto e vetores. Sem elas a importacao falha.
+# Bibliotecas de sistema exigidas por dependencias Python que sao apenas
+# involucros sobre codigo C, e que por isso nao vem no pacote do pip:
+#
+#   libpango, libcairo, libgdk-pixbuf, fontes  -> WeasyPrint, que gera o PDF
+#                                                 do certificado
+#   libmagic1                                  -> python-magic, que identifica
+#                                                 o tipo real de um arquivo
+#                                                 enviado pelo conteudo, e nao
+#                                                 pela extensao declarada
+#
+# A ausencia de qualquer uma delas so aparece quando o Django carrega as
+# views, ja com o servidor subindo — momento ruim para descobrir.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libpango-1.0-0 \
         libpangoft2-1.0-0 \
         libcairo2 \
         libgdk-pixbuf-2.0-0 \
         libffi-dev \
+        libmagic1 \
         shared-mime-info \
         fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
