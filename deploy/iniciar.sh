@@ -20,21 +20,78 @@ python manage.py collectstatic --noinput
 # A carga inicial roda uma unica vez, na primeira implantacao. Repeti-la a
 # cada reinicio apagaria o que os participantes produziram durante o teste,
 # que e justamente o dado que queremos observar.
-if [ "${CARGA_INICIAL:-false}" = "true" ]; then
-    echo "==> Importando a matriz curricular"
-    python manage.py importar_matriz_ppc docs/ppc-cco.txt \
-        --curso CCO --nome "Ciencia da Computacao" --ano 2026 || true
 
-    echo "==> Criando os perfis de referencia"
-    python manage.py criar_perfis_demo --reset || true
+# Executa um passo da carga sem derrubar o servidor, mas deixando a falha
+# visivel no log.
+#
+# A versao anterior silenciava o erro com "|| true", e o resultado foi o pior
+# dos mundos: a plataforma subia vazia e o log nao dizia por que. Aqui a falha
+# aparece destacada e a inicializacao continua, porque um erro de carga nao
+# deve impedir o acesso ao que ja existe.
+executar_passo() {
+    local descricao="$1"
+    shift
 
-    echo "==> Populando o semestre de demonstracao"
-    python manage.py popular_demonstracao || true
+    echo "==> ${descricao}"
+
+    if "$@"; then
+        echo "    concluido"
+    else
+        echo "!!! FALHOU: ${descricao}"
+        echo "!!! comando: $*"
+    fi
+}
+
+executar_carga() {
+    echo "==> Carga inicial ativada"
+
+    if [ ! -f docs/ppc-cco.txt ]; then
+        echo "!!! docs/ppc-cco.txt nao esta na imagem."
+        echo "!!! Sem ele nao ha disciplinas, e os passos seguintes falham."
+    fi
+
+    executar_passo "Importando a matriz curricular" \
+        python manage.py importar_matriz_ppc docs/ppc-cco.txt \
+        --curso CCO --nome "Ciencia da Computacao" --ano 2026
+
+    executar_passo "Criando os perfis de referencia" \
+        python manage.py criar_perfis_demo --reset
+
+    executar_passo "Populando o semestre de demonstracao" \
+        python manage.py popular_demonstracao
 
     if [ -f docs/participantes.csv ]; then
-        echo "==> Cadastrando os participantes"
-        python manage.py cadastrar_participantes docs/participantes.csv || true
+        executar_passo "Cadastrando os participantes" \
+            python manage.py cadastrar_participantes docs/participantes.csv
     fi
+
+    echo "==> Conferindo o resultado da carga"
+    python manage.py shell -c "
+from autenticacao.models import Usuario
+from forum.models import Disciplina, Post
+print(f'    disciplinas: {Disciplina.objects.count()}')
+print(f'    usuarios:    {Usuario.objects.count()}')
+print(f'    publicacoes: {Post.objects.count()}')
+" || echo "!!! Nao foi possivel conferir."
+
+    echo "==> Carga inicial concluida"
+}
+
+# A carga roda em segundo plano, e o servidor sobe imediatamente.
+#
+# Executa-la antes do Daphne parecia natural — dados prontos antes do primeiro
+# acesso — mas a plataforma de hospedagem verifica se alguma coisa esta
+# escutando na porta e cancela a implantacao quando ninguem responde. Gerar as
+# capas com PIL e os certificados em PDF leva alguns minutos numa instancia
+# gratuita, tempo suficiente para essa verificacao falhar.
+#
+# Com a inversao, quem entrar nos primeiros minutos encontra a plataforma
+# vazia, e depois ela se preenche. E um custo aceitavel: acontece uma unica
+# vez, na primeira implantacao.
+if [ "${CARGA_INICIAL:-false}" = "true" ]; then
+    executar_carga &
+else
+    echo "==> Carga inicial desativada (CARGA_INICIAL=${CARGA_INICIAL:-nao definida})"
 fi
 
 echo "==> Subindo o Daphne na porta ${PORT:-8000}"
