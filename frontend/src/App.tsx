@@ -27,6 +27,7 @@ import AnaliseDenunciaPage from './pages/moderacao/AnaliseDenunciaPage'
 import PerfilPage from './pages/perfil/PerfilPage'
 import AndamentoPage from './pages/andamento/AndamentoPage'
 import CertificadosPage from './pages/certificados/CertificadosPage'
+import ArquivosPage from './pages/arquivos/ArquivosPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth()
@@ -108,6 +109,7 @@ function App() {
               <Route path="/conversas/:id" element={<ConversaPage />} />
               <Route path="/ajuda" element={<AjudaPage />} />
               <Route path="/certificados" element={<CertificadosPage />} />
+              <Route path="/arquivos" element={<ArquivosPage />} />
               {/* Proximas telas virao aqui */}
             </Route>
           </Routes>

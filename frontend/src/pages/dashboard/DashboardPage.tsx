@@ -400,7 +400,8 @@ export default function DashboardPage() {
       <div
         className="rounded-xl"
         style={{
-          padding: '24px 28px', marginBottom: '16px',
+          padding: 'clamp(18px, 4vw, 24px) clamp(18px, 5vw, 28px)',
+          marginBottom: '16px',
           background: 'var(--accent-blue)',
         }}
       >
@@ -416,7 +417,13 @@ export default function DashboardPage() {
         {/* Números diretos, sem anel de progresso. O anel comparava cada valor
             com um total arbitrário, e a proporção resultante não descrevia
             nada que existisse. */}
-        <div className="flex items-center" style={{ gap: '38px', marginTop: '22px' }}>
+        {/* Quatro números com espaçamento fixo de 38 pixels somavam mais que a
+            largura de um telefone, e o último saía da faixa. Com quebra de
+            linha eles se reorganizam em duas fileiras. */}
+        <div
+          className="flex items-center flex-wrap"
+          style={{ gap: '22px 32px', marginTop: '22px' }}
+        >
           {([
             [totalTopicos, 'dúvidas publicadas'],
             [totalRespostas, 'respostas dadas'],
@@ -436,7 +443,12 @@ export default function DashboardPage() {
       </div>
 
       {/* ===== Primeira linha ===== */}
-      <div style={{ ...grade, gridTemplateColumns: 'minmax(0, 1.15fr) minmax(0, 1fr)' }}>
+      {/* auto-fit no lugar de duas colunas declaradas.
+          Com a proporcao fixa, as colunas continuavam existindo num telefone:
+          cada cartao recebia cerca de cento e cinquenta pixels, e o titulo de
+          uma duvida quebrava uma letra por linha. Agora a segunda coluna so
+          aparece quando ha largura para os 280 pixels minimos. */}
+      <div style={{ ...grade, gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
         <Cartao>
           <CabecalhoCartao titulo="Suas dúvidas" acao="Ver fórum" aoClicar={() => navigate('/forum')} />
           {posts.length === 0 ? (
@@ -471,7 +483,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ===== Segunda linha ===== */}
-      <div style={{ ...grade, gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', marginBottom: 0 }}>
+      <div style={{ ...grade, gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', marginBottom: 0 }}>
         <Cartao>
           <CabecalhoCartao titulo="Por disciplina" acao="Ver tudo" aoClicar={() => navigate('/andamento')} />
           {andamento.length === 0 ? (

@@ -218,3 +218,59 @@ textarea:focus-visible {
     scroll-behavior: auto !important;
   }
 }
+
+/* ==========================================================================
+   Comportamento em telas estreitas
+   ========================================================================== */
+
+/* Nenhum elemento deve empurrar a pagina para alem da largura do aparelho.
+   Sem isto, um unico cartao largo demais cria rolagem horizontal no site
+   inteiro, e a pessoa passa a arrastar a tela de lado para ler qualquer
+   coisa. */
+html,
+body {
+  overflow-x: hidden;
+}
+
+/* Codigo de disciplina, endereco de arquivo e nome de anexo nao tem espaco
+   onde quebrar. Numa coluna estreita eles escapavam da borda do cartao. A
+   quebra so acontece quando nao ha alternativa. */
+body {
+  overflow-wrap: break-word;
+}
+
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+}
+
+/* Tabelas e blocos de codigo sao os dois casos em que encolher destroi a
+   informacao. Neles a rolagem lateral e a resposta certa, mas restrita ao
+   proprio elemento. */
+table,
+pre {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+@media (max-width: 1023px) {
+  /* O alvo de toque confortavel tem cerca de quarenta e quatro pixels. Varios
+     botoes da interface foram dimensionados para o ponteiro do mouse e ficam
+     abaixo disso no telefone. */
+  button,
+  a[role='button'] {
+    min-height: 40px;
+  }
+
+  /* Campo com fonte menor que dezesseis pixels faz o navegador do telefone
+     aproximar a pagina sozinho quando recebe foco, e a pessoa fica com o
+     layout ampliado sem ter pedido. */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

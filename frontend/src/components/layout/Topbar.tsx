@@ -10,7 +10,12 @@ import { useNotificacoes } from '../../contexts/NotificacoesContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import { SunIcon, MoonIcon } from '../ui/Icons'
 
-export function Topbar() {
+interface TopbarProps {
+  mostrarBotaoMenu?: boolean
+  onAbrirMenu?: () => void
+}
+
+export function Topbar({ mostrarBotaoMenu = false, onAbrirMenu }: TopbarProps) {
   const { user } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const { naoLidas } = useNotificacoes()
@@ -26,12 +31,30 @@ export function Topbar() {
       className="flex items-center flex-shrink-0"
       style={{
         height: '56px',
-        padding: '0 24px',
+        padding: mostrarBotaoMenu ? '0 12px' : '0 24px',
         borderBottom: '1px solid var(--border)',
         background: 'var(--bg-card)',
-        gap: '16px',
+        gap: mostrarBotaoMenu ? '8px' : '16px',
       }}
     >
+      {/* Única porta de entrada da navegação no telefone, já que a barra
+          lateral sai da tela. Fica à esquerda, onde o polegar alcança. */}
+      {mostrarBotaoMenu && (
+        <button
+          onClick={onAbrirMenu}
+          aria-label="Abrir o menu de navegação"
+          className="flex items-center justify-center rounded-lg cursor-pointer flex-shrink-0"
+          style={{
+            width: '40px', height: '40px', border: 'none',
+            background: 'transparent', color: 'var(--text-secondary)',
+          }}
+        >
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+          </svg>
+        </button>
+      )}
+
       {/* Busca no fórum. A consulta vai para /busca, que decide entre
           comparação por significado e correspondência de termos conforme o
           que o servidor tem disponível. */}
@@ -41,7 +64,7 @@ export function Topbar() {
           const termo = consulta.trim()
           if (termo) navigate(`/busca?q=${encodeURIComponent(termo)}`)
         }}
-        className="flex items-center flex-1"
+        className="flex items-center flex-1 min-w-0"
         style={{
           maxWidth: '400px', gap: '8px',
           background: 'var(--bg-input)', border: '1px solid var(--border)',
@@ -52,19 +75,35 @@ export function Topbar() {
         <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
         </svg>
+        {/* Duas adaptações ao telefone.
+            O texto longo não cabe num campo estreito: aparecia cortado no meio
+            de uma palavra, sem indicar o que fazer.
+            E abaixo de 16 pixels o navegador aproxima a página sozinho ao
+            focar o campo, deixando a pessoa com o layout ampliado sem ter
+            pedido. */}
         <input
           type="text"
           value={consulta}
           onChange={(e) => setConsulta(e.target.value)}
-          placeholder="Descreva a dúvida e procure no fórum..."
+          placeholder={
+            mostrarBotaoMenu
+              ? 'Buscar no fórum...'
+              : 'Descreva a dúvida e procure no fórum...'
+          }
           aria-label="Buscar no fórum"
-          className="flex-1 bg-transparent outline-none"
-          style={{ fontSize: '13px', color: 'var(--text-primary)' }}
+          className="flex-1 min-w-0 bg-transparent outline-none"
+          style={{
+            fontSize: mostrarBotaoMenu ? '16px' : '13px',
+            color: 'var(--text-primary)',
+          }}
         />
       </form>
 
       {/* Acoes a direita */}
-      <div className="flex items-center" style={{ marginLeft: 'auto', gap: '12px' }}>
+      <div
+        className="flex items-center flex-shrink-0"
+        style={{ marginLeft: 'auto', gap: mostrarBotaoMenu ? '2px' : '12px' }}
+      >
         {/* Botão só com ícone precisa de nome acessível: sem ele, o leitor de
             tela anuncia apenas "botão" e a pessoa não sabe o que aciona. */}
         <button

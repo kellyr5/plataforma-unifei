@@ -522,12 +522,17 @@ export default function ConversaPage() {
        A largura fixa fazia sentido para texto corrido, onde linha longa
        cansa. Aqui o conteúdo já vem em balões curtos, e o que sobrava era
        faixa morta à direita.
-       A altura é calculada exatamente: 56 px da barra superior mais os 24 px
-       de espaçamento em cima e embaixo da área principal. O valor anterior,
-       110 px, era aproximação e deixava um vão embaixo do campo de escrita. */
+       A altura acompanha o espaço que a área principal oferece, em vez de ser
+       deduzida da altura da janela. A conta anterior subtraía 104 px de 100vh
+       — a barra superior mais o espaçamento — e dependia de que esses valores
+       nunca mudassem. Mudaram: no telefone o espaçamento passou a 16 px, e
+       100vh ali não é a altura visível, porque o navegador conta a faixa do
+       endereço que se recolhe ao rolar. O resultado seria a conversa
+       terminando abaixo da borda da tela, com o campo de escrita fora do
+       alcance. */
     <div style={{
       display: 'flex', flexDirection: 'column',
-      height: 'calc(100vh - 104px)', maxWidth: '100%',
+      height: '100%', minHeight: 0, maxWidth: '100%',
     }}>
       <Toaster position="top-right" toastOptions={{
         duration: 3000,

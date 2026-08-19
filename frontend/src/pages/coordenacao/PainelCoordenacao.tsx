@@ -410,7 +410,7 @@ export default function PainelCoordenacao() {
             </p>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 330px)' }}>
+          <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100dvh - 330px)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '860px' }}>
               <thead>
                 <tr>

@@ -117,6 +117,18 @@ const navItems: NavItem[] = [
     icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" /></svg>,
     visivelPara: (usuario) => !!usuario.pode_moderar,
   },
+  {
+    /* O material trocado nas conversas, nos trabalhos e no fórum ficava onde
+       caiu, e reencontrá-lo exigia lembrar por onde havia chegado. Aqui ele
+       aparece reunido e separado por disciplina.
+
+       Fica junto do fórum e dos trabalhos, e não na seção da conta, porque é
+       material da vida acadêmica — e só faz sentido para quem tem turma. */
+    label: 'Arquivos',
+    path: '/arquivos',
+    icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" /></svg>,
+    visivelPara: (u) => participaDoForum(u) && temVinculoComDisciplina(u),
+  },
   { section: 'Conta', label: 'Notificações', path: '/notificacoes', icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" /></svg> },
   {
     /* Certificado é documento do voluntário. Quem coordena o curso ou quem
@@ -179,9 +191,20 @@ function NavButton({ item, isActive, collapsed, onClick }: {
 interface SidebarProps {
   collapsed: boolean
   onToggle: () => void
+  /* Em telas estreitas a barra deixa de ocupar espaco no fluxo e passa a
+     flutuar sobre o conteudo, entrando e saindo pela esquerda. */
+  modoGaveta?: boolean
+  gavetaAberta?: boolean
+  onFecharGaveta?: () => void
 }
 
-export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export function Sidebar({
+  collapsed,
+  onToggle,
+  modoGaveta = false,
+  gavetaAberta = false,
+  onFecharGaveta,
+}: SidebarProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, logout } = useAuth()
@@ -201,11 +224,31 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   return (
     <aside
       aria-label="Navegação principal"
-      className="h-screen flex flex-col flex-shrink-0 relative overflow-hidden"
+      aria-hidden={modoGaveta && !gavetaAberta}
+      className="flex flex-col flex-shrink-0 relative overflow-hidden"
       style={{
-        width: collapsed ? '76px' : '248px',
+        /* Na gaveta a largura e sempre a plena: recolher uma barra que ja
+           esta sobreposta so tornaria os rotulos ilegiveis sem devolver
+           espaco nenhum ao conteudo. */
+        width: modoGaveta ? '264px' : collapsed ? '76px' : '248px',
+        height: '100dvh',
         background: 'linear-gradient(180deg, #001233 0%, #001845 50%, #002150 100%)',
-        transition: 'width 0.28s cubic-bezier(0.4, 0, 0.2, 1)',
+        transition: modoGaveta
+          ? 'transform 0.28s cubic-bezier(0.4, 0, 0.2, 1)'
+          : 'width 0.28s cubic-bezier(0.4, 0, 0.2, 1)',
+        ...(modoGaveta
+          ? {
+              position: 'fixed' as const,
+              top: 0,
+              left: 0,
+              zIndex: 50,
+              transform: gavetaAberta ? 'translateX(0)' : 'translateX(-100%)',
+              boxShadow: gavetaAberta ? '0 0 40px rgba(0,0,0,0.35)' : 'none',
+              /* Fora da tela, a barra nao deve receber foco por tabulacao nem
+                 interceptar toques destinados ao conteudo. */
+              visibility: gavetaAberta ? ('visible' as const) : ('hidden' as const),
+            }
+          : {}),
       }}
     >
       {/* Decoracao sutil de fundo */}
@@ -263,13 +306,27 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             </div>
           </div>
         )}
+        {/* O mesmo canto abriga duas ações conforme o modo: no computador
+            recolhe a barra, no telefone fecha a gaveta. São gestos diferentes
+            e por isso o rótulo e o ícone mudam junto. */}
         {!collapsed && (
-          <button onClick={onToggle} className="cursor-pointer transition-colors"
-            aria-label="Recolher a barra de navegação"
-            style={{ color: 'rgba(255,255,255,0.4)', padding: '4px', background: 'none', border: 'none' }}>
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-            </svg>
+          <button
+            onClick={modoGaveta ? onFecharGaveta : onToggle}
+            className="cursor-pointer transition-colors flex-shrink-0"
+            aria-label={
+              modoGaveta ? 'Fechar o menu' : 'Recolher a barra de navegação'
+            }
+            style={{ color: 'rgba(255,255,255,0.4)', padding: '4px', background: 'none', border: 'none' }}
+          >
+            {modoGaveta ? (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+              </svg>
+            )}
           </button>
         )}
       </div>

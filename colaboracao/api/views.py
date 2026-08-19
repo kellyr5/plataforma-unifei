@@ -13,8 +13,10 @@ from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from colaboracao import services
+from colaboracao.acervo import montar_acervo
 from colaboracao.api.serializers import (
     ArquivoTrabalhoSerializer,
     ConversaSerializer,
@@ -37,6 +39,26 @@ from forum.models import PermissaoDisciplina
 
 def erro(excecao):
     return Response({'detail': str(excecao)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AcervoArquivosView(APIView):
+    """
+    GET /api/colaboracao/arquivos/
+
+    Reune, num lugar so, todo o material que passou pelas maos da pessoa:
+    anexos de conversa, material de apoio dos trabalhos e anexos de publicacao
+    no forum. Vem agrupado por disciplina.
+
+    Antes disto, reencontrar um arquivo exigia lembrar por onde ele havia
+    chegado e rolar a conversa ate ele. O aluno que recebeu a especificacao do
+    trabalho em marco precisava percorrer dois meses de mensagens em maio.
+
+    Nao ha copia nem modelo novo: a consulta le o que ja esta gravado, com o
+    mesmo recorte de permissao de cada origem.
+    """
+
+    def get(self, request):
+        return Response({'grupos': montar_acervo(request.user)})
 
 
 def disciplinas_do_usuario(usuario):

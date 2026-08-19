@@ -437,7 +437,13 @@ export default function PerfilPage() {
             <button onClick={() => navigate('/andamento')} className="cursor-pointer font-medium"
               style={{ fontSize: '13px', color: 'var(--accent-blue)' }}>Ver painel completo</button>
           </div>
-          <div className="grid grid-cols-2" style={{ gap: '12px' }}>
+          <div
+            className="grid"
+            style={{
+              gap: '12px',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+            }}
+          >
             {reputacoes.map(r => (
               <RepCard
                 key={r.disciplina_codigo}

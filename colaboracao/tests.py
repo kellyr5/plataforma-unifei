@@ -8,6 +8,7 @@ ninguém perceberia até alguém reclamar.
 
 from datetime import timedelta
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
@@ -15,6 +16,7 @@ from rest_framework.test import APITestCase
 
 from colaboracao import services
 from colaboracao.models import (
+    ArquivoTrabalho,
     Conversa,
     GrupoTrabalho,
     MembroGrupo,
@@ -588,3 +590,119 @@ class ContadorNaoLidasTests(APITestCase):
         services.registrar_leitura(self.conversa, self.membro)
 
         self.assertEqual(services.nao_lidas(self.conversa, self.membro), 0)
+
+
+class AcervoDeArquivosTests(APITestCase):
+    """
+    O acervo reúne arquivos de três origens sem afrouxar nenhum controle.
+
+    É o risco próprio de um agregador: ao juntar o que estava separado, ele
+    pode tornar acessível num lugar o que não era em outro. Os testes abaixo
+    verificam justamente isso — que o recorte de cada origem sobrevive à
+    reunião.
+    """
+
+    def setUp(self):
+        self.disciplina = criar_disciplina()
+        self.professor = criar_usuario(nome='Professor')
+        self.membro = criar_usuario(nome='Membro do Grupo')
+        self.colega = criar_usuario(nome='Colega de Turma')
+
+        vincular(self.professor, self.disciplina, papel='professor')
+        vincular(self.membro, self.disciplina, papel='aluno')
+        vincular(self.colega, self.disciplina, papel='aluno')
+
+        trabalho = criar_trabalho(self.disciplina, self.professor)
+        services.criar_grupos_vazios(trabalho)
+
+        self.grupo = trabalho.grupos.first()
+        services.entrar_no_grupo(self.grupo, self.membro)
+        self.conversa = self.grupo.conversa
+
+        self.mensagem = MensagemChat.objects.create(
+            conversa=self.conversa,
+            autor=self.membro,
+            arquivo=SimpleUploadedFile('esboco.pdf', b'conteudo'),
+            nome_original='esboco.pdf',
+            tipo_midia='documento',
+        )
+
+        self.url = reverse('acervo-arquivos')
+
+    def arquivos_de(self, usuario):
+        """Achata os grupos por disciplina numa lista só, para facilitar a asserção."""
+        self.client.force_authenticate(user=usuario)
+        resposta = self.client.get(self.url)
+
+        self.assertEqual(resposta.status_code, status.HTTP_200_OK)
+
+        return [
+            arquivo
+            for grupo in resposta.data['grupos']
+            for arquivo in grupo['arquivos']
+        ]
+
+    def test_membro_encontra_o_proprio_anexo(self):
+        nomes = [a['nome'] for a in self.arquivos_de(self.membro)]
+
+        self.assertIn('esboco.pdf', nomes)
+
+    def test_colega_fora_do_grupo_nao_ve_o_anexo(self):
+        """
+        O ponto sensível de todo o recurso.
+
+        A conversa do grupo é privada, e o colega da mesma turma não participa
+        dela. Se o anexo aparecesse aqui, o acervo teria aberto uma porta que a
+        conversa mantém fechada.
+        """
+        nomes = [a['nome'] for a in self.arquivos_de(self.colega)]
+
+        self.assertNotIn('esboco.pdf', nomes)
+
+    def test_professor_nao_ve_o_anexo_do_grupo(self):
+        """Quem leciona supervisiona o trabalho, mas não lê a conversa dele."""
+        nomes = [a['nome'] for a in self.arquivos_de(self.professor)]
+
+        self.assertNotIn('esboco.pdf', nomes)
+
+    def test_mensagem_apagada_leva_o_anexo_junto(self):
+        self.mensagem.deleted_at = timezone.now()
+        self.mensagem.save(update_fields=['deleted_at'])
+
+        nomes = [a['nome'] for a in self.arquivos_de(self.membro)]
+
+        self.assertNotIn('esboco.pdf', nomes)
+
+    def test_material_do_trabalho_alcanca_a_turma_inteira(self):
+        """
+        Ao contrário do anexo de conversa: material de apoio é da turma.
+
+        O colega não participa do grupo, mas cursa a disciplina — e é para ele
+        que o professor publicou a especificação.
+        """
+        ArquivoTrabalho.objects.create(
+            trabalho=self.grupo.trabalho,
+            enviado_por=self.professor,
+            arquivo=SimpleUploadedFile('especificacao.pdf', b'conteudo'),
+            nome_original='especificacao.pdf',
+            tamanho_bytes=8,
+            tipo_mime='application/pdf',
+        )
+
+        nomes = [a['nome'] for a in self.arquivos_de(self.colega)]
+
+        self.assertIn('especificacao.pdf', nomes)
+
+    def test_sem_vinculo_com_a_disciplina_o_acervo_vem_vazio(self):
+        visitante = criar_usuario(nome='Sem Vínculo')
+
+        self.assertEqual(self.arquivos_de(visitante), [])
+
+    def test_arquivos_vem_agrupados_pela_disciplina(self):
+        self.client.force_authenticate(user=self.membro)
+
+        resposta = self.client.get(self.url)
+        grupos = resposta.data['grupos']
+
+        self.assertEqual(len(grupos), 1)
+        self.assertEqual(grupos[0]['disciplina_codigo'], self.disciplina.codigo)

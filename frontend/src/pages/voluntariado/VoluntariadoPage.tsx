@@ -297,7 +297,7 @@ export default function VoluntariadoPage() {
 
             O filtro de situação existe por outro motivo: quem participou de
             uma ação encerrada precisa de um caminho de volta até ela. */}
-        <div className="flex items-center" style={{ gap: '7px' }}>
+        <div className="flex items-center flex-wrap" style={{ gap: '7px' }}>
           {([
             ['abertas', 'Abertas', abertas],
             ['encerradas', 'Encerradas', encerradas],
@@ -349,7 +349,17 @@ export default function VoluntariadoPage() {
           <p style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>Tente outro filtro ou busca.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2" style={{ gap: '14px' }}>
+        /* Duas colunas declaradas viravam duas colunas de cento e cinquenta
+           pixels no telefone, e o título da oportunidade descia uma palavra
+           por linha. O mínimo de 300 pixels é a largura em que o cartão ainda
+           mostra título, organização, local e período sem quebrar. */
+        <div
+          className="grid"
+          style={{
+            gap: '14px',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+          }}
+        >
           {oportunidades.map(op => (
             <OpCard key={op.id} op={op} onClick={() => navigate(`/voluntariado/${op.id}`)} />
           ))}
