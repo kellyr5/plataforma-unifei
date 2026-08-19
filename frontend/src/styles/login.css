@@ -8,7 +8,10 @@
 
 /* --- Layout split-screen --- */
 .login-page {
-  min-height: 100vh;
+  /* dvh, e nao vh: no telefone a barra de endereco entra na conta de 100vh e
+     a tela nasce mais alta que a area visivel, empurrando o botao de entrar
+     para baixo da dobra. */
+  min-height: 100dvh;
   display: flex;
   background: var(--bg-main);
 }
@@ -95,31 +98,40 @@
   transform: scale(1.05);
 }
 
-/* --- Badge institucional --- */
+/* --- Badge institucional ---
+   O azul da marca vinha escrito no codigo, e o texto era quase preto. No tema
+   claro isso passa; no escuro, o mesmo par de cores cai sobre um fundo quase
+   preto e o aviso desaparece por completo — a faixa continuava la, vazia.
+   Os tokens abaixo trocam de valor com o tema. */
 .login-form__badge {
-  background: rgba(0, 48, 135, 0.04);
-  border: 1px solid rgba(0, 48, 135, 0.08);
+  background: var(--accent-blue-soft);
+  border: 1px solid var(--accent-blue-border);
 }
 
 .login-form__badge-text {
-  color: #0f141d;
+  color: var(--text-primary);
 }
 
 /* --- Botao "Primeiro acesso" --- */
 .login-form__btn-alt {
-  background: rgba(0, 48, 135, 0.06);
-  color: #003087;
-  border: 1px solid rgba(0, 48, 135, 0.1);
+  background: var(--accent-blue-soft);
+  color: var(--accent-blue-text);
+  border: 1px solid var(--accent-blue-border);
 }
 
 .login-form__btn-alt:hover {
-  background: rgba(0, 48, 135, 0.12);
+  background: var(--accent-blue-soft);
+  border-color: var(--accent-blue);
 }
 
-/* --- Botao principal (login) --- */
+/* --- Botao principal (login) ---
+   O gradiente ia de um azul escuro a outro mais escuro ainda. Sobre o fundo
+   claro ele se destaca; sobre o escuro virava um bloco quase invisivel, com o
+   rotulo branco boiando. A cor de destaque do tema resolve os dois casos: ela
+   ja e definida para funcionar como fundo de texto branco. */
 .login-form__btn-primary {
-  background: linear-gradient(135deg, #003087 0%, #001845 100%);
-  box-shadow: 0 4px 16px rgba(0, 48, 135, 0.3);
+  background: var(--accent-blue);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
 }
 
 .login-form__btn-primary:hover {
@@ -138,8 +150,8 @@
 }
 
 .login-form__btn-secondary:hover {
-  border-color: #003087;
-  color: #003087;
+  border-color: var(--accent-blue);
+  color: var(--accent-blue-text);
 }
 
 /* --- Input: estados de foco --- */
@@ -150,8 +162,8 @@
 }
 
 .login-input--focused {
-  border-color: #003087;
-  box-shadow: 0 0 0 3px rgba(0, 48, 135, 0.08);
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px var(--accent-blue-soft);
 }
 
 .login-input__icon {
@@ -160,13 +172,13 @@
 }
 
 .login-input__icon--focused {
-  color: #003087;
+  color: var(--accent-blue-text);
 }
 
 /* --- Indicador de passos (primeiro acesso) --- */
 .login-steps__active {
-  background: #003087;
-  color: white;
+  background: var(--accent-blue);
+  color: #ffffff;
 }
 
 .login-steps__inactive {
@@ -175,12 +187,12 @@
 }
 
 .login-steps__label-active {
-  color: #003087;
+  color: var(--accent-blue-text);
 }
 
 .login-steps__completed {
-  background: rgba(0, 48, 135, 0.15);
-  color: #003087;
+  background: var(--accent-blue-soft);
+  color: var(--accent-blue-text);
 }
 
 /* --- Inputs do codigo OTP --- */
@@ -192,16 +204,16 @@
 }
 
 .login-otp__input:focus {
-  border-color: #003087;
-  box-shadow: 0 0 0 3px rgba(0, 48, 135, 0.08);
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px var(--accent-blue-soft);
 }
 
 /* --- Link "Esqueceu a senha?" --- */
 .login-form__link {
-  color: #003087;
+  color: var(--accent-blue-text);
 }
 
 /* --- Link "Reenviar codigo" --- */
 .login-form__link-reenviar {
-  color: #003087;
+  color: var(--accent-blue-text);
 }

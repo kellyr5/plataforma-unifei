@@ -443,7 +443,7 @@ export default function LoginPage() {
                     style={{ width: '24px', height: '24px', fontSize: '11px' }}>{CheckIcon}</div>
                   <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>Dados</span>
                 </div>
-                <div className="flex-1" style={{ height: '1px', background: 'rgba(0,48,135,0.2)' }} />
+                <div className="flex-1" style={{ height: '1px', background: 'var(--border)' }} />
                 <div className="flex items-center" style={{ gap: '8px' }}>
                   <div className="rounded-full flex items-center justify-center font-bold text-white login-steps__active"
                     style={{ width: '24px', height: '24px', fontSize: '11px' }}>2</div>
