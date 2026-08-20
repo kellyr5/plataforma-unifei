@@ -44,6 +44,19 @@ frontend/dist/
 frontend/node_modules/
 *.tsbuildinfo
 
+# Dados pessoais dos participantes da avaliacao.
+#
+# O arquivo real carrega CPF e e-mail de pessoas que aceitaram participar de um
+# teste academico. O historico do Git e permanente: uma vez enviado, apagar num
+# commit seguinte nao remove o dado, apenas o tira da versao atual. Por isso o
+# arquivo fica de fora e o repositorio guarda somente o modelo, com dados
+# ficticios.
+docs/participantes.csv
+
+# Documento de trabalho, com pendencias e anotacoes de processo. Nao descreve o
+# sistema, e sim o andamento — nao pertence ao repositorio publico.
+docs/estado-do-projeto.md
+
 # Saidas de diagnostico.
 #
 # Sao geradas para inspecionar o banco local e refletem um estado de maquina,
