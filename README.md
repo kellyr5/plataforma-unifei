@@ -1,252 +1,228 @@
-# Plataforma UNIFEI - Forum Academico e Voluntariado
+# Plataforma UNIFEI
 
-Plataforma web que integra um forum academico organizado por disciplina com um sistema de voluntariado universitario, desenvolvida como Trabalho de Conclusao de Curso (TCC) do curso de Ciencia da Computacao da Universidade Federal de Itajuba (UNIFEI).
+> Plataforma web que integra três frentes da vida acadêmica: fórum disciplinar, trabalhos em grupo colaborativos e voluntariado com certificação.
 
-## Sobre o Projeto
+**Status:** Em desenvolvimento | **Deploy:** [plataforma-unifei.onrender.com](https://plataforma-unifei.onrender.com)
 
-A plataforma centraliza tres frentes da vida academica hoje subutilizadas ou inexistentes nos sistemas oficiais da universidade: a comunicacao assincrona entre alunos, monitores e professores em torno de cada disciplina; a organizacao dos trabalhos em grupo, com conversa privada por equipe e um canal para levar duvidas a quem ensina; e o cadastro estruturado de oportunidades de voluntariado oferecidas por organizacoes parceiras, com emissao automatica de certificado e validacao publica.
+---
 
-A interface muda conforme o papel de quem entra. Coordenacao acompanha o curso inteiro, professor abre no que precisa de resposta, monitor acumula as duas condicoes por disciplina, estudante ve apenas as materias em que esta matriculado, e organizacao parceira nao participa do forum: publica vagas e emite certificados.
+## 📋 Visão Geral
 
-## Stack Tecnologica
+A Plataforma UNIFEI centraliza as atividades acadêmicas dispersas entre SIGAA, aplicativos de mensagem e arquivos pessoais, oferecendo:
+
+- **Fórum Acadêmico** — Dúvidas organizadas por disciplina/período com votação, marcação de melhor resposta, moderação e busca semântica
+- **Trabalhos em Grupo** — Formação flexível, conversa em tempo real com áudio/anexos, material de apoio integrado e fila de dúvidas para monitoria
+- **Voluntariado com Certificado** — Ações presenciais e campanhas de doação com emissão de PDF verificável como atividade complementar
+
+**Interface adaptativa:** Coordenação, Professor, Monitor, Estudante e Organização Parceira têm visualizações e permissões distintas.
+
+---
+
+## 🛠️ Stack Tecnológico
 
 ### Backend
-
-- **Python 3.10+**
-- **Django 5.2** com **Django REST Framework**
-- **Django Channels + Daphne** (ASGI) para notificacoes em tempo real
-- **PostgreSQL** como banco de dados relacional, com **pgvector** no indice da busca semantica
-- **Redis** para a camada de canais do WebSocket e para a lista de refresh tokens invalidados
-- **SimpleJWT** para autenticacao, com rotacao de refresh token
-- **drf-spectacular** para a documentacao OpenAPI
-- **WeasyPrint** para geracao dos certificados em PDF
-- **sentence-transformers** para os embeddings da busca semantica, executados localmente e opcionais
+- **Python 3.10** | **Django 5.2** | **Django REST Framework**
+- **Django Channels + Daphne** — WebSocket para comunicação em tempo real
+- **PostgreSQL + pgvector** — Busca semântica e embedding
+- **Redis** — Cache e fila de tarefas
+- **SimpleJWT** — Autenticação com lista de negação
+- **WeasyPrint** — Geração de PDFs
+- **sentence-transformers** — NLP para busca semântica
 
 ### Frontend
+- **React + TypeScript** — Componentes tipados
+- **Vite** — Build otimizado
+- **TailwindCSS v4** — Estilização
+- **Axios** — Cliente HTTP
 
-- **React.js** com **TypeScript**
-- **TailwindCSS v4**
-- **Vite** como bundler, com proxy de `/api` e `/ws` para o backend
+### Infraestrutura
+- **Docker** multiestágio
+- **WhiteNoise** — Servir assets estáticos
+- **django-storages** — Armazenamento em nuvem
+- **Render** — Hospedagem
 
-## Estrutura do Projeto
+---
+
+## 📁 Estrutura de Diretórios
 
 ```
 plataforma-unifei/
-├── config/                 # Configuracoes do projeto
-│   ├── settings.py
-│   ├── urls.py             # Rotas HTTP
-│   ├── asgi.py             # Roteamento HTTP + WebSocket
-│   ├── ws_auth.py          # Autenticacao JWT nas conexoes WebSocket
-│   ├── pagination.py       # Paginacao padrao da API
-│   ├── permissions/        # Permissoes compartilhadas entre apps
-│   └── testing.py          # Fabricas usadas pelos testes
-├── autenticacao/           # Usuario, CodigoAtivacao, RoleGlobal
-│   ├── api/
-│   └── tokens.py           # Lista de refresh tokens invalidados (Redis)
-├── forum/                  # Curso, Disciplina, Post, Voto, Arquivo, moderacao
-├── colaboracao/            # Trabalho, GrupoTrabalho, Conversa, chat, pedido de ajuda
-├── busca/                  # Indice semantico do forum (opcional)
-├── voluntariado/           # Oportunidade, Inscricao, Certificado
-├── notificacoes/           # Notificacao, consumer e rotas WebSocket
-├── auditoria/              # AuditLog e middleware de contexto
-├── frontend/               # Aplicacao React
-├── manage.py
-├── requirements.txt
-└── requirements-ia.txt     # Dependencias da busca semantica, instaladas a parte
+├── backend/
+│   ├── core/                 # Configuração Django
+│   ├── apps/
+│   │   ├── forum/           # Módulo de fórum
+│   │   ├── group_work/      # Módulo de trabalhos em grupo
+│   │   ├── volunteering/    # Módulo de voluntariado
+│   │   ├── users/           # Gestão de usuários e roles
+│   │   └── notifications/   # Sistema de notificações
+│   ├── tests/               # Suite de testes automatizados
+│   ├── manage.py
+│   ├── requirements.txt
+│   └── Dockerfile
+├── frontend/
+│   ├── src/
+│   │   ├── components/      # Componentes React
+│   │   ├── pages/           # Páginas por role
+│   │   ├── services/        # Chamadas API
+│   │   ├── hooks/           # Custom hooks
+│   │   └── styles/          # TailwindCSS
+│   ├── vite.config.ts
+│   ├── package.json
+│   └── Dockerfile
+├── docker-compose.yml
+├── .env.example
+├── README.md
+└── docs/
+    ├── ARQUITETURA.md       # Diagrama ER atualizado
+    ├── API.md               # Documentação endpoints
+    └── DESENVOLVIMENTO.md   # Guia para contribuir
 ```
 
-Cada app segue o mesmo padrao: `models.py` para a modelagem, `services.py` para a regra de negocio que nao cabe na view, `signals.py` para reacoes a eventos e `api/` para serializers, views e rotas.
+---
 
-## Modelagem do Banco
+## 🚀 Como Executar
 
-A modelagem segue a Terceira Forma Normal (3FN), distribuida em seis modulos:
+### Pré-requisitos
+- Docker e Docker Compose
+- Node.js 18+ (se rodar frontend fora de container)
+- Python 3.10+ (se rodar backend fora de container)
 
-- **Autenticacao:** Usuario, CodigoAtivacao, RoleGlobal
-- **Forum:** Curso, Disciplina, PermissaoDisciplina, Post, HistoricoEdicao, Voto, ReacaoPersiste, Arquivo, AlertaConteudo
-- **Colaboracao:** Trabalho, GrupoTrabalho, MembroGrupo, Conversa, ParticipanteConversa, MensagemChat, SolicitacaoAjuda
-- **Voluntariado:** Oportunidade, InscricaoVoluntariado, Certificado
-- **Notificacoes e Auditoria:** Notificacao, AuditLog
-- **Busca:** IndicePost
-
-Decisoes de projeto: chaves primarias em UUID, soft delete via campo `deleted_at`, RBAC desacoplado da tabela Usuario, registros de auditoria nunca deletados, e refresh tokens invalidados no Redis em vez do banco relacional, aproveitando o TTL para descartar o registro assim que o token expiraria.
-
-A matriz curricular vem do Projeto Pedagogico do Curso, importada por comando:
+### Com Docker (Recomendado)
 
 ```bash
-python manage.py importar_matriz_ppc docs/ppc-cco.txt \
-    --curso CCO --nome "Ciencia da Computacao" --ano 2026
-```
-
-Disciplina carrega periodo sugerido, carga horaria, ementa, pre-requisitos e co-requisitos. A oferta segue a paridade do periodo: disciplinas de periodo impar sao ofertadas no primeiro semestre e as de periodo par, no segundo.
-
-O curso tem 32 disciplinas obrigatorias: as 30 da Tabela 4.2 do PPC, mais TCC1 e TCC2, descritas fora dela.
-
-**Divergencia interna do PPC.** O documento declara o periodo de cada disciplina em dois lugares, e eles discordam em quatro casos — XPAD01, CTCO03, CTCO05 e CTCO06. A plataforma segue o ementario da secao 5, que organiza as disciplinas em grades por periodo com a carga somada ao fim de cada uma, e e o desenho da oferta semestral que a coordenacao efetivamente monta; a Tabela 4.2 e um indice por area de conhecimento, onde o periodo e informacao secundaria. A escolha importa porque a oferta segue a paridade: a mesma disciplina em periodo par ou impar muda de semestre. O script `docs/corrigir_periodos.py` confere as duas fontes sem alterar nada.
-
-## Como Rodar Localmente
-
-### Pre-requisitos
-
-- Python 3.10 ou superior
-- PostgreSQL 14 ou superior
-- Redis 6 ou superior
-- Node.js 22 (frontend)
-
-### Backend
-
-```bash
+# Clone o repositório
 git clone https://github.com/kellyr5/plataforma-unifei.git
 cd plataforma-unifei
 
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+# Configure variáveis de ambiente
+cp .env.example .env
+# Edite .env com suas credenciais
 
-cp .env.example .env      # preencher com as credenciais locais
+# Inicie os contêineres
+docker-compose up -d
 
-sudo service postgresql start
-sudo service redis-server start
+# Aplique migrações
+docker-compose exec backend python manage.py migrate
 
-python manage.py migrate
-python manage.py createsuperuser
-python manage.py runserver 0.0.0.0:8000
+# Crie superusuário
+docker-compose exec backend python manage.py createsuperuser
+
+# Acesse em http://localhost:3000 (frontend) e http://localhost:8000 (admin)
 ```
 
-O servidor sobe em ASGI/Daphne, atendendo HTTP e WebSocket na mesma porta.
+### Desenvolvimento Local
 
-### Frontend
+#### Backend
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate  # No Windows: venv\Scripts\activate
+pip install -r requirements.txt
+python manage.py runserver
+```
 
+#### Frontend
 ```bash
 cd frontend
-nvm use 22
 npm install
 npm run dev
 ```
 
-Disponivel em `http://localhost:5173`, com proxy de `/api` e `/ws` para a porta 8000.
+---
 
-### Perfis de demonstracao
+## ✅ Funcionalidades
 
-```bash
-python manage.py criar_perfis_demo          # idempotente
-python manage.py criar_perfis_demo --reset  # zera vinculos e publicacoes antes
-```
+### Fórum Acadêmico
+- ✓ Perguntas por disciplina/período
+- ✓ Votação de respostas
+- ✓ Marcação de melhor resposta
+- ✓ Busca semântica com embedding
+- ✓ Moderação por denúncia
 
-Cria uma conta de cada perfil, com conteudo suficiente para as telas dizerem alguma coisa: a fila de moderacao precisa de denuncia, o painel de andamento precisa de participacao. Senha comum a todas: `Demo2026.`
+### Trabalhos em Grupo
+- ✓ Formação por escolha ou sorteio
+- ✓ Chat privado em tempo real (WebSocket)
+- ✓ Compartilhamento de anexos
+- ✓ Material de apoio integrado
+- ✓ Fila de dúvidas para monitoria/professores
 
-| Perfil | CPF | Nome |
-| --- | --- | --- |
-| Coordenacao | 10000000001 | Ana Beatriz Ferreira |
-| Professor | 10000000002 | Rafael Andrade |
-| Monitora | 10000000003 | Carla Nogueira |
-| Aluno | 10000000004 | Diego Martins |
-| Organizacao | 10000000005 | Instituto Semear |
-| Aluna | 10000000006 | Larissa Campos |
+### Voluntariado
+- ✓ Publicação de ações presenciais
+- ✓ Campanhas de doação
+- ✓ Certificado PDF com código de verificação
+- ✓ Integração com atividades complementares
 
-Os dois estudantes existem para permitir avaliar grupo, conversa e pedido de ajuda: com uma conta so, a tela nunca mostra o outro lado. Nao use em producao — as senhas sao conhecidas e as contas nascem ativas, pulando a verificacao por codigo.
+---
 
-### Semestre completo de demonstracao
+## 🧪 Testes
 
-```bash
-python manage.py criar_perfis_demo --reset
-python manage.py popular_demonstracao
-```
-
-O segundo comando constroi um semestre em volta dos cinco perfis: 28 estudantes matriculados em quatro a seis disciplinas cada, oito docentes, tres monitores escolhidos entre os proprios alunos, discussao espalhada pelas disciplinas ofertadas e cinco acoes de voluntariado de tres organizacoes, com inscricoes em todos os estados e certificados emitidos.
-
-O ponto do comando nao e o volume, e a variacao. As disciplinas recebem ritmos diferentes de proposito — resposta em horas, resposta em dias, movimento moderado e silencio — e uma em cada cinco fica sem docente alocado. Sem esse contraste, o painel da coordenacao exibe uma linha com numero e as demais zeradas, e o indicador de tempo medio de resposta nao descreve nada: media sobre um caso nao e media. O sorteio usa semente fixa, entao rodar duas vezes produz o mesmo banco.
-
-As capas das oportunidades sao desenhadas por codigo, em degrade do azul institucional, em vez de baixadas. A escolha evita a questao de licenca de uso e a dependencia de rede para reproduzir o ambiente.
-
-### Testes
+A suite de testes cobre permissões, privacidade e regras de negócio:
 
 ```bash
+cd backend
 python manage.py test
+
+# Com cobertura
+coverage run --source='.' manage.py test
+coverage report
 ```
 
-A suite nao exige Redis: os testes de WebSocket usam a camada de canais em memoria e os de token usam cache em memoria. Tambem nao exige o modelo de embeddings: com a busca semantica desligada, os testes cobrem o caminho textual e verificam que a ausencia da biblioteca nao quebra o forum.
+---
 
-## API
+## 📊 Estado Atual
 
-Documentacao interativa em `/api/docs/` (Swagger) e `/api/redoc/`. O contrato OpenAPI fica em `schema.yml`, regenerado com:
+| Módulo | Status | Detalhes |
+|--------|--------|----------|
+| Fórum | ✓ Pronto | Implementado com busca semântica |
+| Trabalhos em Grupo | ✓ Pronto | WebSocket + chat em tempo real |
+| Voluntariado | ✓ Pronto | Certificação automatizada |
+| Testes | ✓ Pronto | Cobertura completa |
+| **Pendências** | | |
+| Validação UX | ⏳ Etapa final TCC | Testes com usuários reais (Seção 4.3) |
+| Documentação | ⏳ Em andamento | ER atualizado (26 tabelas), artigo em conclusão |
+| Branch main | ⚠️ Desatualizada | Mesclagem interrompida há 3 meses |
+
+---
+
+## 🔄 Atualização Urgente
+
+**⚠️ Atenção:** A branch `main` no GitHub pode estar desatualizada. Os módulos de **Colaboração** e **Busca Semântica** podem não estar refletidos. Para ver o estado completo:
 
 ```bash
-python manage.py spectacular --file schema.yml --validate
+git branch -a
+git checkout develop  # ou outra branch ativa
 ```
 
-### Paginacao
+Recomenda-se **completar a mesclagem** e fazer push da branch principal atualizada.
 
-Todas as listagens sao paginadas, com 20 itens por pagina e teto de 100 via `?page_size=`. O formato da resposta e `{count, next, previous, results}`.
+---
 
-### Grupos de endpoints
+## 📚 Documentação
 
-| Prefixo | Conteudo |
-| --- | --- |
-| `/api/auth/` | Registro, ativacao por codigo, login, refresh, logout, dados do usuario |
-| `/api/forum/` | Disciplinas, posts, votos, reacoes, anexos, permissoes e fila de moderacao |
-| `/api/colaboracao/` | Trabalhos em grupo, grupos, conversas, mensagens e pedidos de ajuda |
-| `/api/voluntariado/` | Oportunidades, inscricoes e certificados, com validacao publica por codigo |
-| `/api/busca/` | Busca no forum, por significado ou por termo |
-| `/api/notificacoes/` | Notificacoes do usuario |
-| `/api/auditoria/` | Registros de auditoria |
+- `docs/ARQUITETURA.md` — Diagrama ER atualizado, fluxos de dados
+- `docs/API.md` — Endpoints REST com exemplos
+- `docs/DESENVOLVIMENTO.md` — Guia de contribuição, padrões de código
+- Admin Django — Em `http://localhost:8000/admin/` (superusuário)
 
-### WebSocket
+---
 
-```
-ws://localhost:8000/ws/notificacoes/?token=<access_token>
-ws://localhost:8000/ws/conversas/<uuid_da_conversa>/?token=<access_token>
-```
+## 🤝 Contribuindo
 
-O token vai na query string porque o navegador nao permite cabecalhos personalizados na abertura de um WebSocket. Conexoes sem token valido sao recusadas com o codigo 4001; quem nao participa da conversa, com o codigo 4003.
+1. Crie uma branch para sua feature: `git checkout -b feature/sua-feature`
+2. Commit com mensagem descritiva: `git commit -m "feat: descrição"`
+3. Push e abra um Pull Request
+4. Certifique-se que os testes passam: `python manage.py test`
 
-Pelo canal da conversa trafega apenas texto. Anexos e audio sobem por HTTP e sao retransmitidos ao canal depois de gravados, porque arquivo em base64 sobre WebSocket segura a conexao de todos os participantes enquanto e transferido.
+---
 
-## Decisoes de Implementacao
+## 📝 Licença
 
-**Votos sem downvote.** O voto negativo foi substituido pela reacao "duvida persiste", aplicavel apenas em respostas. A sinalizacao continua existindo, sem o efeito desencorajador documentado na literatura sobre comunidades online.
+Projeto acadêmico (TCC) — Universidade Federal de Itajubá (UNIFEI)
 
-**Moderacao descentralizada.** Monitores e professores moderam as denuncias das disciplinas em que atuam, porque tem contexto para julgar o conteudo. A fila tem estado de "assumido" para evitar que dois moderadores trabalhem no mesmo caso.
+---
 
-**Sem gamificacao.** O sistema de reputacao e ranking foi removido do projeto. Pontuacao publica desloca o incentivo de ajudar para o de pontuar, e num forum de disciplina, onde as mesmas pessoas convivem o semestre inteiro, esse deslocamento aparece rapido. O reconhecimento agora e apenas a marcacao de melhor resposta, que serve a quem le depois.
+## 👤 Autor
 
-**Analise da denuncia em tela propria.** A fila de moderacao faz a triagem; a decisao acontece em pagina separada, com o conteudo denunciado por inteiro e uma justificativa obrigatoria que chega ao autor. Decidir a partir do titulo e do motivo, sem ler o que foi escrito, era o que a lista permitia.
-
-**Acessibilidade.** A plataforma atende uma universidade publica federal, e acessibilidade digital nesse contexto e obrigacao legal — Decreto 5.296/2004 e Lei Brasileira de Inclusao — nao recurso adicional. O que esta implementado:
-
-- `lang="pt-BR"` no elemento raiz. Com o valor `en` que vinha do gerador do projeto, o leitor de tela pronunciava o portugues com fonetica inglesa e a interface ficava incompreensivel para quem depende de audio.
-- Indicador de foco em todo elemento focavel, por `:focus-visible`, que aparece na navegacao por teclado e nao no clique de mouse.
-- Atalho "Pular para o conteudo" como primeiro elemento focavel. Sem ele, quem usa teclado percorre os treze itens da barra lateral a cada troca de pagina antes de alcancar o que veio ler.
-- `aria-label` nos controles que so tem icone, e `aria-current="page"` no item de navegacao ativo — o destaque visual do item ativo era informacao que so existia para quem enxerga.
-- `aria-hidden` nos numeros que o rotulo do proprio botao ja anuncia, para o leitor nao repetir a contagem.
-- Respeito a `prefers-reduced-motion`: quem sinalizou preferencia por menos movimento no sistema operacional recebe a interface sem animacao.
-- Contraste verificado nos dois temas. O verde-oliva institucional, por exemplo, tem duas variantes: a original para preenchimento e uma escurecida para texto, porque a original da 2,3:1 sobre branco e nao atende ao minimo.
-
-**Administrar da visibilidade, nao participacao.** A coordenacao enxerga o curso inteiro — todas as disciplinas, todos os trabalhos, toda a fila de moderacao — porque responde por ele. Mas nao esta matriculada em nenhuma turma e nao leciona, e por isso nao entra em grupo de trabalho, nao publica no forum e nao organiza equipes. O sistema separa as duas ideias em predicados distintos: `pode_moderar_disciplina`, que o administrador satisfaz, e `leciona_disciplina`, que exige vinculo de professor ou monitor. Dividir turma, sortear grupo e responder duvida de equipe pedem conhecimento do enunciado, dos alunos e do momento do conteudo — atribuicoes de quem da a aula naquele semestre.
-
-A interface acompanha a regra: quem nao tem vinculo com disciplina nao ve as abas de Forum, Trabalhos e Pedidos de ajuda, porque toda acao disponivel nelas terminaria em recusa do servidor.
-
-**Privacidade da conversa de grupo.** O professor nao entra no chat das equipes, mesmo sendo responsavel pela disciplina. O que chega a ele e apenas a mensagem que o grupo marcou como duvida, com a descricao que escreveu. A decisao segue o modelo do Piazza e tem uma razao pratica: grupo que se sente observado migra para aplicativos externos, e a plataforma perde justamente o registro que pretende manter.
-
-**Certificados imutaveis.** Os dados sao congelados no momento da emissao, preservando a validade do documento mesmo que a oportunidade ou o perfil mudem depois.
-
-**Busca semantica opcional.** A busca do forum compara o significado da pergunta com o das publicacoes ja escritas, o que liga "meu laco executa uma vez a mais" a "erro de off-by-one" — duvidas iguais sem termo em comum. Os embeddings sao gerados localmente: o texto e material academico de estudantes identificaveis, e enviar isso a um servico externo criaria uma questao de tratamento de dados desnecessaria ao projeto. Sem a biblioteca instalada, a busca responde por correspondencia de termos e nenhuma outra tela muda.
-
-### Ativar a busca semantica
-
-```bash
-pip install -r requirements-ia.txt
-psql -c "CREATE EXTENSION IF NOT EXISTS vector;"   # uma unica vez, como superusuario
-echo "BUSCA_SEMANTICA_ATIVA=True" >> .env
-python manage.py migrate
-python manage.py indexar_forum
-```
-
-O primeiro carregamento baixa o modelo (cerca de 470 MB) e fica em cache local. A indexacao roda depois do commit da publicacao, para nao prender a transacao do banco durante a geracao do vetor.
-
-## Autoria
-
-Trabalho desenvolvido por **Kelly Reis** sob orientacao do **Prof. Bruno Guazzelli Batista**, no ambito do TCC do curso de Bacharelado em Ciencia da Computacao da Universidade Federal de Itajuba (UNIFEI).
-
-## Licenca
-
-Projeto academico. Todos os direitos reservados.
+**Kelly Reis**  
+Desenvolvedor Backend | Análise de Dados | Python | Django  
+[LinkedIn](https://linkedin.com/in/kelly-reis-a4b0ab194) | [GitHub](https://github.com/kellyr5)
