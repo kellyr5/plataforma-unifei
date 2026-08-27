@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Toaster } from 'react-hot-toast'
+import toast, { Toaster } from 'react-hot-toast'
 
 import api from '../../services/api'
 import { useAuth } from '../../contexts/AuthContext'
@@ -32,7 +32,8 @@ interface Oportunidade {
   area_display: string
   local: string
   vagas: number
-  vagas_disponiveis: number
+  /* Nulo na campanha de doação, que não tem vaga a contar. */
+  vagas_disponiveis: number | null
   carga_horaria_total: number
   data_inicio: string
   data_fim: string
@@ -42,6 +43,10 @@ interface Oportunidade {
   esta_aberta_inscricao: boolean
   imagem_url: string | null
   inscricoes: Inscricoes
+  e_doacao: boolean
+  unidade_medida: string
+  meta_quantidade: number | null
+  total_arrecadado: number
 }
 
 interface Resumo {
@@ -103,11 +108,15 @@ function Botao({ rotulo, onClick, primario }: {
   )
 }
 
-function CartaoOportunidade({ item, navegar }: {
+function CartaoOportunidade({ item, navegar, aoExcluir }: {
   item: Oportunidade
   navegar: (destino: string) => void
+  aoExcluir: (item: Oportunidade) => void
 }) {
   const pendentes = item.inscricoes.pendentes
+  const [confirmando, setConfirmando] = useState(false)
+
+  const envolvidos = item.inscricoes.aprovadas + item.inscricoes.concluidas
 
   return (
     <article
@@ -147,22 +156,36 @@ function CartaoOportunidade({ item, navegar }: {
               {item.titulo}
             </h3>
             <p style={{ fontSize: '12.5px', color: 'var(--text-tertiary)', marginTop: '3px' }}>
-              {item.local} · {item.carga_horaria_total}h ·{' '}
+              {item.local}
+              {/* Campanha não tem carga horária: exibir "0h" descreveria uma
+                  duração que ninguém definiu. */}
+              {item.e_doacao ? '' : ` · ${item.carga_horaria_total}h`} ·{' '}
               {data(item.data_inicio)} a {data(item.data_fim)} ·
               inscrições até {data(item.prazo_inscricao)}
             </p>
           </div>
 
-          <div className="flex items-start flex-shrink-0" style={{ gap: '16px' }}>
+          <div className="flex items-start flex-shrink-0 flex-wrap" style={{ gap: '16px' }}>
             <Metrica valor={pendentes} rotulo="a decidir" destaque />
             <Metrica valor={item.inscricoes.aprovadas} rotulo="em atividade" />
             <Metrica valor={item.inscricoes.concluidas} rotulo="certificados" />
-            <Metrica valor={item.vagas_disponiveis} rotulo="vagas livres" />
+            {/* Na campanha, o que se acompanha é a arrecadação. A métrica de
+                vagas não existe ali, e vinha do servidor como nulo. */}
+            {item.e_doacao ? (
+              <Metrica
+                valor={item.total_arrecadado}
+                rotulo={item.unidade_medida || 'arrecadados'}
+              />
+            ) : (
+              <Metrica valor={item.vagas_disponiveis ?? 0} rotulo="vagas livres" />
+            )}
           </div>
         </div>
 
+        {/* Quebra de linha porque são quatro ações e o cartão não é largo.
+            Sem isso, a última sai do cartão no telefone. */}
         <div
-          className="flex items-center"
+          className="flex items-center flex-wrap"
           style={{
             gap: '8px', marginTop: '14px', paddingTop: '14px',
             borderTop: '1px solid var(--border)',
@@ -183,11 +206,56 @@ function CartaoOportunidade({ item, navegar }: {
             rotulo="Participantes e certificados"
             onClick={() => navegar(`/organizacao/oportunidade/${item.id}`)}
           />
+          {/* A edição já existia, mas só era alcançável de dentro da tela de
+              participantes — dois cliques longe de onde a organização passa o
+              tempo. Corrigir uma data errada exigia atravessar uma tela que
+              não tem relação com a correção. */}
+          <Botao
+            rotulo="Editar"
+            onClick={() => navegar(`/organizacao/oportunidade/${item.id}/editar`)}
+          />
           <Botao
             rotulo="Ver como o aluno vê"
             onClick={() => navegar(`/voluntariado/${item.id}`)}
           />
+          <Botao rotulo="Excluir" onClick={() => setConfirmando(true)} />
         </div>
+
+        {/* A confirmação nomeia o que será perdido em vez de perguntar
+            genericamente se a pessoa tem certeza. Quem já emitiu certificado
+            precisa saber que o documento continua válido — o registro é
+            preservado, e não apagado de fato. */}
+        {confirmando && (
+          <div
+            className="rounded-lg"
+            style={{
+              marginTop: '12px', padding: '14px 16px',
+              background: 'var(--bg-input)',
+              border: '1px solid var(--accent-blue-border)',
+            }}
+          >
+            <p style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.55 }}>
+              Excluir <strong>{item.titulo}</strong>?
+            </p>
+            <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginTop: '6px', lineHeight: 1.55 }}>
+              {envolvidos > 0
+                ? `A ação sai da listagem e não aceita novas inscrições. ${envolvidos} ${envolvidos === 1 ? 'pessoa que já participa continua' : 'pessoas que já participam continuam'} com o registro, e os certificados emitidos seguem válidos.`
+                : 'A ação sai da listagem e não aceita novas inscrições. Ninguém está inscrito no momento.'}
+            </p>
+
+            <div className="flex items-center flex-wrap" style={{ gap: '8px', marginTop: '12px' }}>
+              <Botao
+                rotulo="Confirmar exclusão"
+                primario
+                onClick={() => {
+                  setConfirmando(false)
+                  aoExcluir(item)
+                }}
+              />
+              <Botao rotulo="Cancelar" onClick={() => setConfirmando(false)} />
+            </div>
+          </div>
+        )}
       </div>
     </article>
   )
@@ -223,6 +291,26 @@ export default function PainelOrganizacao() {
   }, [])
 
   useEffect(() => { buscar() }, [buscar])
+
+  /**
+   * Remove a oportunidade da listagem.
+   *
+   * No servidor é exclusão lógica: o registro permanece, marcado como
+   * cancelado. Precisa ser assim porque quem já concluiu a participação tem
+   * um certificado que aponta para esta ação, e apagar a linha invalidaria um
+   * documento que a pessoa pode precisar apresentar anos depois.
+   */
+  async function excluir(item: Oportunidade) {
+    try {
+      await api.delete(`/voluntariado/oportunidades/${item.id}/`)
+      toast.success('Oportunidade excluída.')
+      await buscar()
+    } catch (err: any) {
+      toast.error(
+        err.response?.data?.detail || 'Não foi possível excluir a oportunidade.'
+      )
+    }
+  }
 
   const semAssinatura = !user?.nome_responsavel
 
@@ -316,7 +404,12 @@ export default function PainelOrganizacao() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {oportunidades.map(item => (
-            <CartaoOportunidade key={item.id} item={item} navegar={navigate} />
+            <CartaoOportunidade
+              key={item.id}
+              item={item}
+              navegar={navigate}
+              aoExcluir={excluir}
+            />
           ))}
         </div>
       )}

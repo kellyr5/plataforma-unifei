@@ -2,19 +2,24 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
-export default defineConfig({
-  // Prefixo dos arquivos gerados no build.
+export default defineConfig(({ command }) => ({
+  // Prefixo dos arquivos gerados, aplicado somente na construcao.
   //
-  // Sem esta linha, o Vite escreve no index.html referencias absolutas para
+  // Sem ele, o Vite escreve no index.html referencias absolutas para
   // /assets/index-abc.js. Em producao quem entrega esses arquivos e o Django,
-  // que os publica sob /static/. O navegador pedia /assets/..., nao encontrava,
-  // caia na rota que devolve o index.html para qualquer endereco e recebia
-  // HTML no lugar do JavaScript — resultando em pagina em branco, sem erro
+  // que os publica sob /static/. O navegador pedia /assets/..., nao
+  // encontrava, caia na rota que devolve o index.html para qualquer endereco
+  // e recebia HTML no lugar do JavaScript — pagina em branco, sem erro
   // visivel no servidor.
   //
-  // Em desenvolvimento nao ha efeito: o servidor do Vite serve os modulos
-  // diretamente, sem passar pelo Django.
-  base: '/static/',
+  // A condicao existe porque o prefixo tambem vale para o servidor de
+  // desenvolvimento, ao contrario do que se poderia supor. Fixo em '/static/',
+  // o Vite passava a servir a aplicacao nesse caminho, o roteador recebia
+  // '/static/' como rota, nao encontrava nenhuma correspondente e renderizava
+  // vazio: a mesma tela em branco, agora em desenvolvimento.
+  //
+  // Em desenvolvimento nao ha Django no caminho, entao a raiz e o valor certo.
+  base: command === 'build' ? '/static/' : '/',
 
   plugins: [
     react(),
@@ -53,4 +58,4 @@ export default defineConfig({
       },
     },
   },
-})
+}))

@@ -216,3 +216,39 @@ def criar_oportunidade(organizacao, vagas=2, requer_aprovacao=True, prazo_dias=3
         prazo_inscricao=hoje + timedelta(days=prazo_dias),
         requer_aprovacao=requer_aprovacao,
     )
+
+
+def criar_campanha(
+    organizacao,
+    unidade='peças de agasalho',
+    meta=None,
+    horas=4,
+    requer_aprovacao=False,
+    prazo_dias=30,
+):
+    """
+    Cria uma campanha de doação aberta a participações.
+
+    Vagas e carga horária vão com valores neutros porque a modalidade não os
+    usa: campanha não limita participantes, e as horas do certificado vêm de
+    horas_por_participacao.
+    """
+    hoje = timezone.now().date()
+
+    return Oportunidade.objects.create(
+        organizacao=organizacao,
+        titulo='Campanha do agasalho',
+        descricao='Arrecadação de roupas de inverno para famílias atendidas.',
+        area='assistencia_social',
+        local='Itajubá - MG',
+        modalidade='doacao',
+        vagas=1,
+        carga_horaria_total=0,
+        unidade_medida=unidade,
+        meta_quantidade=meta,
+        horas_por_participacao=horas,
+        data_inicio=hoje + timedelta(days=prazo_dias + 1),
+        data_fim=hoje + timedelta(days=prazo_dias + 30),
+        prazo_inscricao=hoje + timedelta(days=prazo_dias),
+        requer_aprovacao=requer_aprovacao,
+    )

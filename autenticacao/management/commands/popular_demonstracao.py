@@ -28,6 +28,7 @@ demonstracao que muda a cada execucao nao pode ser preparada com antecedencia.
 """
 
 import random
+import unicodedata
 from datetime import timedelta
 
 from django.core.management.base import BaseCommand, CommandError
@@ -37,6 +38,18 @@ from django.utils import timezone
 from autenticacao.models import RoleGlobal, Usuario
 from forum.models import Disciplina, PermissaoDisciplina, Post
 from voluntariado.models import InscricaoVoluntariado, Oportunidade
+
+
+def _sem_acento(texto: str) -> str:
+    """
+    Remove acentuacao, para compor endereco de e-mail.
+
+    Nome proprio brasileiro costuma ter acento, e endereco de e-mail com
+    caractere acentuado e recusado por boa parte dos servidores. O nome
+    exibido na plataforma continua acentuado; so o endereco e simplificado.
+    """
+    normalizado = unicodedata.normalize('NFKD', texto)
+    return ''.join(c for c in normalizado if not unicodedata.combining(c))
 
 
 SEMENTE = 20262
@@ -299,11 +312,22 @@ class Command(BaseCommand):
         sinalizar como pendencia de alocacao, e uma grade toda preenchida nao
         exercita esse caminho.
         """
+        # Nomes ficticios, deliberadamente.
+        #
+        # A lista anterior trazia docentes reais do curso, extraidos do projeto
+        # pedagogico. Numa base de demonstracao isso associa pessoas
+        # identificaveis a publicacoes, respostas e ritmos de atendimento que
+        # elas nunca produziram — e a plataforma esta publica. Um docente que
+        # abrisse a tela encontraria o proprio nome ao lado de comportamento
+        # inventado, sem nunca ter sido consultado.
+        #
+        # Os sobrenomes foram escolhidos para nao coincidir com o quadro do
+        # Instituto de Matematica e Computacao.
         nomes = [
-            ('m', 'Bruno Guazzelli Batista'), ('f', 'Adriana Prest Mattedi'),
-            ('m', 'Rodrigo Maximiano Antunes'), ('f', 'Vanessa Cristina Oliveira'),
-            ('m', 'Carlos Henrique Valério'), ('f', 'Melise Maria Veiga'),
-            ('m', 'Enzo Seraphim'), ('f', 'Thatyana de Faria Piola'),
+            ('m', 'Otávio Bernardes Fontoura'), ('f', 'Solange Vieira Tavares'),
+            ('m', 'Idalécio Marques Rebouças'), ('f', 'Neusa Portela Camargo'),
+            ('m', 'Waldemar Assunção Vilela'), ('f', 'Cremilda Rangel Duarte'),
+            ('m', 'Osmar Teixeira Bicalho'), ('f', 'Marlene Quadros Antunes'),
         ]
 
         professores = []
@@ -315,7 +339,7 @@ class Command(BaseCommand):
 
             genero, nome = nomes[indice % len(nomes)]
             cpf = self._proximo_cpf(100 + (indice % len(nomes)))
-            primeiro = nome.split()[0].lower()
+            primeiro = _sem_acento(nome.split()[0]).lower()
 
             docente = self._criar_usuario(
                 cpf=cpf,

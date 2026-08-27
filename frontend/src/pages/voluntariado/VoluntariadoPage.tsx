@@ -34,6 +34,13 @@ interface Oportunidade {
   requer_aprovacao: boolean
   created_at: string
   imagem_url: string | null
+  /* Campanha de doação mede arrecadação, e não ocupação de vagas. */
+  modalidade: 'presencial' | 'doacao'
+  e_doacao: boolean
+  unidade_medida: string
+  meta_quantidade: number | null
+  total_arrecadado: number
+  progresso_meta: number | null
   /* Situação da inscrição de quem está vendo, quando existir. É uma por
      pessoa em cada vaga, então a tela precisa saber antes de oferecer o
      botão. */
@@ -178,20 +185,43 @@ function OpCard({ op, onClick }: { op: Oportunidade; onClick: () => void }) {
           <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          {op.carga_horaria_total} horas | {formatDate(op.data_inicio)} a {formatDate(op.data_fim)}
+          {op.e_doacao
+            ? `${formatDate(op.data_inicio)} a ${formatDate(op.data_fim)}`
+            : `${op.carga_horaria_total} horas | ${formatDate(op.data_inicio)} a ${formatDate(op.data_fim)}`}
         </div>
         <div className="flex items-center" style={{ gap: '6px', fontSize: '13px', color: 'var(--text-secondary)' }}>
-          <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
-          </svg>
-          {preenchidas} de {op.vagas} vagas preenchidas
+          {op.e_doacao ? (
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+            </svg>
+          )}
+          {op.e_doacao
+            ? `${op.total_arrecadado}${op.meta_quantidade ? ` de ${op.meta_quantidade}` : ''} ${op.unidade_medida || 'itens'}`
+            : `${preenchidas} de ${op.vagas} vagas preenchidas`}
         </div>
       </div>
 
-      {/* Barra de progresso */}
-      <div className="rounded-full" style={{ height: '4px', background: 'var(--border)' }}>
-        <div className="rounded-full transition-all duration-500" style={{ height: '4px', background: cor, width: `${porcent}%` }} />
-      </div>
+      {/* Barra de progresso.
+          Na campanha sem meta declarada não há barra: ela precisa de um
+          denominador, e sem meta o único disponível seria inventado. */}
+      {(!op.e_doacao || op.meta_quantidade) && (
+        <div className="rounded-full" style={{ height: '4px', background: 'var(--border)' }}>
+          <div
+            className="rounded-full transition-all duration-500"
+            style={{
+              height: '4px',
+              background: cor,
+              width: `${op.e_doacao
+                ? Math.min(100, (op.progresso_meta ?? 0) * 100)
+                : porcent}%`,
+            }}
+          />
+        </div>
+      )}
 
       {/* Aprovacao */}
       {op.requer_aprovacao && (

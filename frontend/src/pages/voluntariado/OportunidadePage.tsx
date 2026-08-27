@@ -30,6 +30,14 @@ interface Oportunidade {
   minha_inscricao: string | null
   requer_aprovacao: boolean
   total_inscritos: number
+  /* Campanha de doação mede quantidade arrecadada, e não tempo. */
+  modalidade: 'presencial' | 'doacao'
+  e_doacao: boolean
+  unidade_medida: string
+  meta_quantidade: number | null
+  horas_por_participacao: number
+  total_arrecadado: number
+  progresso_meta: number | null
 }
 
 /* A cor por área foi removida daqui: ela confundia classificação com
@@ -70,6 +78,8 @@ export default function OportunidadePage() {
   const [inscrevendo, setInscrevendo] = useState(false)
   const [motivacao, setMotivacao] = useState('')
   const [showMotivacao, setShowMotivacao] = useState(false)
+  const [quantidade, setQuantidade] = useState('')
+  const [itemDoado, setItemDoado] = useState('')
 
   useEffect(() => {
     api.get(`/voluntariado/oportunidades/${id}/`).then(res => {
@@ -81,20 +91,45 @@ export default function OportunidadePage() {
   }, [id])
 
   async function handleInscrever() {
+    const eDoacao = op?.e_doacao ?? false
+
+    if (eDoacao && (!quantidade.trim() || Number(quantidade) <= 0)) {
+      toast.error('Informe quanto você pretende doar.')
+      return
+    }
+
     setInscrevendo(true)
     try {
-      const res = await api.post(`/voluntariado/oportunidades/${id}/inscrever/`, { motivacao })
+      const corpo: Record<string, unknown> = { motivacao }
+
+      if (eDoacao) {
+        corpo.quantidade_declarada = Number(quantidade)
+        corpo.item_doado = itemDoado.trim()
+      }
+
+      const res = await api.post(`/voluntariado/oportunidades/${id}/inscrever/`, corpo)
       const status = res.data.status
-      if (status === 'aprovada') {
+
+      /* A mensagem diz o que acontece em seguida, e isso muda com a
+         modalidade: quem doa precisa entregar o material à organização, e
+         nada é contabilizado antes disso. */
+      if (eDoacao) {
+        toast.success(
+          'Doação registrada. A organização confirmará no recebimento.'
+        )
+      } else if (status === 'aprovada') {
         toast.success('Inscrição realizada! Você foi aprovado automaticamente.')
       } else {
         toast.success('Inscrição enviada! Aguarde aprovação da organizacao.')
       }
+
       /* Recarrega dados */
       const updated = await api.get(`/voluntariado/oportunidades/${id}/`)
       setOp(updated.data)
       setShowMotivacao(false)
       setMotivacao('')
+      setQuantidade('')
+      setItemDoado('')
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Erro ao se inscrever')
     } finally {
@@ -198,24 +233,72 @@ export default function OportunidadePage() {
             icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" /></svg>} />
           <InfoRow label="Periodo" value={`${formatDate(op.data_inicio)} a ${formatDate(op.data_fim)}`}
             icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>} />
-          <InfoRow label="Carga horaria" value={`${op.carga_horaria_total} horas`}
-            icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
+          {op.e_doacao ? (
+            <InfoRow
+              label="Horas atribuídas"
+              value={
+                op.horas_por_participacao > 0
+                  ? `${op.horas_por_participacao} horas, definidas pela organização`
+                  : 'Certificado sem contagem de horas'
+              }
+              icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+            />
+          ) : (
+            <InfoRow label="Carga horaria" value={`${op.carga_horaria_total} horas`}
+              icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
+          )}
           <InfoRow label="Prazo de inscrição" value={formatDate(op.prazo_inscricao)}
             icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>} />
           <InfoRow label="Aprovação" value={op.requer_aprovacao ? 'Requer aprovação da organização' : 'Inscrição automática (sem aprovação)'}
             icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" /></svg>} />
         </div>
 
-        {/* Vagas */}
-        <div style={{ marginTop: '20px' }}>
-          <div className="flex items-center justify-between" style={{ marginBottom: '8px' }}>
-            <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Vagas preenchidas</span>
-            <span className="font-medium" style={{ fontSize: '13px', color: 'var(--text-primary)' }}>{preenchidas}/{op.vagas}</span>
+        {/* Progresso.
+            Na campanha, o que se acompanha é a arrecadação, e não a ocupação
+            de vagas — campanha não tem vaga a preencher. Sem meta declarada
+            não há barra: uma barra precisa de um denominador, e inventar um
+            faria a campanha parecer mais ou menos adiantada do que está. */}
+        {op.e_doacao ? (
+          <div style={{ marginTop: '20px' }}>
+            <div className="flex items-center justify-between flex-wrap" style={{ gap: '4px 12px', marginBottom: '8px' }}>
+              <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                {op.meta_quantidade ? 'Arrecadado até agora' : 'Total arrecadado'}
+              </span>
+              <span className="font-medium" style={{ fontSize: '13px', color: 'var(--text-primary)' }}>
+                {op.total_arrecadado}
+                {op.meta_quantidade ? ` de ${op.meta_quantidade}` : ''}
+                {op.unidade_medida ? ` ${op.unidade_medida}` : ''}
+              </span>
+            </div>
+
+            {op.meta_quantidade ? (
+              <div className="rounded-full" style={{ height: '6px', background: 'var(--bg-input)' }}>
+                <div
+                  className="rounded-full transition-all duration-500"
+                  style={{
+                    height: '6px',
+                    background: 'var(--accent-blue)',
+                    width: `${Math.min(100, (op.progresso_meta ?? 0) * 100)}%`,
+                  }}
+                />
+              </div>
+            ) : null}
+
+            <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '8px' }}>
+              Só entra na contagem o que a organização confirma ter recebido.
+            </p>
           </div>
-          <div className="rounded-full" style={{ height: '6px', background: 'var(--bg-input)' }}>
-            <div className="rounded-full transition-all duration-500" style={{ height: '6px', background: 'var(--accent-blue)', width: `${porcent}%` }} />
+        ) : (
+          <div style={{ marginTop: '20px' }}>
+            <div className="flex items-center justify-between" style={{ marginBottom: '8px' }}>
+              <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Vagas preenchidas</span>
+              <span className="font-medium" style={{ fontSize: '13px', color: 'var(--text-primary)' }}>{preenchidas}/{op.vagas}</span>
+            </div>
+            <div className="rounded-full" style={{ height: '6px', background: 'var(--bg-input)' }}>
+              <div className="rounded-full transition-all duration-500" style={{ height: '6px', background: 'var(--accent-blue)', width: `${porcent}%` }} />
+            </div>
           </div>
-        </div>
+        )}
         </div>
       </div>
 
@@ -258,12 +341,59 @@ export default function OportunidadePage() {
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
               </svg>
-              Quero me inscrever
+              {op.e_doacao ? 'Quero doar' : 'Quero me inscrever'}
             </button>
           ) : (
             <div>
+              {/* Na campanha, a quantidade vem antes da motivação: é o dado que
+                  a organização precisa para se preparar, e o único que o
+                  formulário exige. */}
+              {op.e_doacao && (
+                <div style={{ marginBottom: '16px' }}>
+                  <h3 className="font-semibold" style={{ fontSize: '15px', color: 'var(--text-primary)', marginBottom: '4px' }}>
+                    Quanto você pretende doar?
+                  </h3>
+                  <p style={{ fontSize: '12.5px', color: 'var(--text-tertiary)', marginBottom: '12px' }}>
+                    Em {op.unidade_medida || 'itens'}. A organização confirma no
+                    recebimento, e é a confirmação dela que entra na contagem da
+                    campanha.
+                  </p>
+
+                  <div className="flex flex-wrap" style={{ gap: '10px' }}>
+                    <input
+                      type="number"
+                      min={1}
+                      value={quantidade}
+                      onChange={e => setQuantidade(e.target.value)}
+                      placeholder="Ex.: 10"
+                      aria-label={`Quantidade em ${op.unidade_medida || 'itens'}`}
+                      className="rounded-xl outline-none"
+                      style={{
+                        width: '120px', padding: '12px', fontSize: '16px',
+                        background: 'var(--bg-input)', border: '1.5px solid var(--border)',
+                        color: 'var(--text-primary)',
+                      }}
+                    />
+                    <input
+                      type="text"
+                      value={itemDoado}
+                      onChange={e => setItemDoado(e.target.value)}
+                      placeholder="O que você vai entregar (opcional)"
+                      maxLength={160}
+                      aria-label="Descrição do que será doado"
+                      className="flex-1 rounded-xl outline-none"
+                      style={{
+                        minWidth: '180px', padding: '12px', fontSize: '16px',
+                        background: 'var(--bg-input)', border: '1.5px solid var(--border)',
+                        color: 'var(--text-primary)',
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
               <h3 className="font-semibold" style={{ fontSize: '15px', color: 'var(--text-primary)', marginBottom: '12px' }}>
-                Por que você quer participar?
+                {op.e_doacao ? 'Quer deixar alguma observação?' : 'Por que você quer participar?'}
               </h3>
               <textarea
                 value={motivacao}
@@ -280,7 +410,13 @@ export default function OportunidadePage() {
                 onBlur={e => e.target.style.borderColor = 'var(--border)'}
               />
               <div className="flex items-center justify-end" style={{ gap: '10px' }}>
-                <button onClick={() => { setShowMotivacao(false); setMotivacao('') }}
+                <button
+                  onClick={() => {
+                    setShowMotivacao(false)
+                    setMotivacao('')
+                    setQuantidade('')
+                    setItemDoado('')
+                  }}
                   className="rounded-xl font-medium cursor-pointer"
                   style={{ padding: '10px 20px', fontSize: '14px', background: 'var(--bg-input)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
                   Cancelar
@@ -291,7 +427,9 @@ export default function OportunidadePage() {
                     padding: '10px 24px', fontSize: '14px', border: 'none',
                     background: 'var(--accent-blue)', opacity: inscrevendo ? 0.7 : 1,
                   }}>
-                  {inscrevendo ? 'Inscrevendo...' : 'Confirmar inscrição'}
+                  {inscrevendo
+                    ? 'Registrando...'
+                    : op.e_doacao ? 'Confirmar doação' : 'Confirmar inscrição'}
                 </button>
               </div>
             </div>

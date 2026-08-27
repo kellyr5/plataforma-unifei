@@ -1,5 +1,6 @@
 from rest_framework import viewsets, filters, status, permissions
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from django.db.models import Count
@@ -83,11 +84,17 @@ class OportunidadeViewSet(viewsets.ModelViewSet):
         return super().update(request, *args, **kwargs)
 
     def perform_destroy(self, instance):
+        # Levanta a excecao em vez de devolver Response.
+        #
+        # O DRF ignora o retorno de perform_destroy e responde 204 de qualquer
+        # forma. Com o return anterior, uma organizacao que tentasse remover a
+        # oportunidade de outra recebia confirmacao de sucesso enquanto nada
+        # era removido — a resposta afirmava o contrario do que aconteceu.
         if not usuario_e_dono_oportunidade(self.request.user, instance):
-            return Response(
-                {'detail': 'Apenas a organizacao dona da oportunidade pode remove-la.'},
-                status=status.HTTP_403_FORBIDDEN,
+            raise PermissionDenied(
+                'Apenas a organizacao dona da oportunidade pode remove-la.'
             )
+
         instance.deleted_at = timezone.now()
         instance.status = 'cancelada'
         instance.save()
@@ -184,6 +191,34 @@ class OportunidadeViewSet(viewsets.ModelViewSet):
             'motivacao': motivacao,
             'status': status_inicial,
         }
+
+        # Na campanha de doacao, quem se inscreve ja declara o que pretende
+        # entregar. E declaracao, nao registro: o valor fica guardado a parte e
+        # nao entra na contagem da campanha ate a organizacao confirmar o
+        # recebimento.
+        if oportunidade.e_doacao:
+            quantidade = request.data.get('quantidade_declarada')
+
+            if quantidade is not None:
+                try:
+                    quantidade = int(quantidade)
+                except (TypeError, ValueError):
+                    return Response(
+                        {'detail': 'A quantidade informada precisa ser um numero.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                if quantidade <= 0:
+                    return Response(
+                        {'detail': 'Informe uma quantidade maior que zero.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                inscricao_data['quantidade_declarada'] = quantidade
+
+            inscricao_data['item_doado'] = request.data.get(
+                'item_doado', ''
+            ).strip()[:160]
 
         if status_inicial == 'aprovada':
             inscricao_data['avaliado_em'] = timezone.now()
@@ -368,21 +403,55 @@ class InscricaoVoluntariadoViewSet(viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        horas = request.data.get('horas_realizadas')
-        if not horas or int(horas) <= 0:
-            return Response(
-                {'detail': 'Informe um valor valido em "horas_realizadas".'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         avaliacao = request.data.get('avaliacao_organizacao', '').strip()
+        oportunidade = inscricao.oportunidade
 
-        certificado = concluir_inscricao(
-            inscricao=inscricao,
-            horas_realizadas=int(horas),
-            avaliacao_organizacao=avaliacao,
-            avaliado_por=request.user,
-        )
+        # O que a organizacao confirma depende da modalidade: horas cumpridas
+        # na acao presencial, quantidade recebida na campanha de doacao. Exigir
+        # horas de quem esta conferindo um saco de agasalhos obrigaria a
+        # inventar um numero.
+        if oportunidade.e_doacao:
+            quantidade = request.data.get('quantidade_confirmada')
+
+            if quantidade is None:
+                # Sem contestacao, vale o que o estudante declarou.
+                quantidade = inscricao.quantidade_declarada
+
+            try:
+                quantidade = int(quantidade)
+            except (TypeError, ValueError):
+                return Response(
+                    {'detail': 'Informe a quantidade recebida em '
+                               '"quantidade_confirmada".'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if quantidade < 0:
+                return Response(
+                    {'detail': 'A quantidade recebida nao pode ser negativa.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            certificado = concluir_inscricao(
+                inscricao=inscricao,
+                avaliacao_organizacao=avaliacao,
+                avaliado_por=request.user,
+                quantidade_confirmada=quantidade,
+            )
+        else:
+            horas = request.data.get('horas_realizadas')
+            if not horas or int(horas) <= 0:
+                return Response(
+                    {'detail': 'Informe um valor valido em "horas_realizadas".'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            certificado = concluir_inscricao(
+                inscricao=inscricao,
+                horas_realizadas=int(horas),
+                avaliacao_organizacao=avaliacao,
+                avaliado_por=request.user,
+            )
 
         return Response(
             {

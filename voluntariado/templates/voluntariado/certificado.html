@@ -149,6 +149,31 @@
 
             <div class="nome">{{ certificado.nome_estudante }}</div>
 
+            {# O texto muda com a modalidade porque o que se atesta e
+               diferente. Na acao presencial, a pessoa esteve la e cumpriu
+               horas. Na campanha de doacao, ela entregou algo — dizer que
+               "participou por 4 horas" de uma arrecadacao de agasalhos
+               descreveria uma coisa que nao aconteceu, e o certificado perde
+               exatamente aquilo que o torna util: corresponder ao fato. #}
+            {% if certificado.modalidade == 'doacao' %}
+            <p class="texto">
+                contribuiu com a campanha
+                <strong>"{{ certificado.nome_oportunidade }}"</strong>,
+                na area de <strong>{{ certificado.area_atuacao }}</strong>,
+                realizada em {{ certificado.local }},
+                no periodo de <strong>{{ certificado.data_inicio|date:"d/m/Y" }}</strong>
+                a <strong>{{ certificado.data_fim|date:"d/m/Y" }}</strong>{% if certificado.contribuicao %},
+                mediante a doacao de <strong>{{ certificado.contribuicao }}</strong>{% endif %}.
+            </p>
+
+            {% if certificado.horas_realizadas %}
+            <p class="texto">
+                A organizacao atribui a esta participacao o equivalente a
+                <strong>{{ certificado.horas_realizadas }} hora(s)</strong>
+                de atividade voluntaria.
+            </p>
+            {% endif %}
+            {% else %}
             <p class="texto">
                 participou da acao voluntaria intitulada
                 <strong>"{{ certificado.nome_oportunidade }}"</strong>,
@@ -159,6 +184,7 @@
                 totalizando <strong>{{ certificado.horas_realizadas }} hora(s)</strong>
                 de atividade.
             </p>
+            {% endif %}
 
             <div class="detalhes">
                 Emitido em <strong>{{ certificado.emitido_em|date:"d \d\e F \d\e Y" }}</strong>

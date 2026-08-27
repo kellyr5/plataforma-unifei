@@ -25,6 +25,9 @@ interface Inscricao {
   motivacao: string
   horas_realizadas: number | null
   created_at: string
+  quantidade_declarada: number | null
+  quantidade_confirmada: number | null
+  item_doado: string
 }
 
 interface Oportunidade {
@@ -37,6 +40,11 @@ interface Oportunidade {
   data_inicio: string
   data_fim: string
   status_display: string
+  e_doacao: boolean
+  unidade_medida: string
+  meta_quantidade: number | null
+  total_arrecadado: number
+  horas_por_participacao: number
 }
 
 const AZUL = 'var(--accent-blue)'
@@ -100,7 +108,14 @@ function LinhaInscricao({ inscricao, children }: {
           </div>
           <div style={{ fontSize: '11.5px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
             Inscrito em {data(inscricao.created_at)}
-            {inscricao.horas_realizadas ? ` · ${inscricao.horas_realizadas}h cumpridas` : ''}
+            {inscricao.quantidade_confirmada !== null
+              ? ` · ${inscricao.quantidade_confirmada} recebidos`
+              : inscricao.quantidade_declarada !== null
+                ? ` · declarou ${inscricao.quantidade_declarada}`
+                : inscricao.horas_realizadas
+                  ? ` · ${inscricao.horas_realizadas}h cumpridas`
+                  : ''}
+            {inscricao.item_doado ? ` · ${inscricao.item_doado}` : ''}
           </div>
           {inscricao.motivacao && (
             <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginTop: '7px', lineHeight: 1.5 }}>
@@ -178,6 +193,27 @@ export default function ParticipantesOportunidade() {
 
   async function concluir(inscricaoId: string) {
     const valor = parseInt(horas, 10)
+
+    /* O campo é o mesmo, mas o que ele registra muda com a modalidade: horas
+       cumpridas na ação presencial, quantidade recebida na campanha. Na
+       campanha o zero é legítimo — a pessoa pode ter se inscrito e não ter
+       entregado nada, e registrar isso é mais honesto que apagar a inscrição. */
+    if (oportunidade?.e_doacao) {
+      if (Number.isNaN(valor) || valor < 0) {
+        toast.error('Informe a quantidade recebida.')
+        return
+      }
+
+      const ok = await acao(inscricaoId, 'concluir', {
+        quantidade_confirmada: valor,
+      })
+      if (ok) {
+        toast.success('Recebimento confirmado e certificado emitido.')
+        setConcluindo(null)
+        setHoras('')
+      }
+      return
+    }
 
     if (!valor || valor <= 0) {
       toast.error('Informe quantas horas a pessoa cumpriu.')
@@ -257,8 +293,16 @@ export default function ParticipantesOportunidade() {
 
         {aprovadas.length > 0 && (
           <Grupo
-            titulo={`Em atividade (${aprovadas.length})`}
-            descricao="Ao concluir, informe as horas cumpridas. O certificado é emitido na hora."
+            titulo={
+              oportunidade.e_doacao
+                ? `Aguardando entrega (${aprovadas.length})`
+                : `Em atividade (${aprovadas.length})`
+            }
+            descricao={
+              oportunidade.e_doacao
+                ? 'Ao confirmar o recebimento, informe a quantidade que chegou. Só ela entra na contagem da campanha, e o certificado é emitido na hora.'
+                : 'Ao concluir, informe as horas cumpridas. O certificado é emitido na hora.'
+            }
           >
             {aprovadas.map(inscricao => (
               <div key={inscricao.id}>
@@ -266,11 +310,24 @@ export default function ParticipantesOportunidade() {
                   {concluindo === inscricao.id ? null : (
                     <>
                       <Botao
-                        rotulo="Concluir e emitir certificado"
+                        rotulo={
+                          oportunidade.e_doacao
+                            ? 'Confirmar recebimento'
+                            : 'Concluir e emitir certificado'
+                        }
                         primario
                         onClick={() => {
                           setConcluindo(inscricao.id)
-                          setHoras(String(oportunidade.carga_horaria_total))
+                          /* O campo já vem com o valor esperado: as horas
+                             previstas na ação presencial, o que a pessoa
+                             declarou na campanha. Na maioria dos casos a
+                             organização apenas confirma, e digitar de novo o
+                             número que já está na tela é trabalho sem ganho. */
+                          setHoras(
+                            oportunidade.e_doacao
+                              ? String(inscricao.quantidade_declarada ?? 0)
+                              : String(oportunidade.carga_horaria_total)
+                          )
                         }}
                       />
                       <Botao rotulo="Remover" discreto onClick={() => acao(inscricao.id, 'remover')} />
@@ -280,18 +337,21 @@ export default function ParticipantesOportunidade() {
 
                 {concluindo === inscricao.id && (
                   <div
-                    className="flex items-center rounded-lg"
+                    className="flex items-center flex-wrap rounded-lg"
                     style={{
                       padding: '12px 16px', gap: '10px', marginTop: '6px',
-                      background: 'var(--bg-card)', border: '1px solid rgba(0,48,135,0.28)',
+                      background: 'var(--bg-card)',
+                      border: '1px solid var(--accent-blue-border)',
                     }}
                   >
                     <label style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                      Horas cumpridas
+                      {oportunidade.e_doacao
+                        ? `Recebido${oportunidade.unidade_medida ? ` em ${oportunidade.unidade_medida}` : ''}`
+                        : 'Horas cumpridas'}
                     </label>
                     <input
                       type="number"
-                      min={1}
+                      min={oportunidade.e_doacao ? 0 : 1}
                       value={horas}
                       onChange={(e) => setHoras(e.target.value)}
                       style={{
@@ -303,6 +363,15 @@ export default function ParticipantesOportunidade() {
                     />
                     <Botao rotulo="Emitir certificado" primario onClick={() => concluir(inscricao.id)} />
                     <Botao rotulo="Cancelar" discreto onClick={() => setConcluindo(null)} />
+
+                    {oportunidade.e_doacao && (
+                      <span style={{ fontSize: '11.5px', color: 'var(--text-tertiary)', width: '100%' }}>
+                        O certificado registrará
+                        {oportunidade.horas_por_participacao > 0
+                          ? ` ${oportunidade.horas_por_participacao} horas atribuídas pela sua organização.`
+                          : ' a contribuição, sem contagem de horas.'}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>

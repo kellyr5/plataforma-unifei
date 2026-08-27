@@ -61,16 +61,41 @@ def gerar_pdf_certificado(certificado: Certificado) -> ContentFile:
 @transaction.atomic
 def concluir_inscricao(
     inscricao: InscricaoVoluntariado,
-    horas_realizadas: int,
+    horas_realizadas: int = None,
     avaliacao_organizacao: str = '',
     avaliado_por=None,
+    quantidade_confirmada: int = None,
 ) -> Certificado:
     """
     Marca a inscricao como concluida e emite o certificado correspondente.
 
     Operacao atomica: se a geracao do certificado falhar, o status da
     inscricao tambem nao e alterado (rollback automatico).
+
+    Nas duas modalidades a conclusao e o mesmo ato — a organizacao confirma que
+    a participacao aconteceu — mas o que ela confirma muda. Na acao presencial,
+    quantas horas foram cumpridas. Na campanha de doacao, quanto foi recebido,
+    e as horas do certificado vem do valor que a propria organizacao atribuiu a
+    campanha quando a publicou.
+
+    A quantidade so entra aqui, na confirmacao. O que o estudante declarou fica
+    guardado separado e nunca e contabilizado: campanha que soma promessa exibe
+    um total que nao chegou.
     """
+    oportunidade = inscricao.oportunidade
+
+    if oportunidade.e_doacao:
+        if quantidade_confirmada is not None:
+            inscricao.quantidade_confirmada = quantidade_confirmada
+        elif inscricao.quantidade_confirmada is None:
+            # Sem valor informado, vale o que o estudante declarou. Acontece
+            # quando a organizacao confirma o recebimento sem contestar.
+            inscricao.quantidade_confirmada = inscricao.quantidade_declarada or 0
+
+        horas_realizadas = oportunidade.horas_por_participacao
+    elif horas_realizadas is None:
+        horas_realizadas = oportunidade.carga_horaria_total
+
     inscricao.status = 'concluida'
     inscricao.horas_realizadas = horas_realizadas
     inscricao.avaliacao_organizacao = avaliacao_organizacao
@@ -80,6 +105,14 @@ def concluir_inscricao(
     inscricao.save()
 
     op = inscricao.oportunidade
+
+    contribuicao = ''
+    if op.e_doacao and inscricao.quantidade_confirmada:
+        contribuicao = (
+            f'{inscricao.quantidade_confirmada} '
+            f'{op.unidade_medida or "itens"}'
+        ).strip()
+
     certificado = Certificado.objects.create(
         inscricao=inscricao,
         nome_estudante=inscricao.estudante.nome_completo,
@@ -91,6 +124,8 @@ def concluir_inscricao(
         data_inicio=op.data_inicio,
         data_fim=op.data_fim,
         horas_realizadas=horas_realizadas,
+        modalidade=op.modalidade,
+        contribuicao=contribuicao,
     )
 
     # Gera o PDF e anexa ao certificado

@@ -467,6 +467,49 @@ FUNCIONAIS = [
      'GET /api/voluntariado/inscricoes/minhas/.',
      'Aluno', 'ESSENCIAL'),
 
+    ('RF-VOL-014', 'Publicar campanha de doação', 'Voluntariado',
+     'A organização cadastra uma arrecadação de itens, como agasalhos ou '
+     'alimentos, definindo como a contribuição será contada.',
+     'Modalidade da oportunidade. A unidade é texto livre — peças de agasalho, '
+     'quilos de alimento — porque qualquer lista fixa não teria a categoria da '
+     'próxima campanha. Meta é opcional. Vagas e carga horária não se aplicam: '
+     'campanha não limita participantes nem cumpre hora.',
+     'Organização', 'ESSENCIAL'),
+
+    ('RF-VOL-015', 'Declarar doação', 'Voluntariado',
+     'Estudante informa quanto pretende entregar à campanha.',
+     'POST em inscrever, com quantidade declarada e descrição opcional do '
+     'item. É declaração de intenção: o valor fica registrado à parte e não '
+     'entra na contagem da campanha até a organização confirmar o recebimento.',
+     'Aluno', 'ESSENCIAL'),
+
+    ('RF-VOL-016', 'Confirmar recebimento da doação', 'Voluntariado',
+     'A organização registra quanto de fato recebeu, que pode divergir do que '
+     'foi declarado.',
+     'POST em concluir, com a quantidade confirmada. Sem valor informado, vale '
+     'o declarado. O campo é somente leitura para o estudante: se ele pudesse '
+     'registrar o próprio recebimento, o total da campanha deixaria de '
+     'significar algo. Emite o certificado na mesma operação.',
+     'Organização', 'CRÍTICA'),
+
+    ('RF-VOL-017', 'Acompanhar a arrecadação', 'Voluntariado',
+     'A página da campanha mostra quanto já foi arrecadado e, havendo meta, o '
+     'progresso em relação a ela.',
+     'Soma apenas as quantidades confirmadas em participações concluídas. Sem '
+     'meta declarada não há barra de progresso: a barra precisa de um '
+     'denominador, e inventar um faria a campanha parecer mais adiantada do '
+     'que está.',
+     'Todos', 'ESSENCIAL'),
+
+    ('RF-VOL-018', 'Certificar participação em campanha', 'Voluntariado',
+     'Quem doou recebe certificado declarando a contribuição.',
+     'O texto do certificado muda com a modalidade: registra o que foi '
+     'entregue e acrescenta que a organização atribui àquela participação o '
+     'equivalente a um número de horas por ela definido. A formulação é '
+     'deliberada — doar não é cumprir hora, e quem receber o documento precisa '
+     'saber que avalia uma equivalência declarada pela entidade.',
+     'Sistema', 'ESSENCIAL'),
+
     # --- Paineis por perfil ---
     ('RF-PAI-001', 'Painel de quem conduz a turma', 'Painéis',
      'Professor e monitor veem, num lugar só, as dúvidas sem resposta, os '
@@ -701,6 +744,16 @@ NAO_FUNCIONAIS = [
     ('RNF-INT-003', 'Atomicidade nas operações concorrentes', 'Integridade',
      'Duas inscrições simultâneas não ultrapassam o número de vagas.',
      'Verificação de disponibilidade e gravação dentro da mesma transação.',
+     'ESSENCIAL'),
+
+    ('RNF-INT-005', 'Separação entre intenção e fato registrado',
+     'Integridade',
+     'O que a pessoa declara e o que a organização confirma são guardados em '
+     'campos distintos, e apenas o confirmado é contabilizado.',
+     'Na campanha de doação, quantidade declarada e quantidade confirmada '
+     'coexistem. Somar a declaração exibiria uma arrecadação que nunca chegou; '
+     'guardar só a confirmação apagaria o registro da intenção — e a diferença '
+     'entre os dois números é, ela própria, um dado sobre a campanha.',
      'ESSENCIAL'),
 
     ('RNF-INT-004', 'Identificadores não sequenciais', 'Integridade',
@@ -975,9 +1028,22 @@ DIVERGENCIAS = [
      'análise registrada e justificativa comunicada ao autor. Fica como '
      'trabalho futuro.'),
 
-    ('Registro de doações e pontuação por item', 'Removido',
+    ('Registro de doações', 'Reformulado',
      'RF-VOL-014 do TCC1',
-     'Removido junto com o sistema de pontuação, pelo mesmo motivo.'),
+     'O TCC1 previa doação como gerador de pontos, com fórmula progressiva por '
+     'item. A pontuação foi removida, mas a doação em si retornou como '
+     'modalidade própria de oportunidade: a organização publica uma campanha, '
+     'define a unidade de contagem e uma meta opcional, e o estudante declara '
+     'o que pretende entregar. O que mudou foi o propósito — antes o item '
+     'valia pontos numa classificação, agora ele conta para uma arrecadação '
+     'com destino concreto.'),
+
+    ('Separação entre doação declarada e confirmada', 'Incorporado',
+     'Sem correspondência no TCC1',
+     'O desenho original registrava a doação num único valor. Na implementação '
+     'ficou claro que intenção e recebimento são coisas distintas: somar o que '
+     'os estudantes prometeram faria a campanha exibir uma arrecadação que '
+     'nunca chegou. A confirmação passou a ser ato exclusivo da organização.'),
 
     ('Restrição de publicação por decisão pedagógica', 'Incorporado',
      'RF-FOR-015',

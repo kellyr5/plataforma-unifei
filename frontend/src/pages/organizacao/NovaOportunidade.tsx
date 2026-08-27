@@ -79,6 +79,16 @@ export default function NovaOportunidade() {
   const [imagemAtual, setImagemAtual] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
 
+  /* Campanha de doação mede coisa diferente de ação presencial: não há vaga a
+     ocupar nem hora a cumprir, e sim quantidade arrecadada numa unidade que só
+     a organização sabe qual é. */
+  const [modalidade, setModalidade] = useState<'presencial' | 'doacao'>('presencial')
+  const [unidadeMedida, setUnidadeMedida] = useState('')
+  const [metaQuantidade, setMetaQuantidade] = useState('')
+  const [horasPorParticipacao, setHorasPorParticipacao] = useState('4')
+
+  const eDoacao = modalidade === 'doacao'
+
   useEffect(() => {
     if (!editando) return
 
@@ -96,6 +106,10 @@ export default function NovaOportunidade() {
       setPrazo(data.prazo_inscricao)
       setRequerAprovacao(data.requer_aprovacao)
       setImagemAtual(data.imagem_url)
+      setModalidade(data.modalidade || 'presencial')
+      setUnidadeMedida(data.unidade_medida || '')
+      setMetaQuantidade(data.meta_quantidade ? String(data.meta_quantidade) : '')
+      setHorasPorParticipacao(String(data.horas_por_participacao ?? 0))
     }).catch(() => toast.error('Não foi possível carregar a oportunidade.'))
   }, [editando, id])
 
@@ -114,6 +128,12 @@ export default function NovaOportunidade() {
       return toast.error('A data de término não pode ser anterior ao início.')
     }
 
+    if (eDoacao && !unidadeMedida.trim()) {
+      return toast.error(
+        'Informe como a arrecadação será contada, no plural: peças de agasalho, quilos de alimento.'
+      )
+    }
+
     const corpo = new FormData()
     corpo.append('titulo', titulo.trim())
     corpo.append('descricao', descricao.trim())
@@ -121,8 +141,22 @@ export default function NovaOportunidade() {
     corpo.append('requisitos', requisitos.trim())
     corpo.append('area', area)
     corpo.append('local', local.trim())
-    corpo.append('vagas', vagas)
-    corpo.append('carga_horaria_total', cargaHoraria)
+    corpo.append('modalidade', modalidade)
+
+    /* Na doação, vagas e carga horária não descrevem nada — mas o modelo
+       exige os campos. Vão com valores neutros: uma vaga simbólica, que o
+       backend ignora porque campanha não limita participantes, e carga zero,
+       já que as horas do certificado vêm de horas_por_participacao. */
+    corpo.append('vagas', eDoacao ? '1' : vagas)
+    corpo.append('carga_horaria_total', eDoacao ? '0' : cargaHoraria)
+
+    if (eDoacao) {
+      corpo.append('unidade_medida', unidadeMedida.trim())
+      corpo.append('horas_por_participacao', horasPorParticipacao || '0')
+      if (metaQuantidade.trim()) {
+        corpo.append('meta_quantidade', metaQuantidade.trim())
+      }
+    }
     corpo.append('data_inicio', dataInicio)
     corpo.append('data_fim', dataFim)
     corpo.append('prazo_inscricao', prazo)
@@ -186,6 +220,61 @@ export default function NovaOportunidade() {
       </div>
 
       <form onSubmit={publicar} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        {/* A escolha vem antes de tudo porque decide quais campos existem
+            adiante. Perguntar depois faria a pessoa preencher vagas e carga
+            horária para só então descobrir que a campanha dela não tem
+            nenhuma das duas. */}
+        <Secao titulo="Tipo de ação">
+          <div
+            className="grid"
+            style={{ gap: '10px', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}
+          >
+            {([
+              ['presencial', 'Ação presencial',
+               'Voluntários participam presencialmente e cumprem carga horária. Tem vagas limitadas.'],
+              ['doacao', 'Campanha de doação',
+               'Arrecadação de itens, como agasalhos ou alimentos. Sem limite de participantes.'],
+            ] as const).map(([chave, nome, explicacao]) => {
+              const ativo = modalidade === chave
+              return (
+                <button
+                  key={chave}
+                  type="button"
+                  onClick={() => setModalidade(chave)}
+                  aria-pressed={ativo}
+                  className="cursor-pointer rounded-xl text-left"
+                  style={{
+                    padding: '14px 16px',
+                    border: `1.5px solid ${ativo ? 'var(--accent-blue)' : 'var(--border)'}`,
+                    background: ativo ? 'var(--accent-blue-soft)' : 'var(--bg-card)',
+                  }}
+                >
+                  <div
+                    className="font-semibold"
+                    style={{
+                      fontSize: '14px',
+                      color: ativo ? 'var(--accent-blue-text)' : 'var(--text-primary)',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    {nome}
+                  </div>
+                  <div style={{ fontSize: '12.5px', color: 'var(--text-tertiary)', lineHeight: 1.45 }}>
+                    {explicacao}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+
+          {editando && (
+            <p style={ajuda}>
+              Alterar o tipo de uma ação que já tem participantes muda o que o
+              certificado deles declara. Prefira encerrar esta e publicar outra.
+            </p>
+          )}
+        </Secao>
+
         <Secao titulo="Identificação">
           <div>
             <label style={rotulo}>Título</label>
@@ -319,19 +408,79 @@ export default function NovaOportunidade() {
             </div>
           </div>
 
-          <div className="flex" style={{ gap: '12px' }}>
-            <div style={{ flex: 1 }}>
-              <label style={rotulo}>Vagas</label>
-              <input type="number" min={1} value={vagas} onChange={(e) => setVagas(e.target.value)}
-                style={campo} className="outline-none" />
+          {/* Os campos abaixo trocam com a modalidade, porque medem coisas
+              incompatíveis: tempo de um lado, quantidade do outro. Mostrar os
+              dois conjuntos ao mesmo tempo obrigaria a organização a preencher
+              campo que não descreve a ação dela. */}
+          {eDoacao ? (
+            <>
+              <div>
+                <label style={rotulo}>Como a arrecadação será contada</label>
+                <input
+                  type="text"
+                  value={unidadeMedida}
+                  onChange={(e) => setUnidadeMedida(e.target.value)}
+                  placeholder="Ex.: peças de agasalho, quilos de alimento, litros de leite"
+                  maxLength={60}
+                  style={campo}
+                  className="outline-none"
+                />
+                <p style={ajuda}>
+                  Escreva no plural. É assim que o total aparecerá na página da
+                  campanha e no certificado.
+                </p>
+              </div>
+
+              <div className="flex" style={{ gap: '12px' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={rotulo}>Meta (opcional)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={metaQuantidade}
+                    onChange={(e) => setMetaQuantidade(e.target.value)}
+                    placeholder="Ex.: 500"
+                    style={campo}
+                    className="outline-none"
+                  />
+                  <p style={ajuda}>
+                    Com meta, a página mostra barra de progresso. Sem meta,
+                    mostra apenas o total arrecadado.
+                  </p>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={rotulo}>Horas atribuídas por participação</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={horasPorParticipacao}
+                    onChange={(e) => setHorasPorParticipacao(e.target.value)}
+                    style={campo}
+                    className="outline-none"
+                  />
+                  <p style={ajuda}>
+                    Doar não é cumprir hora. O certificado registrará que esta é
+                    uma equivalência definida pela sua organização. Deixe zero
+                    para emitir sem horas.
+                  </p>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="flex" style={{ gap: '12px' }}>
+              <div style={{ flex: 1 }}>
+                <label style={rotulo}>Vagas</label>
+                <input type="number" min={1} value={vagas} onChange={(e) => setVagas(e.target.value)}
+                  style={campo} className="outline-none" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={rotulo}>Carga horária total</label>
+                <input type="number" min={1} value={cargaHoraria} onChange={(e) => setCargaHoraria(e.target.value)}
+                  style={campo} className="outline-none" />
+                <p style={ajuda}>Em horas. É o que constará no certificado.</p>
+              </div>
             </div>
-            <div style={{ flex: 1 }}>
-              <label style={rotulo}>Carga horária total</label>
-              <input type="number" min={1} value={cargaHoraria} onChange={(e) => setCargaHoraria(e.target.value)}
-                style={campo} className="outline-none" />
-              <p style={ajuda}>Em horas. É o que constará no certificado.</p>
-            </div>
-          </div>
+          )}
         </Secao>
 
         <Secao titulo="Inscrições">

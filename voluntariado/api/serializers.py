@@ -11,11 +11,19 @@ class OportunidadeSerializer(serializers.ModelSerializer):
     organizacao_foto_url = serializers.SerializerMethodField()
     area_display = serializers.CharField(source='get_area_display', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
-    vagas_disponiveis = serializers.IntegerField(read_only=True)
+    # Nulo na campanha de doacao, onde nao ha vaga a contar.
+    vagas_disponiveis = serializers.IntegerField(read_only=True, allow_null=True)
     esta_aberta_inscricao = serializers.BooleanField(read_only=True)
     total_inscritos = serializers.SerializerMethodField()
     imagem_url = serializers.SerializerMethodField()
     minha_inscricao = serializers.SerializerMethodField()
+
+    modalidade_display = serializers.CharField(
+        source='get_modalidade_display', read_only=True
+    )
+    e_doacao = serializers.BooleanField(read_only=True)
+    total_arrecadado = serializers.IntegerField(read_only=True)
+    progresso_meta = serializers.FloatField(read_only=True)
 
     class Meta:
         model = Oportunidade
@@ -26,8 +34,11 @@ class OportunidadeSerializer(serializers.ModelSerializer):
             'imagem', 'imagem_url',
             'area', 'area_display',
             'local',
+            'modalidade', 'modalidade_display', 'e_doacao',
             'vagas', 'vagas_disponiveis', 'total_inscritos', 'minha_inscricao',
             'carga_horaria_total',
+            'unidade_medida', 'meta_quantidade', 'horas_por_participacao',
+            'total_arrecadado', 'progresso_meta',
             'data_inicio', 'data_fim', 'prazo_inscricao',
             'requer_aprovacao',
             'status', 'status_display',
@@ -110,6 +121,12 @@ class InscricaoVoluntariadoSerializer(serializers.ModelSerializer):
     oportunidade_organizacao = serializers.CharField(
         source='oportunidade.organizacao.nome_completo', read_only=True
     )
+    oportunidade_unidade = serializers.CharField(
+        source='oportunidade.unidade_medida', read_only=True
+    )
+    oportunidade_modalidade = serializers.CharField(
+        source='oportunidade.modalidade', read_only=True
+    )
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     avaliado_por_nome = serializers.CharField(
         source='avaliado_por.nome_completo', read_only=True, default=None
@@ -125,15 +142,22 @@ class InscricaoVoluntariadoSerializer(serializers.ModelSerializer):
             'motivacao',
             'avaliado_por', 'avaliado_por_nome', 'avaliado_em', 'motivo_decisao',
             'horas_realizadas', 'avaliacao_organizacao',
+            'quantidade_declarada', 'quantidade_confirmada', 'item_doado',
+            'oportunidade_unidade', 'oportunidade_modalidade',
             'created_at', 'updated_at',
         ]
         read_only_fields = [
             'id',
             'estudante', 'estudante_nome', 'estudante_cpf',
             'oportunidade_titulo', 'oportunidade_organizacao',
+            'oportunidade_unidade', 'oportunidade_modalidade',
             'status', 'status_display',
             'avaliado_por', 'avaliado_por_nome', 'avaliado_em', 'motivo_decisao',
             'horas_realizadas', 'avaliacao_organizacao',
+            # A confirmacao e ato da organizacao, e nao do estudante. Deixar o
+            # campo editavel aqui permitiria a quem doa registrar o proprio
+            # recebimento — e o total da campanha deixaria de significar algo.
+            'quantidade_confirmada',
             'created_at', 'updated_at',
         ]
 
@@ -153,6 +177,7 @@ class CertificadoSerializer(serializers.ModelSerializer):
             'area_atuacao', 'local',
             'data_inicio', 'data_fim',
             'horas_realizadas',
+            'modalidade', 'contribuicao',
             'arquivo_pdf_url',
             'emitido_em',
         ]
@@ -184,6 +209,7 @@ class CertificadoPublicoSerializer(serializers.ModelSerializer):
             'area_atuacao', 'local',
             'data_inicio', 'data_fim',
             'horas_realizadas',
+            'modalidade', 'contribuicao',
             'emitido_em',
         ]
         read_only_fields = fields
