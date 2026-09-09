@@ -566,12 +566,17 @@ class MensagemViewSet(viewsets.GenericViewSet):
 
     # Prazo para desfazer o envio.
     #
-    # Tres minutos cobrem o arrependimento imediato — a mensagem incompleta, o
-    # audio que saiu errado, o destinatario trocado — sem permitir reescrever a
-    # conversa depois que ela ja produziu efeito. Grupo de trabalho combina
-    # divisao de tarefa pelo chat, e apagar a combinacao de ontem apagaria a
-    # prova do que foi acordado.
-    PRAZO_EXCLUSAO = timedelta(minutes=3)
+    # Dez minutos cobrem o arrependimento — a mensagem incompleta, o audio que
+    # saiu errado, o destinatario trocado — sem permitir reescrever a conversa
+    # depois que ela ja produziu efeito. Grupo de trabalho combina divisao de
+    # tarefa pelo chat, e apagar a combinacao de ontem apagaria a prova do que
+    # foi acordado.
+    #
+    # O valor era tres minutos e mostrou-se curto no uso: quem percebe o erro
+    # ao reler a conversa, ou depois de gravar um audio e ouvi-lo de volta, ja
+    # passou do prazo. Dez minutos absorvem essa releitura e continuam longe da
+    # janela em que a mensagem vira registro do combinado.
+    PRAZO_EXCLUSAO = timedelta(minutes=10)
 
     def destroy(self, request, pk=None):
         """
@@ -597,7 +602,7 @@ class MensagemViewSet(viewsets.GenericViewSet):
             return Response(
                 {
                     'detail': 'O prazo para apagar esta mensagem terminou. '
-                              'Mensagens podem ser removidas em até 3 minutos '
+                              'Mensagens podem ser removidas em até 10 minutos '
                               'após o envio.'
                 },
                 status=status.HTTP_400_BAD_REQUEST,

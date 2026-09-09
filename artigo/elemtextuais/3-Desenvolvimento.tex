@@ -60,6 +60,12 @@ RF-VOL-003 & Voluntariado & Inscrição em oportunidade \\
 \hline
 RF-VOL-007 & Voluntariado & Emissão de certificado em PDF \\
 \hline
+RF-VOL-014 & Voluntariado & Publicar campanha de doação \\
+\hline
+RF-VOL-016 & Voluntariado & Confirmar recebimento da doação \\
+\hline
+RF-COL-014 & Colaboração & Reunir arquivos por disciplina \\
+\hline
 RF-PRF-002 & Perfil & Editar perfil com imagem e biografia \\
 \hline
 RF-PRF-006 & Perfil & Acompanhar o próprio percurso por disciplina \\
@@ -74,8 +80,13 @@ RF-NOT-001 & Notificações & Notificações em tempo real \\
 Cada requisito possui a sua descrição funcional e técnica, a indicação do ator
 responsável por usá-lo e o nível de prioridade, parâmetros que ajudam a definir
 a ordem em que as funcionalidades vão sendo implementadas ao longo do projeto.
+O levantamento completo, com 83 requisitos funcionais e 50 requisitos não
+funcionais, encontra-se no repositório do projeto\footnote{Disponível em:
+\url{https://github.com/kellyr5/plataforma-unifei}.}, acompanhado do registro
+das divergências em relação ao escopo definido na primeira etapa deste
+trabalho.
 
-Ao longo do desenvolvimento, dois conjuntos de requisitos foram revistos. O
+Ao longo do desenvolvimento, alguns conjuntos de requisitos foram revistos. O
 sistema de reputação e o ranking semestral, previstos inicialmente para
 incentivar a participação, foram removidos do escopo. A decisão partiu da
 constatação de que a pontuação pública desloca o incentivo de ajudar para o de
@@ -87,6 +98,18 @@ foi incorporado o módulo de colaboração, com trabalhos em grupo, conversa
 privada por equipe e encaminhamento de dúvida à monitoria, respondendo a uma
 lacuna identificada durante o levantamento: a discussão de trabalho em grupo
 acontecia integralmente fora dos sistemas da universidade.
+
+O registro de doações, previsto na primeira etapa como mecanismo de pontuação
+por item entregue, foi reformulado em vez de descartado. A mecânica de pontos
+saiu junto com o sistema de reputação, pela mesma razão, mas a doação retornou
+como modalidade própria de ação voluntária, descrita na Seção
+\ref{modalidades-voluntariado}. Alterou-se o propósito: o item deixou de valer
+pontos em uma classificação individual e passou a integrar uma arrecadação com
+destinação definida. Incorporaram-se ainda dois requisitos surgidos do próprio
+uso do sistema, e não do levantamento inicial: a restrição de publicação por
+decisão pedagógica, que atende ao caso da resposta que entrega o exercício
+resolvido sem infringir qualquer regra de conduta, e o acervo de arquivos
+descrito na Seção \ref{acervo}.
 
 \subsection{Arquitetura do Sistema}
 
@@ -272,7 +295,124 @@ ausência das bibliotecas correspondentes, a busca responde por correspondência
 textual e nenhuma outra funcionalidade é afetada, o que evita que a
 disponibilidade do fórum dependa de um componente acessório.
 
-\subsection{Acessibilidade}
+\subsection{Colaboração em Grupo e Privacidade da Conversa}
+\label{colaboracao}
+
+O trabalho em grupo ocupa parte considerável da carga das disciplinas e não
+aparece em nenhuma das plataformas examinadas na Tabela \ref{tab-comparativo}.
+A discussão acontece integralmente fora dos sistemas da universidade, em
+aplicativos de mensagem instantânea, e o material produzido se dispersa ao fim
+do semestre junto com o grupo que o produziu.
+
+O módulo de colaboração incorpora esse fluxo. O docente propõe o trabalho
+definindo o número de grupos, o tamanho máximo de cada um, o prazo e o modo de
+formação, que pode ser por escolha dos estudantes ou por sorteio entre os
+matriculados. Ao enunciado podem ser anexados os materiais de apoio que o
+acompanham na prática --- a especificação em PDF, a base de dados a processar,
+o esqueleto de código, a rubrica de correção ---, de modo que o trabalho não
+fique com o enunciado em um lugar e os arquivos em outro. Cada grupo recebe um
+espaço de conversa próprio, com entrega de mensagens em tempo real, anexos e
+mensagens de voz.
+
+A decisão central desse módulo é que a conversa do grupo é privada aos seus
+integrantes, inclusive em relação ao docente responsável pela disciplina. A
+escolha não é evidente, uma vez que o professor detém autoridade sobre a
+turma, mas decorre de uma constatação sobre o comportamento observado: um
+espaço de discussão sujeito à leitura de quem avalia não é utilizado para
+discutir, e os grupos retornariam aos aplicativos externos, reproduzindo
+exatamente a dispersão que o módulo pretende resolver. A privacidade é,
+portanto, condição de funcionamento, e não concessão.
+
+Essa vedação criaria, entretanto, um novo isolamento: o grupo que trava diante
+de uma dificuldade não teria como acionar quem ensina sem sair da plataforma.
+A solução adotada é o encaminhamento seletivo. O grupo marca uma mensagem
+específica da sua conversa e a encaminha acompanhada de uma descrição do
+problema; apenas esses dois elementos atravessam a fronteira da privacidade, e
+a discussão em torno deles permanece invisível. O destinatário é determinado
+pelo sistema conforme a estrutura da disciplina: quando há monitoria
+constituída, o pedido chega ao monitor; quando não há, chega diretamente ao
+professor. O estudante não precisa conhecer essa organização para ser
+atendido.
+
+A exclusão de mensagens observa a mesma lógica de equilíbrio. O autor pode
+remover o que enviou dentro de um prazo curto após o envio, o que cobre o
+arrependimento imediato --- a mensagem incompleta, o áudio malsucedido ---
+sem permitir a reescrita retroativa da conversa. A restrição existe porque
+grupos de trabalho combinam divisão de tarefas pelo próprio canal, e a
+supressão tardia de uma mensagem eliminaria o registro daquilo que foi
+acordado. Mensagens que originaram pedido de ajuda não podem ser removidas,
+pois já foram encaminhadas a terceiros.
+
+\subsection{Modalidades de Ação Voluntária}
+\label{modalidades-voluntariado}
+
+O módulo de voluntariado foi inicialmente concebido em torno de ações
+presenciais, nas quais a contribuição do estudante é medida em tempo e o
+certificado declara a carga horária cumprida. O levantamento junto a
+organizações parceiras evidenciou, contudo, que parte relevante das ações
+universitárias não se enquadra nesse formato: campanhas de arrecadação, como a
+do agasalho ou a de alimentos, mobilizam voluntários sem que haja vaga a
+ocupar ou hora a cumprir.
+
+A plataforma passou a distinguir, portanto, duas modalidades. Na ação
+presencial permanecem as noções de vaga e de carga horária. Na campanha de
+doação ambas são substituídas pela quantidade arrecadada, expressa em uma
+unidade que a própria organização define em texto livre --- peças de
+agasalho, quilos de alimento, litros de leite. A opção pelo texto livre, em
+lugar de uma lista fechada de categorias, decorre da constatação de que
+qualquer enumeração prévia deixaria de fora o objeto da campanha seguinte.
+Uma meta pode ser informada, e nesse caso a interface exibe o progresso da
+arrecadação; na ausência de meta, exibe apenas o total, pois um indicador de
+progresso exige um denominador e sua arbitragem distorceria a percepção do
+andamento da campanha.
+
+A contabilização distingue dois valores. O estudante declara, ao aderir à
+campanha, a quantidade que pretende entregar; a organização registra, no
+recebimento, a quantidade efetivamente recebida. Somente o segundo valor
+compõe o total da campanha. A separação responde a uma diferença real entre
+intenção e fato: a soma das declarações exibiria uma arrecadação que pode não
+ter se concretizado, e a manutenção dos dois registros preserva a diferença
+entre eles, que constitui, ela própria, uma informação sobre a campanha. O
+campo de confirmação é acessível apenas à organização, uma vez que a
+possibilidade de o próprio doador registrar seu recebimento esvaziaria o
+significado do total.
+
+O certificado emitido ao final adota redação distinta conforme a modalidade.
+Em campanhas de doação, o documento registra a contribuição entregue e declara
+que a organização atribui àquela participação o equivalente a determinado
+número de horas de atividade voluntária. A formulação é deliberada: doar não
+constitui cumprimento de carga horária, e um certificado que afirmasse o
+contrário descreveria fato diverso do ocorrido. Ao explicitar que se trata de
+equivalência definida pela entidade promotora, o documento permite que a
+instância responsável pela validação das horas complementares avalie o
+critério empregado.
+
+\subsection{Acervo de Arquivos por Disciplina}
+\label{acervo}
+
+O material didático circula pela plataforma por três caminhos distintos: como
+anexo de mensagem na conversa de um grupo, como material de apoio vinculado ao
+enunciado de um trabalho e como anexo de publicação no fórum. Cada um desses
+caminhos preserva o arquivo em seu contexto de origem, o que é adequado para a
+consulta imediata, mas insuficiente para a recuperação posterior: reencontrar
+um documento exige lembrar por qual dos caminhos ele chegou e percorrer o
+histórico correspondente.
+
+A plataforma reúne as três origens em uma visão única, agrupada por disciplina,
+que é o critério pelo qual o semestre é efetivamente organizado por quem o
+cursa. A implementação não introduz entidade nova nem duplica arquivos: a
+consulta percorre os registros existentes e os apresenta sob outra
+organização.
+
+O ponto sensível de um agregador é a possibilidade de tornar acessível, em um
+lugar, aquilo que não era acessível em outro. O recorte de acesso de cada
+origem é, por isso, preservado integralmente: anexos de conversa aparecem
+apenas para quem participa daquela conversa, e materiais de trabalho e anexos
+de publicação, apenas para quem possui vínculo com a disciplina. Nenhum arquivo
+se torna visível no acervo que já não o fosse pelo caminho original, e a
+verificação dessa propriedade integra a suíte de testes automatizados.
+
+\subsection{Acessibilidade e Adaptação a Dispositivos Móveis}
 
 Por se tratar de sistema destinado a uma instituição federal de ensino, a
 acessibilidade digital constitui obrigação legal, estabelecida pelo Decreto
@@ -288,6 +428,20 @@ a cada mudança de página; atribui rótulos acessíveis aos controles
 representados apenas por ícone; e respeita a preferência do sistema operacional
 por movimento reduzido. As combinações de cor foram verificadas quanto ao
 contraste mínimo nos dois temas disponíveis.
+
+A adaptação a telas estreitas integra o mesmo conjunto de preocupações, uma vez
+que o telefone é o dispositivo pelo qual a maior parte do acesso estudantil
+ocorre. A barra lateral de navegação, permanentemente visível no computador,
+consumia largura considerável em uma tela de trezentos e sessenta pixels mesmo
+quando recolhida, comprimindo o conteúdo a ponto de o texto quebrar entre
+caracteres de uma mesma palavra. Abaixo do limiar de mil e vinte e quatro
+pixels ela passa a ser sobreposta ao conteúdo e acionada por botão, liberando a
+largura integral para a área principal. As grades de colunas fixas foram
+substituídas por composição automática, que instancia a segunda coluna apenas
+quando há largura suficiente para ela, e os campos de entrada adotam tamanho de
+fonte igual ou superior a dezesseis pixels, medida que evita a ampliação
+automática da página que os navegadores móveis aplicam ao foco em campos
+menores.
 
 \subsection{Casos de Uso}
 \label{casos-de-uso}

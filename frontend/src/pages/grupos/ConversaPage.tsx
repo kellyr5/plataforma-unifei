@@ -72,7 +72,7 @@ function dia(valor: string): string {
  * só para esconder um botão que o backend recusaria — oferecer a ação e
  * responder com erro é pior do que não oferecer.
  */
-const PRAZO_EXCLUSAO = 3 * 60 * 1000
+const PRAZO_EXCLUSAO = 10 * 60 * 1000
 
 function Balao({ mensagem, minha, aoPedirAjuda, aoApagar }: {
   mensagem: Mensagem
@@ -370,8 +370,14 @@ export default function ConversaPage() {
         { headers: { 'Content-Type': 'multipart/form-data' } },
       )
       acrescentar(data)
-    } catch {
-      toast.error('Não foi possível enviar o arquivo.')
+    } catch (erro: any) {
+      /* O servidor explica por que recusou — formato fora da lista, tamanho
+         acima do limite. O aviso genérico anterior escondia justamente essa
+         explicação, e o defeito do áudio no celular ficou invisível por isso:
+         a recusa chegava, mas a tela dizia apenas que não deu certo. */
+      toast.error(
+        erro?.response?.data?.detail || 'Não foi possível enviar o arquivo.'
+      )
     }
   }
 
@@ -397,9 +403,39 @@ export default function ConversaPage() {
       return
     }
 
+    /* MediaRecorder é mais recente que getUserMedia. No iPhone ele só existe a
+       partir do Safari 14.3, e verificar apenas o microfone deixava o erro
+       aparecer como exceção sem explicação ao tocar em gravar. */
+    if (typeof MediaRecorder === 'undefined') {
+      toast.error('Este navegador não grava áudio. Atualize-o ou use outro.')
+      return
+    }
+
     try {
       const fluxo = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const gravador = new MediaRecorder(fluxo)
+
+      /* O formato precisa ser escolhido, e não deixado por conta do padrão.
+         Sem indicação, alguns navegadores de celular devolvem mimeType vazio;
+         o arquivo então sobe como application/octet-stream, que a lista de
+         tipos aceitos do servidor recusa — e a recusa chegava como um aviso
+         genérico de falha no envio, sem dizer o motivo.
+
+         A ordem segue o que cada plataforma produz: webm com opus no Chrome
+         e no Firefox, mp4 no Safari do iPhone. */
+      const formatos = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+        'audio/ogg;codecs=opus',
+      ]
+      const formato = formatos.find(
+        tipo => MediaRecorder.isTypeSupported?.(tipo)
+      )
+
+      const gravador = new MediaRecorder(
+        fluxo,
+        formato ? { mimeType: formato } : undefined,
+      )
 
       pedacosRef.current = []
       gravador.ondataavailable = (evento) => {
@@ -411,15 +447,30 @@ export default function ConversaPage() {
         // indicador de gravação do sistema fica aceso indefinidamente.
         fluxo.getTracks().forEach(faixa => faixa.stop())
 
-        const blob = new Blob(pedacosRef.current, { type: gravador.mimeType })
-        const extensao = gravador.mimeType.includes('mp4') ? 'm4a' : 'webm'
+        /* Se o navegador não informar o formato, vale o que foi pedido a ele.
+           Um File sem type sobe como binário genérico e é recusado. */
+        const tipo = gravador.mimeType || formato || 'audio/webm'
+        const blob = new Blob(pedacosRef.current, { type: tipo })
+        const extensao = tipo.includes('mp4') ? 'm4a'
+          : tipo.includes('ogg') ? 'ogg'
+          : 'webm'
 
-        if (blob.size > 0) {
-          anexar(new File([blob], `mensagem-de-voz.${extensao}`, { type: gravador.mimeType }))
+        if (blob.size === 0) {
+          /* Silêncio aqui era o pior comportamento possível: a pessoa
+             concedia o microfone, gravava, tocava em enviar e nada
+             acontecia — sem áudio na conversa e sem aviso nenhum. */
+          toast.error('A gravação saiu vazia. Tente novamente e fale mais perto do microfone.')
+          return
         }
+
+        anexar(new File([blob], `mensagem-de-voz.${extensao}`, { type: tipo }))
       }
 
-      gravador.start()
+      /* O intervalo faz o navegador entregar o áudio em pedaços durante a
+         gravação, em vez de um bloco único no fim. Em celular isso importa:
+         se a pessoa troca de aba ou a tela apaga, o que já foi capturado
+         está guardado. Sem o intervalo, a gravação inteira podia se perder. */
+      gravador.start(1000)
       gravadorRef.current = gravador
       setGravando(true)
       setSegundos(0)
@@ -433,8 +484,18 @@ export default function ConversaPage() {
           return anterior + 1
         })
       }, 1000)
-    } catch {
-      toast.error('Não foi possível acessar o microfone. Verifique a permissão do navegador.')
+    } catch (erro: any) {
+      /* Distinguir permissão negada de ausência de microfone: as duas coisas
+         pedem providências diferentes de quem está usando. */
+      const nome = erro?.name
+
+      if (nome === 'NotAllowedError' || nome === 'SecurityError') {
+        toast.error('Permissão de microfone negada. Libere o acesso nas configurações do navegador.')
+      } else if (nome === 'NotFoundError') {
+        toast.error('Nenhum microfone encontrado neste aparelho.')
+      } else {
+        toast.error('Não foi possível iniciar a gravação neste navegador.')
+      }
     }
   }
 
