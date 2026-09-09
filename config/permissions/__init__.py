@@ -53,13 +53,42 @@ def leciona_disciplina(usuario, disciplina) -> bool:
     administrador nao passa. A distincao e entre supervisionar e participar.
 
     A coordenacao acompanha o curso e modera conteudo de qualquer disciplina,
-    mas nao esta matriculada em nenhuma turma e nao leciona. Organizar
-    trabalho em grupo, sortear equipes e responder duvida de grupo sao atos de
-    quem conduz a materia naquele semestre — quem conhece a turma, o enunciado
-    e o momento do conteudo. Deixar isso a cargo de um administrador global
-    seria decidir sobre uma sala em que ele nao entra.
+    mas nao esta matriculada em nenhuma turma e nao leciona. Responder duvida
+    de grupo, acompanhar equipes e atender a monitoria sao atos de quem conduz
+    a materia naquele semestre — quem conhece a turma, o enunciado e o momento
+    do conteudo. Deixar isso a cargo de um administrador global seria decidir
+    sobre uma sala em que ele nao entra.
+
+    Inclui o monitor, que participa da conducao da turma. Para os atos
+    privativos do docente, use e_professor_da_disciplina.
     """
     return disciplina.id in set(disciplinas_que_modera(usuario))
+
+
+def e_professor_da_disciplina(usuario, disciplina) -> bool:
+    """
+    Informa se o usuario e o docente responsavel pela disciplina.
+
+    Existe porque leciona_disciplina e amplo demais para alguns atos. O monitor
+    conduz a turma junto com o professor: modera conteudo, atende pedido de
+    ajuda, acompanha os grupos. Mas propor trabalho, definir prazo e estabelecer
+    como as equipes se formam sao decisoes de desenho da disciplina, e cabem a
+    quem responde por ela perante a coordenacao.
+
+    A distincao importa na pratica: o monitor e, quase sempre, um aluno da
+    propria turma ou de periodo proximo. Autoriza-lo a criar a atividade que
+    seus colegas serao avaliados inverteria a relacao que a monitoria pressupoe.
+
+    O administrador tambem nao passa, pela mesma razao de leciona_disciplina.
+    """
+    from forum.models import PermissaoDisciplina
+
+    return PermissaoDisciplina.objects.filter(
+        usuario=usuario,
+        disciplina=disciplina,
+        papel='professor',
+        ativo=True,
+    ).exists()
 
 
 class PodeModerar(BasePermission):

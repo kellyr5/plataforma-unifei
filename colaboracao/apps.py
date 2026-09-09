@@ -14,3 +14,7 @@ class ColaboracaoConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'colaboracao'
     verbose_name = 'Colaboracao'
+
+    def ready(self):
+        # Importado pelo efeito colateral de registrar os receptores.
+        from colaboracao import signals  # noqa: F401

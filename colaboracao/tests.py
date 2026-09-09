@@ -25,6 +25,7 @@ from colaboracao.models import (
     Trabalho,
 )
 from config.testing import criar_disciplina, criar_usuario, itens, vincular
+from forum.models import PermissaoDisciplina
 from notificacoes.models import Notificacao
 
 
@@ -590,6 +591,196 @@ class ContadorNaoLidasTests(APITestCase):
         services.registrar_leitura(self.conversa, self.membro)
 
         self.assertEqual(services.nao_lidas(self.conversa, self.membro), 0)
+
+
+class MonitorNaoDesenhaAvaliacaoTests(APITestCase):
+    """
+    O monitor conduz a turma, mas não desenha a avaliação.
+
+    A distinção não é evidente: monitor e professor compartilham a moderação,
+    o atendimento de dúvidas e o acompanhamento dos grupos. Propor trabalho,
+    abrir os grupos e sortear a turma, porém, definem como os colegas do
+    monitor serão avaliados — e ele é, quase sempre, aluno da própria turma.
+    """
+
+    def setUp(self):
+        self.disciplina = criar_disciplina()
+        self.professor = criar_usuario(nome='Professor Responsável')
+        self.monitor = criar_usuario(nome='Monitor da Turma')
+
+        vincular(self.professor, self.disciplina, papel='professor')
+        vincular(self.monitor, self.disciplina, papel='monitor')
+
+        self.trabalho = criar_trabalho(self.disciplina, self.professor)
+
+    def corpo_do_trabalho(self):
+        return {
+            'disciplina': str(self.disciplina.id),
+            'titulo': 'Trabalho proposto pelo monitor',
+            'especificacao': 'Enunciado qualquer.',
+            'total_grupos': 2,
+            'tamanho_maximo': 3,
+            'modo_formacao': 'alunos',
+            'prazo_entrega': (timezone.now().date() + timedelta(days=20)).isoformat(),
+        }
+
+    def test_monitor_nao_cria_trabalho(self):
+        self.client.force_authenticate(user=self.monitor)
+
+        resposta = self.client.post(reverse('trabalho-list'), self.corpo_do_trabalho())
+
+        self.assertEqual(resposta.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_professor_cria_trabalho(self):
+        self.client.force_authenticate(user=self.professor)
+
+        resposta = self.client.post(reverse('trabalho-list'), self.corpo_do_trabalho())
+
+        self.assertEqual(resposta.status_code, status.HTTP_201_CREATED)
+
+    def test_monitor_nao_sorteia_a_turma(self):
+        self.client.force_authenticate(user=self.monitor)
+
+        resposta = self.client.post(
+            reverse('trabalho-sortear', args=[self.trabalho.id])
+        )
+
+        self.assertEqual(resposta.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_monitor_nao_abre_os_grupos(self):
+        self.client.force_authenticate(user=self.monitor)
+
+        resposta = self.client.post(
+            reverse('trabalho-criar-grupos', args=[self.trabalho.id])
+        )
+
+        self.assertEqual(resposta.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_monitor_continua_enxergando_os_trabalhos(self):
+        """A restrição é sobre criar, não sobre acompanhar."""
+        self.client.force_authenticate(user=self.monitor)
+
+        resposta = self.client.get(reverse('trabalho-list'))
+
+        self.assertEqual(len(itens(resposta)), 1)
+
+    def test_monitor_continua_respondendo_pedido_de_ajuda(self):
+        """
+        Atender dúvida é atribuição da monitoria, e permanece.
+
+        Sem este teste, um endurecimento futuro das permissões poderia
+        alcançar também o atendimento, que é a razão de existir da monitoria.
+        """
+        from config.permissions import leciona_disciplina
+
+        self.assertTrue(leciona_disciplina(self.monitor, self.disciplina))
+
+
+class CanalDeMonitoriaTests(APITestCase):
+    """
+    O canal reúne quem conduz uma disciplina, e apenas aquela.
+
+    É o ponto que define o recurso: monitor de uma matéria não alcança o canal
+    de outra, e professor de uma matéria não lê o que se discute na monitoria
+    de outra. O recorte segue o vínculo, como no resto da plataforma.
+    """
+
+    def setUp(self):
+        self.banco = criar_disciplina(codigo='CTCO03', nome='Banco de Dados')
+        self.algoritmos = criar_disciplina(codigo='CTCO01', nome='Algoritmos')
+
+        self.professor_banco = criar_usuario(nome='Professor de Banco')
+        self.monitor_banco = criar_usuario(nome='Monitor de Banco')
+        self.professor_algoritmos = criar_usuario(nome='Professor de Algoritmos')
+        self.aluno = criar_usuario(nome='Aluno Comum')
+
+        vincular(self.professor_banco, self.banco, papel='professor')
+        vincular(self.professor_algoritmos, self.algoritmos, papel='professor')
+        vincular(self.aluno, self.banco, papel='aluno')
+
+        # A promoção a monitor é o que faz o canal nascer.
+        vincular(self.monitor_banco, self.banco, papel='monitor')
+
+    def canal(self, disciplina):
+        return Conversa.objects.filter(tipo='monitoria', disciplina=disciplina).first()
+
+    def conversas_de(self, usuario):
+        self.client.force_authenticate(user=usuario)
+        resposta = self.client.get(reverse('conversa-list'))
+        return itens(resposta)
+
+    def test_canal_nasce_com_a_monitoria(self):
+        canal = self.canal(self.banco)
+
+        self.assertIsNotNone(canal)
+        self.assertEqual(canal.tipo, 'monitoria')
+
+    def test_professor_e_monitor_da_materia_participam(self):
+        canal = self.canal(self.banco)
+        participantes = set(canal.participantes.values_list('usuario_id', flat=True))
+
+        self.assertIn(self.professor_banco.id, participantes)
+        self.assertIn(self.monitor_banco.id, participantes)
+
+    def test_aluno_da_materia_nao_participa(self):
+        """O canal é de quem conduz a turma, não de quem a cursa."""
+        canal = self.canal(self.banco)
+        participantes = set(canal.participantes.values_list('usuario_id', flat=True))
+
+        self.assertNotIn(self.aluno.id, participantes)
+
+    def test_professor_de_outra_materia_nao_enxerga_o_canal(self):
+        """
+        O ponto sensível do recurso.
+
+        Cada canal pertence a uma disciplina. Se o professor de algoritmos
+        alcançasse o canal de banco de dados, o recorte por matéria não
+        existiria de fato.
+        """
+        titulos = [c['titulo'] for c in self.conversas_de(self.professor_algoritmos)]
+
+        self.assertNotIn('Monitoria de CTCO03', titulos)
+
+    def test_monitor_enxerga_o_canal_da_propria_materia(self):
+        titulos = [c['titulo'] for c in self.conversas_de(self.monitor_banco)]
+
+        self.assertIn('Monitoria de CTCO03', titulos)
+
+    def test_disciplina_sem_monitor_nao_ganha_canal(self):
+        """Canal do professor consigo mesmo ocuparia a lista sem servir a nada."""
+        self.assertIsNone(self.canal(self.algoritmos))
+
+    def test_fim_da_monitoria_arquiva_o_canal(self):
+        """
+        O histórico permanece, mas o canal para de aceitar mensagem.
+
+        Apagar eliminaria o registro de combinações que podem ter valido para
+        a turma inteira.
+        """
+        vinculo = PermissaoDisciplina.objects.get(
+            usuario=self.monitor_banco, disciplina=self.banco,
+        )
+        vinculo.ativo = False
+        vinculo.save()
+
+        canal = self.canal(self.banco)
+
+        self.assertIsNotNone(canal)
+        self.assertTrue(canal.somente_leitura)
+
+    def test_monitoria_reconstituida_reabre_o_canal(self):
+        vinculo = PermissaoDisciplina.objects.get(
+            usuario=self.monitor_banco, disciplina=self.banco,
+        )
+        vinculo.ativo = False
+        vinculo.save()
+
+        vinculo.ativo = True
+        vinculo.save()
+
+        canal = self.canal(self.banco)
+
+        self.assertFalse(canal.somente_leitura)
 
 
 class AcervoDeArquivosTests(APITestCase):

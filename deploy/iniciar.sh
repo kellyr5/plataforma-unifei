@@ -94,5 +94,21 @@ else
     echo "==> Carga inicial desativada (CARGA_INICIAL=${CARGA_INICIAL:-nao definida})"
 fi
 
+# Saneamento dos vinculos, a cada inicializacao.
+#
+# Roda sempre, e nao so na carga inicial, porque e idempotente: quando nao ha
+# inconsistencia, apenas relata que nao ha. O custo e uma consulta por
+# disciplina, desprezivel diante do que uma base inconsistente produz — canal
+# de monitoria com gente que nao monitora, fila de pedidos chegando a quem nao
+# atende mais.
+#
+# Existe aqui porque o plano gratuito nao oferece terminal remoto: sem este
+# passo, corrigir dados em producao exigiria uma implantacao com carga
+# completa, que apagaria o que os participantes produziram.
+# Em segundo plano, pela mesma razao da carga: o servidor precisa abrir a
+# porta antes, ou a plataforma de hospedagem cancela a implantacao.
+executar_passo "Saneando os vinculos com disciplinas" \
+    python manage.py sanear_vinculos --aplicar &
+
 echo "==> Subindo o Daphne na porta ${PORT:-8000}"
 exec daphne -b 0.0.0.0 -p "${PORT:-8000}" config.asgi:application

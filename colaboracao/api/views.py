@@ -33,7 +33,11 @@ from colaboracao.models import (
     SolicitacaoAjuda,
     Trabalho,
 )
-from config.permissions import e_administrador, leciona_disciplina
+from config.permissions import (
+    e_administrador,
+    e_professor_da_disciplina,
+    leciona_disciplina,
+)
 from forum.models import PermissaoDisciplina
 
 
@@ -97,11 +101,20 @@ class TrabalhoViewSet(viewsets.ModelViewSet):
         return queryset.order_by('-created_at')
 
     def _exigir_docencia(self, disciplina):
-        if not leciona_disciplina(self.request.user, disciplina):
-            from rest_framework.exceptions import PermissionDenied
+        """
+        Exige o vinculo de professor, e nao apenas de conducao da turma.
 
+        Propor trabalho, alterar prazo e definir como as equipes se formam sao
+        decisoes de desenho da disciplina. O monitor participa da conducao —
+        modera, atende pedido de ajuda, acompanha os grupos — mas nao desenha a
+        avaliacao: ele e, quase sempre, aluno da propria turma ou de periodo
+        proximo, e autoriza-lo a criar a atividade pela qual os colegas serao
+        avaliados inverteria a relacao que a monitoria pressupoe.
+        """
+        if not e_professor_da_disciplina(self.request.user, disciplina):
             raise PermissionDenied(
-                'Apenas quem leciona ou monitora a disciplina organiza os trabalhos.'
+                'Apenas o professor responsável pela disciplina organiza os '
+                'trabalhos.'
             )
 
     def perform_create(self, serializer):
@@ -270,10 +283,12 @@ class GrupoTrabalhoViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         trabalho = serializer.validated_data['trabalho']
 
-        if not leciona_disciplina(self.request.user, trabalho.disciplina):
-            from rest_framework.exceptions import PermissionDenied
-
-            raise PermissionDenied('Apenas quem leciona ou monitora cria grupos.')
+        # Compor as equipes faz parte do desenho da avaliacao, como propor o
+        # trabalho: cabe ao professor, e nao ao monitor.
+        if not e_professor_da_disciplina(self.request.user, trabalho.disciplina):
+            raise PermissionDenied(
+                'Apenas o professor responsável pela disciplina cria grupos.'
+            )
 
         grupo = serializer.save()
         services.abrir_conversa_do_grupo(grupo)
@@ -462,6 +477,48 @@ class ConversaViewSet(
         if tipo.startswith('audio/'):
             return 'audio'
         return 'documento'
+
+    @action(detail=True, methods=['get'])
+    def participantes(self, request, pk=None):
+        """
+        GET /api/colaboracao/conversas/{id}/participantes/
+
+        Quem esta na conversa, com o papel de cada um.
+
+        Saber com quem se fala e informacao basica de qualquer conversa, e
+        faltava: a interface mostrava apenas a contagem. Numa conversa de
+        grupo o numero basta, porque a composicao e conhecida; num canal que
+        reune professores e monitores de uma disciplina, nao — a contagem
+        inesperada nao tem como ser investigada sem a lista.
+
+        O papel vem do vinculo com a disciplina da conversa, quando existe.
+        Na conversa privada nao ha papel a exibir.
+        """
+        conversa = self.get_object()
+
+        pessoas = conversa.participantes.select_related('usuario')
+
+        papeis = {}
+        if conversa.disciplina_id:
+            papeis = dict(
+                PermissaoDisciplina.objects.filter(
+                    disciplina_id=conversa.disciplina_id,
+                    usuario__in=[p.usuario_id for p in pessoas],
+                    ativo=True,
+                ).values_list('usuario_id', 'papel')
+            )
+
+        return Response({
+            'participantes': [
+                {
+                    'id': str(p.usuario_id),
+                    'nome': p.usuario.nome_completo,
+                    'papel': papeis.get(p.usuario_id, ''),
+                    'sou_eu': p.usuario_id == request.user.id,
+                }
+                for p in pessoas
+            ]
+        })
 
     @action(detail=True, methods=['post'], url_path='marcar-lida')
     def marcar_lida(self, request, pk=None):

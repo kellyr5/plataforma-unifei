@@ -202,6 +202,15 @@ export default function PainelDocente({ papel }: { papel?: 'professor' | 'monito
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState('')
 
+  /* Canais entre a monitoria e o professor, um por disciplina. */
+  const [canais, setCanais] = useState<{
+    id: string
+    titulo: string
+    nao_lidas: number
+    total_participantes: number
+    somente_leitura: boolean
+  }[]>([])
+
   const buscar = useCallback(async () => {
     setCarregando(true)
     setErro('')
@@ -210,6 +219,19 @@ export default function PainelDocente({ papel }: { papel?: 'professor' | 'monito
       const { data } = await api.get('/forum/minhas-disciplinas/', { params })
       setDisciplinas(data.disciplinas || [])
       setResumo(data.resumo || null)
+
+      /* A falha aqui não derruba a tela: o painel serve para acompanhar as
+         disciplinas, e a conversa é um recurso ao lado. */
+      try {
+        const { data: conversas } = await api.get('/colaboracao/conversas/')
+        const registros = Array.isArray(conversas)
+          ? conversas
+          : conversas.results || []
+
+        setCanais(registros.filter((c: { tipo: string }) => c.tipo === 'monitoria'))
+      } catch {
+        setCanais([])
+      }
     } catch (err: any) {
       /* Falha de servidor precisa aparecer. Tratar erro como lista vazia faz
          a tela mentir: o usuário conclui que não tem disciplina quando o que
@@ -249,9 +271,9 @@ export default function PainelDocente({ papel }: { papel?: 'professor' | 'monito
 
       {resumo && resumo.disciplinas > 0 && (
         <div
-          className="flex items-center rounded-xl"
+          className="flex items-center flex-wrap rounded-xl"
           style={{
-            padding: '16px 24px', gap: '34px', marginBottom: '16px',
+            padding: '16px 24px', gap: '22px 34px', marginBottom: '16px',
             background: 'var(--bg-card)', border: '1px solid var(--border)',
           }}
         >
@@ -259,6 +281,76 @@ export default function PainelDocente({ papel }: { papel?: 'professor' | 'monito
           <Metrica valor={resumo.matriculados} rotulo="estudantes" />
           <Metrica valor={resumo.sem_resposta} rotulo="dúvidas sem resposta" destaque />
           <Metrica valor={resumo.denuncias_pendentes} rotulo="denúncias a analisar" destaque />
+        </div>
+      )}
+
+      {/* Conversa com quem leciona.
+          Fica logo abaixo do resumo, e não no fim da página, porque é o
+          caminho que o monitor procura quando trava numa correção ou precisa
+          alinhar o atendimento — momento em que ele não quer percorrer a
+          lista de disciplinas para achar onde falar. */}
+      {canais.length > 0 && (
+        <div style={{ marginBottom: '16px' }}>
+          <h2
+            className="font-semibold"
+            style={{ fontSize: '14px', color: 'var(--text-primary)', marginBottom: '3px' }}
+          >
+            {eMonitoria ? 'Conversa com o professor' : 'Conversa com a monitoria'}
+          </h2>
+          <p style={{ fontSize: '12.5px', color: 'var(--text-tertiary)', marginBottom: '10px' }}>
+            {eMonitoria
+              ? 'Canal reservado a você e ao professor de cada disciplina que você monitora.'
+              : 'Canal reservado a você e à monitoria de cada disciplina que você leciona.'}
+          </p>
+
+          <div
+            className="grid"
+            style={{
+              gap: '10px',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+            }}
+          >
+            {canais.map(canal => (
+              <button
+                key={canal.id}
+                onClick={() => navigate(`/conversas/${canal.id}`)}
+                className="rounded-xl cursor-pointer text-left"
+                style={{
+                  padding: '13px 15px',
+                  background: 'var(--bg-card)',
+                  border: `1px solid ${canal.nao_lidas > 0 ? 'var(--accent-blue-border)' : 'var(--border)'}`,
+                }}
+              >
+                <div className="flex items-center justify-between" style={{ gap: '10px' }}>
+                  <span
+                    className="font-medium truncate"
+                    style={{ fontSize: '13.5px', color: 'var(--text-primary)' }}
+                  >
+                    {canal.titulo}
+                  </span>
+
+                  {canal.nao_lidas > 0 && (
+                    <span
+                      className="flex items-center justify-center flex-shrink-0"
+                      style={{
+                        minWidth: '20px', height: '20px', padding: '0 6px',
+                        borderRadius: '10px', background: 'var(--accent-blue)',
+                        color: '#FFFFFF', fontSize: '11px', fontWeight: 600,
+                      }}
+                    >
+                      {canal.nao_lidas > 99 ? '99+' : canal.nao_lidas}
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ fontSize: '11.5px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
+                  {canal.total_participantes}
+                  {canal.total_participantes === 1 ? ' participante' : ' participantes'}
+                  {canal.somente_leitura ? ' · encerrado' : ''}
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

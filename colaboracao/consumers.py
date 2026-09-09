@@ -11,6 +11,7 @@ mantem o socket leve e evita transportar arquivo em base64.
 """
 
 import json
+from collections import defaultdict
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
@@ -23,16 +24,33 @@ def nome_do_grupo(conversa_id) -> str:
     return f'conversa_{conversa_id}'
 
 
+# Quem esta com cada conversa aberta neste processo.
+#
+# Estrutura: {id_da_conversa: {id_do_usuario: quantidade_de_abas}}. A contagem
+# por pessoa existe porque a mesma pessoa costuma abrir a conversa em mais de
+# uma aba, e fechar uma delas nao deveria anuncia-la como ausente.
+#
+# Fica em memoria, e nao no banco: presenca e informacao efemera, que perde o
+# sentido no instante em que o processo cai, e grava-la produziria escrita
+# constante para um dado que ninguem consulta depois. A implantacao atual roda
+# em instancia unica, entao a memoria do processo ve todas as conexoes. Com
+# varias instancias, isto precisaria migrar para o Redis — e a contagem
+# passaria a refletir apenas quem esta na mesma instancia, que e um erro
+# discreto o bastante para passar despercebido, e por isso fica registrado.
+_presenca: dict[str, dict[str, int]] = defaultdict(dict)
+
+
 class ConversaConsumer(AsyncWebsocketConsumer):
     """
     Canal de uma conversa: turma, grupo de trabalho ou privada.
 
     Mensagens enviadas ao cliente:
 
-        {"tipo": "conectado", "participantes": 4}
+        {"tipo": "conectado", "participantes": 4, "conectados": 2}
         {"tipo": "mensagem", "mensagem": {...}}
         {"tipo": "removida", "mensagem_id": "..."}
         {"tipo": "digitando", "usuario": "Diego Martins"}
+        {"tipo": "presenca", "conectados": 3}
         {"tipo": "erro", "detalhe": "..."}
 
     Mensagens aceitas do cliente:
@@ -63,14 +81,23 @@ class ConversaConsumer(AsyncWebsocketConsumer):
         await self.channel_layer.group_add(self.grupo, self.channel_name)
         await self.accept()
 
+        self._registrar_presenca()
+
         await self._enviar({
             'tipo': 'conectado',
             'participantes': await self._contar_participantes(),
             'somente_leitura': self.conversa.somente_leitura,
+            'conectados': self._conectados(),
         })
+
+        # Os demais precisam saber que alguem chegou. Sem isto, a contagem so
+        # se atualizaria ao recarregar a pagina.
+        await self._anunciar_presenca()
 
     async def disconnect(self, close_code):
         if hasattr(self, 'grupo'):
+            self._remover_presenca()
+            await self._anunciar_presenca()
             await self.channel_layer.group_discard(self.grupo, self.channel_name)
 
     async def receive(self, text_data=None, bytes_data=None):
@@ -115,6 +142,47 @@ class ConversaConsumer(AsyncWebsocketConsumer):
             return
 
         await self._enviar({'tipo': 'digitando', 'usuario': event['usuario']})
+
+    async def aviso_presenca(self, event):
+        await self._enviar({
+            'tipo': 'presenca',
+            'conectados': event['conectados'],
+        })
+
+    # ===== Presenca =====
+
+    def _registrar_presenca(self):
+        pessoas = _presenca[str(self.conversa_id)]
+        chave = str(self.usuario.id)
+        pessoas[chave] = pessoas.get(chave, 0) + 1
+
+    def _remover_presenca(self):
+        pessoas = _presenca.get(str(self.conversa_id))
+
+        if not pessoas:
+            return
+
+        chave = str(self.usuario.id)
+        restantes = pessoas.get(chave, 1) - 1
+
+        if restantes > 0:
+            pessoas[chave] = restantes
+        else:
+            pessoas.pop(chave, None)
+
+        # Conversa sem ninguem sai do dicionario: manter a chave vazia faria a
+        # estrutura crescer com o numero de conversas ja visitadas.
+        if not pessoas:
+            _presenca.pop(str(self.conversa_id), None)
+
+    def _conectados(self) -> int:
+        return len(_presenca.get(str(self.conversa_id), {}))
+
+    async def _anunciar_presenca(self):
+        await self.channel_layer.group_send(self.grupo, {
+            'type': 'aviso.presenca',
+            'conectados': self._conectados(),
+        })
 
     # ===== Auxiliares =====
 

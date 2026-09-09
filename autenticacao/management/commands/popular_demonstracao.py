@@ -395,8 +395,20 @@ class Command(BaseCommand):
             estudantes.append(estudante)
 
         # Alguns monitores, escolhidos entre os proprios estudantes, como
-        # acontece na universidade.
+        # acontece na universidade. Um por disciplina: a monitoria e encargo
+        # unico por turma.
         for disciplina in disciplinas[:3]:
+            # Disciplina que ja tem monitor nao ganha outro. Sem esta
+            # verificacao, cada execucao do comando somava um monitor as
+            # mesmas tres disciplinas, e o canal da monitoria acumulava gente
+            # que nunca exerceu o papel junta.
+            ja_tem = PermissaoDisciplina.objects.filter(
+                disciplina=disciplina, papel='monitor', ativo=True,
+            ).exists()
+
+            if ja_tem:
+                continue
+
             candidatos = [
                 v.usuario for v in PermissaoDisciplina.objects.filter(
                     disciplina=disciplina, papel='aluno', ativo=True,

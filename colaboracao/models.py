@@ -225,11 +225,19 @@ class MembroGrupo(models.Model):
 
 class Conversa(models.Model):
     """
-    Espaco de mensagens, em tres formatos.
+    Espaco de mensagens, em quatro formatos.
 
-    A turma inteira, um grupo de trabalho ou uma conversa privada entre duas
-    pessoas. O tipo define quem entra, e o resto do comportamento e o mesmo,
-    o que evita triplicar mensagem, participante e controle de leitura.
+    A turma inteira, um grupo de trabalho, o canal da monitoria de uma
+    disciplina ou uma conversa privada entre duas pessoas. O tipo define quem
+    entra, e o resto do comportamento e o mesmo, o que evita quadruplicar
+    mensagem, participante e controle de leitura.
+
+    O canal de monitoria reune quem conduz uma disciplina especifica: os
+    professores e os monitores dela. E por disciplina, e nao por pessoa: o
+    monitor de banco de dados nao alcanca o canal de algoritmos, e o professor
+    de algoritmos nao le o que se discute na monitoria de banco de dados. O
+    recorte segue o vinculo, que e o mesmo criterio de todo o resto da
+    plataforma.
 
     O arquivamento no fim do semestre deixa a conversa somente leitura, sem
     apagar nada: o material continua acessivel a quem participou.
@@ -238,6 +246,7 @@ class Conversa(models.Model):
     TIPO_CHOICES = [
         ('disciplina', 'Turma da disciplina'),
         ('grupo', 'Grupo de trabalho'),
+        ('monitoria', 'Monitoria da disciplina'),
         ('privada', 'Conversa privada'),
     ]
 

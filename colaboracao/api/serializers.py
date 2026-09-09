@@ -152,12 +152,16 @@ class ConversaSerializer(serializers.ModelSerializer):
     total_participantes = serializers.SerializerMethodField()
     nao_lidas = serializers.SerializerMethodField()
     ultima_mensagem = serializers.SerializerMethodField()
+    # Derivado de arquivada_em. A interface precisa do valor pronto para
+    # decidir se mostra o campo de escrita.
+    somente_leitura = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Conversa
         fields = [
             'id', 'tipo', 'titulo', 'disciplina', 'grupo', 'semestre',
-            'arquivada_em', 'total_participantes', 'nao_lidas',
+            'arquivada_em', 'somente_leitura',
+            'total_participantes', 'nao_lidas',
             'ultima_mensagem', 'created_at',
         ]
         read_only_fields = fields

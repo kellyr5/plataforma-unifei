@@ -74,6 +74,13 @@ function dia(valor: string): string {
  */
 const PRAZO_EXCLUSAO = 10 * 60 * 1000
 
+/* O papel vem do vínculo com a disciplina e é exibido ao lado do nome. */
+const ROTULO_PAPEL: Record<string, string> = {
+  professor: 'professor',
+  monitor: 'monitoria',
+  aluno: 'aluno',
+}
+
 function Balao({ mensagem, minha, aoPedirAjuda, aoApagar }: {
   mensagem: Mensagem
   minha: boolean
@@ -229,8 +236,23 @@ export default function ConversaPage() {
   const [conversa, setConversa] = useState<Conversa | null>(null)
   const [mensagens, setMensagens] = useState<Mensagem[]>([])
   const [texto, setTexto] = useState('')
-  const [digitando, setDigitando] = useState('')
+  /* Quem está escrevendo, com o instante do último aviso.
+     Um único nome não bastava: em conversa de grupo mais de uma pessoa
+     escreve ao mesmo tempo, e o aviso anterior era substituído pelo seguinte,
+     de modo que só o último aparecia. */
+  const [digitantes, setDigitantes] = useState<Record<string, number>>({})
   const [conectado, setConectado] = useState(false)
+  const [conectados, setConectados] = useState(0)
+
+  /* Quem está na conversa. Carregado sob demanda: só interessa quando a
+     pessoa pergunta, e é a resposta para uma contagem inesperada. */
+  const [participantes, setParticipantes] = useState<{
+    id: string
+    nome: string
+    papel: string
+    sou_eu: boolean
+  }[]>([])
+  const [mostrarParticipantes, setMostrarParticipantes] = useState(false)
   const [carregando, setCarregando] = useState(true)
   const [pedindoAjuda, setPedindoAjuda] = useState<Mensagem | null>(null)
   const [descricaoAjuda, setDescricaoAjuda] = useState('')
@@ -304,9 +326,18 @@ export default function ConversaPage() {
           )
         }
 
+        /* Registra o instante do aviso. A remoção fica a cargo de um
+           temporizador único, mais adiante: agendar um por aviso criaria uma
+           agenda de temporizadores enquanto a pessoa escreve. */
         if (dados.tipo === 'digitando') {
-          setDigitando(dados.usuario)
-          window.setTimeout(() => setDigitando(''), 2500)
+          setDigitantes(anteriores => ({
+            ...anteriores,
+            [dados.usuario]: Date.now(),
+          }))
+        }
+
+        if (dados.tipo === 'conectado' || dados.tipo === 'presenca') {
+          setConectados(dados.conectados ?? 0)
         }
 
         if (dados.tipo === 'erro') toast.error(dados.detalhe)
@@ -332,6 +363,49 @@ export default function ConversaPage() {
       socketRef.current?.close()
     }
   }, [id])
+
+  /* Retira da lista quem parou de escrever.
+     O servidor avisa que alguém está digitando, mas não avisa que parou —
+     seria um segundo evento para um estado que expira sozinho. Três segundos
+     sem novo aviso significam que a pessoa parou, fechou a aba ou enviou. */
+  useEffect(() => {
+    if (Object.keys(digitantes).length === 0) return
+
+    const relogio = window.setInterval(() => {
+      const limite = Date.now() - 3000
+
+      setDigitantes(anteriores => {
+        const ativos = Object.fromEntries(
+          Object.entries(anteriores).filter(([, instante]) => instante > limite)
+        )
+
+        /* Devolve o objeto anterior quando nada mudou: um objeto novo a cada
+           segundo redesenharia o cabeçalho sem necessidade. */
+        return Object.keys(ativos).length === Object.keys(anteriores).length
+          ? anteriores
+          : ativos
+      })
+    }, 1000)
+
+    return () => window.clearInterval(relogio)
+  }, [digitantes])
+
+  /** Texto do aviso de digitação, conforme quantas pessoas escrevem. */
+  const avisoDigitacao = (() => {
+    const nomes = Object.keys(digitantes)
+
+    if (nomes.length === 0) return ''
+
+    /* Só o primeiro nome importa para quem lê. Listar quatro nomes ocuparia
+       a linha inteira do cabeçalho e mudaria a cada instante. */
+    const primeiro = nomes[0].split(' ')[0]
+
+    if (nomes.length === 1) return `${primeiro} está digitando...`
+    if (nomes.length === 2) {
+      return `${primeiro} e ${nomes[1].split(' ')[0]} estão digitando...`
+    }
+    return `${primeiro} e mais ${nomes.length - 1} estão digitando...`
+  })()
 
   function enviar(e: React.FormEvent) {
     e.preventDefault()
@@ -616,16 +690,99 @@ export default function ConversaPage() {
         </button>
 
         <div className="flex-1 min-w-0">
+          {/* O título é rótulo, não comando. Ele estava acumulando a ação de
+              abrir os participantes, e nada na aparência dizia isso — quem
+              quisesse a lista não teria como descobrir onde clicar. A ação
+              ficou no próprio texto que a descreve, logo abaixo. */}
           <div className="font-semibold truncate" style={{ fontSize: '15px', color: 'var(--text-primary)' }}>
             {conversa.titulo}
           </div>
+          {/* O aviso de digitação substitui a linha inteira enquanto dura:
+              é a informação mais volátil e a que a pessoa está esperando. */}
           <div style={{ fontSize: '11.5px', color: 'var(--text-tertiary)' }}>
-            {conversa.total_participantes}
-            {conversa.total_participantes === 1 ? ' participante' : ' participantes'}
-            {digitando ? ` · ${digitando} está digitando...` : (conectado ? '' : ' · reconectando...')}
+            {avisoDigitacao ? (
+              <span style={{ color: 'var(--accent-blue-text)' }}>
+                {avisoDigitacao}
+              </span>
+            ) : (
+              <>
+                {conversa.total_participantes}
+                {conversa.total_participantes === 1 ? ' participante' : ' participantes'}
+                {/* Só faz sentido anunciar presença quando há mais de uma
+                    pessoa: "1 online" é sempre quem está lendo. */}
+                {conectados > 1 ? ` · ${conectados} online agora` : ''}
+                {conectado ? '' : ' · reconectando...'}
+                {' · '}
+                <button
+                  onClick={() => {
+                    const abrindo = !mostrarParticipantes
+                    setMostrarParticipantes(abrindo)
+
+                    /* Recarrega a cada abertura, e não só na primeira: a
+                       composição muda quando alguém entra ou sai, e uma lista
+                       guardada mostraria o estado de quando foi vista. */
+                    if (abrindo) {
+                      api.get(`/colaboracao/conversas/${id}/participantes/`)
+                        .then(({ data }) => setParticipantes(data.participantes || []))
+                        .catch(() => toast.error('Não foi possível carregar os participantes.'))
+                    }
+                  }}
+                  aria-expanded={mostrarParticipantes}
+                  className="cursor-pointer"
+                  style={{
+                    background: 'none', border: 'none', padding: 0,
+                    fontSize: '11.5px', color: 'var(--accent-blue-text)',
+                    textDecoration: 'underline',
+                  }}
+                >
+                  {mostrarParticipantes ? 'ocultar participantes' : 'ver participantes'}
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Lista de participantes.
+          Saber com quem se fala é informação básica de qualquer conversa, e
+          antes só existia a contagem. Numa conversa de grupo o número basta,
+          porque a composição é conhecida; num canal que reúne professores e
+          monitores de uma disciplina, uma contagem inesperada não tinha como
+          ser investigada pela interface. */}
+      {mostrarParticipantes && (
+        <div
+          className="rounded-lg flex-shrink-0"
+          style={{
+            margin: '10px 0 0',
+            padding: '12px 14px',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border)',
+          }}
+        >
+          {participantes.length === 0 ? (
+            <p style={{ fontSize: '12.5px', color: 'var(--text-tertiary)' }}>
+              Carregando...
+            </p>
+          ) : (
+            <div className="flex flex-wrap" style={{ gap: '6px 14px' }}>
+              {participantes.map(pessoa => (
+                <span
+                  key={pessoa.id}
+                  style={{ fontSize: '12.5px', color: 'var(--text-secondary)' }}
+                >
+                  {pessoa.nome}
+                  {pessoa.sou_eu ? ' (você)' : ''}
+                  {pessoa.papel && (
+                    <span style={{ color: 'var(--text-tertiary)' }}>
+                      {' · '}{ROTULO_PAPEL[pessoa.papel] || pessoa.papel}
+                    </span>
+                  )}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Mensagens */}
       {/* A lista rola; o cabeçalho e o campo de escrita ficam fixos. O

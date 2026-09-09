@@ -637,6 +637,30 @@ class PermissaoDisciplinaViewSet(viewsets.ModelViewSet):
         disciplina_id = request.data.get('disciplina')
         papel = request.data.get('papel')
 
+        # Uma disciplina tem um monitor por vez.
+        #
+        # A monitoria e um encargo unico por turma, e nao um papel que varias
+        # pessoas acumulam: e uma vaga com bolsa ou com aproveitamento de
+        # horas, atribuida a uma pessoa por semestre. Sem esta verificacao, o
+        # canal da monitoria reunia todos os que ja passaram pelo papel, e a
+        # fila de pedidos de ajuda chegava a gente que nao atende mais.
+        if papel == 'monitor':
+            outro = PermissaoDisciplina.objects.filter(
+                disciplina_id=disciplina_id, papel='monitor', ativo=True,
+            ).exclude(usuario_id=usuario_id).select_related('usuario').first()
+
+            if outro is not None:
+                return Response(
+                    {
+                        'detail': (
+                            f'{outro.usuario.nome_completo} já é monitor desta '
+                            f'disciplina. Encerre a monitoria atual antes de '
+                            f'atribuir outra.'
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
         existente = PermissaoDisciplina.objects.filter(
             usuario_id=usuario_id, disciplina_id=disciplina_id,
         ).first()

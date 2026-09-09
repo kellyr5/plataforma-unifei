@@ -396,6 +396,73 @@ def sincronizar_participantes(grupo):
     return conversa
 
 
+@transaction.atomic
+def garantir_canal_de_monitoria(disciplina):
+    """
+    Cria ou atualiza o canal entre quem conduz a disciplina.
+
+    Reune professores e monitores daquela materia, e apenas daquela. Ate aqui,
+    o monitor que precisava alinhar uma correcao com o professor recorria a
+    canal externo, ou entrava na fila de pedidos de ajuda, que existe para
+    duvida de aluno e traz o recorte errado.
+
+    O canal so existe quando ha monitoria constituida: sem monitor, seria uma
+    conversa do professor consigo mesmo, e ela apareceria na lista dele sem
+    servir para nada.
+
+    A funcao e idempotente. Chamada a cada mudanca de vinculo, ela acerta a
+    lista de participantes sem duplicar a conversa.
+    """
+    vinculos = PermissaoDisciplina.objects.filter(
+        disciplina=disciplina,
+        ativo=True,
+        papel__in=['professor', 'monitor'],
+    )
+
+    conduzem = set(vinculos.values_list('usuario_id', flat=True))
+    ha_monitor = vinculos.filter(papel='monitor').exists()
+
+    conversa = Conversa.objects.filter(
+        tipo='monitoria', disciplina=disciplina,
+    ).first()
+
+    if not ha_monitor:
+        # Perdeu a monitoria: o canal para de aceitar mensagem, mas o
+        # historico permanece. Apagar eliminaria o registro de combinacoes que
+        # podem ter valido para a turma inteira. O arquivamento e o mecanismo
+        # que ja existe para deixar uma conversa em somente leitura.
+        if conversa is not None and conversa.arquivada_em is None:
+            conversa.arquivada_em = timezone.now()
+            conversa.save(update_fields=['arquivada_em'])
+        return conversa
+
+    if conversa is None:
+        conversa = Conversa.objects.create(
+            tipo='monitoria',
+            disciplina=disciplina,
+            titulo=f'Monitoria de {disciplina.codigo}',
+        )
+    elif conversa.arquivada_em is not None:
+        # A monitoria foi reconstituida: o canal volta a aceitar mensagem.
+        conversa.arquivada_em = None
+        conversa.save(update_fields=['arquivada_em'])
+
+    inscritos = set(conversa.participantes.values_list('usuario_id', flat=True))
+
+    ParticipanteConversa.objects.bulk_create([
+        ParticipanteConversa(conversa=conversa, usuario_id=usuario_id)
+        for usuario_id in conduzem - inscritos
+    ])
+
+    # Quem perdeu o vinculo sai do canal. O historico das mensagens dele
+    # permanece, porque apagar reescreveria a conversa dos demais.
+    conversa.participantes.filter(
+        usuario_id__in=inscritos - conduzem,
+    ).delete()
+
+    return conversa
+
+
 def pode_ver_conversa(usuario, conversa):
     """
     Quem enxerga a conversa.

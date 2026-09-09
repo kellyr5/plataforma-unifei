@@ -401,6 +401,16 @@ export default function TrabalhosPage() {
      recalcular a leitura de quem pergunta a cada cartão. */
   const [naoLidas, setNaoLidas] = useState<Record<string, number>>({})
 
+  /* Canais entre professor e monitores de uma disciplina. Só existem para quem
+     conduz a turma, e apenas nas matérias em que a pessoa atua. */
+  const [canaisMonitoria, setCanaisMonitoria] = useState<{
+    id: string
+    titulo: string
+    nao_lidas: number
+    total_participantes: number
+    somente_leitura: boolean
+  }[]>([])
+
   const disciplinas = user?.papeis_disciplina || []
 
   /**
@@ -441,6 +451,14 @@ export default function TrabalhosPage() {
           [conversa.id, conversa.nao_lidas]
         )
       ))
+
+      /* O canal da monitoria não pertence a nenhum trabalho, então não tem
+         onde aparecer entre os grupos. Fica em bloco próprio, no topo. */
+      setCanaisMonitoria(
+        registrosConversa.filter(
+          (conversa: { tipo: string }) => conversa.tipo === 'monitoria'
+        )
+      )
     } catch (err: any) {
       setTrabalhos([])
       setErro(
@@ -500,9 +518,22 @@ export default function TrabalhosPage() {
     disciplinas.map(vinculo => [vinculo.disciplina_id, vinculo.papel])
   )
 
+  /** Participa da condução da turma: professor ou monitor. */
   function conduz(disciplinaId: string): boolean {
     const papel = papelEm.get(disciplinaId)
     return papel === 'professor' || papel === 'monitor'
+  }
+
+  /**
+   * É o docente responsável pela disciplina.
+   *
+   * Separado de `conduz` porque as ações que desenham a avaliação — abrir os
+   * grupos, sortear a turma — não são da monitoria. O monitor acompanha o
+   * andamento e atende dúvidas, mas quem define como a turma se divide é
+   * quem responde pela disciplina.
+   */
+  function ministra(disciplinaId: string): boolean {
+    return papelEm.get(disciplinaId) === 'professor'
   }
 
   /**
@@ -517,15 +548,25 @@ export default function TrabalhosPage() {
     return papelEm.get(disciplinaId) === 'aluno'
   }
 
-  /* O botão de criar aparece para quem conduz ao menos uma disciplina. A
-     coordenação fica de fora de propósito: ela acompanha o curso, e quem
-     divide a turma é quem dá a aula. */
-  const podeCriar = disciplinas.some(
-    vinculo => vinculo.papel === 'professor' || vinculo.papel === 'monitor'
-  )
+  /* O botão de criar aparece somente para quem é professor de alguma
+     disciplina.
 
-  /* Usado só no texto de apoio, que fala do conjunto e não de uma disciplina. */
-  const ensina = podeCriar || !!user?.e_coordenacao
+     A coordenação fica de fora porque acompanha o curso sem dar aula. E o
+     monitor também: ele conduz a turma junto com o professor — modera,
+     atende pedido de ajuda, acompanha os grupos —, mas propor trabalho e
+     definir prazo são decisões de desenho da avaliação. O monitor costuma ser
+     aluno da própria turma, e criar a atividade pela qual os colegas serão
+     avaliados inverteria a relação que a monitoria pressupõe. O servidor
+     aplica a mesma regra; esconder o botão evita que ela seja descoberta por
+     uma mensagem de erro. */
+  const podeCriar = disciplinas.some(vinculo => vinculo.papel === 'professor')
+
+  /* Usado só no texto de apoio, que fala do conjunto e não de uma disciplina.
+     Aqui o monitor entra: ele participa da condução, ainda que não crie. */
+  const ensina =
+    disciplinas.some(
+      vinculo => vinculo.papel === 'professor' || vinculo.papel === 'monitor'
+    ) || !!user?.e_coordenacao
 
   const seletor = {
     padding: '8px 12px', fontSize: '13px', borderRadius: '8px',
@@ -592,6 +633,75 @@ export default function TrabalhosPage() {
         </div>
       )}
 
+      {/* Canais da monitoria.
+          Ficam acima dos trabalhos porque atendem a um público menor e mais
+          específico — quem conduz a turma —, e ali seriam encontrados na
+          primeira olhada em vez de procurados. Aparecem apenas para quem
+          participa de algum. */}
+      {canaisMonitoria.length > 0 && (
+        <div style={{ marginBottom: '20px' }}>
+          <h2
+            className="font-semibold"
+            style={{ fontSize: '14px', color: 'var(--text-primary)', marginBottom: '4px' }}
+          >
+            Monitoria
+          </h2>
+          <p style={{ fontSize: '12.5px', color: 'var(--text-tertiary)', marginBottom: '10px' }}>
+            Canal entre o professor e a monitoria de cada disciplina, separado
+            por matéria.
+          </p>
+
+          <div
+            className="grid"
+            style={{
+              gap: '10px',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+            }}
+          >
+            {canaisMonitoria.map(canal => (
+              <button
+                key={canal.id}
+                onClick={() => navigate(`/conversas/${canal.id}`)}
+                className="rounded-xl cursor-pointer text-left"
+                style={{
+                  padding: '14px 16px',
+                  background: 'var(--bg-card)',
+                  border: `1px solid ${canal.nao_lidas > 0 ? 'var(--accent-blue-border)' : 'var(--border)'}`,
+                }}
+              >
+                <div className="flex items-center justify-between" style={{ gap: '10px' }}>
+                  <span
+                    className="font-medium truncate"
+                    style={{ fontSize: '13.5px', color: 'var(--text-primary)' }}
+                  >
+                    {canal.titulo}
+                  </span>
+
+                  {canal.nao_lidas > 0 && (
+                    <span
+                      className="flex items-center justify-center flex-shrink-0"
+                      style={{
+                        minWidth: '20px', height: '20px', padding: '0 6px',
+                        borderRadius: '10px', background: AZUL,
+                        color: '#FFFFFF', fontSize: '11px', fontWeight: 600,
+                      }}
+                    >
+                      {canal.nao_lidas > 99 ? '99+' : canal.nao_lidas}
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ fontSize: '11.5px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
+                  {canal.total_participantes}
+                  {canal.total_participantes === 1 ? ' participante' : ' participantes'}
+                  {canal.somente_leitura ? ' · encerrado' : ''}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {carregando ? (
         <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)' }}>Carregando trabalhos...</p>
       ) : trabalhos.length === 0 && !erro ? (
@@ -644,8 +754,12 @@ export default function TrabalhosPage() {
                     </p>
                   </div>
 
-                  {conduz(trabalho.disciplina) && (
-                    <div className="flex items-center flex-shrink-0" style={{ gap: '8px' }}>
+                  {/* Abrir grupos e sortear a turma compõem a avaliação, como
+                      propor o trabalho: são do professor, não da monitoria. O
+                      monitor continua vendo os trabalhos e acompanhando os
+                      grupos, mas não define a composição deles. */}
+                  {ministra(trabalho.disciplina) && (
+                    <div className="flex items-center flex-shrink-0 flex-wrap" style={{ gap: '8px' }}>
                       {trabalho.total_grupos_criados === 0 && (
                         <Botao
                           rotulo="Abrir grupos"
